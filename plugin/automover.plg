@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.07.19.1"
+  version="2025.07.19.2"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/auto_mover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
@@ -16,9 +16,9 @@
 <CHANGES>
 <![CDATA[
 
-### 2025.07.19.1
+### 2025.07.19.2
 
-- Initial release
+-Initial release
 
 ### 2025.07.19
 
@@ -29,9 +29,9 @@ For older releases, see https://github.com/jcofer555/auto_mover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.19.1-noarch-1.txz">
-<URL>https://github.com/jcofer555/auto_mover/releases/download/2025.07.19.1/unraid-automover-2025.07.19.1-noarch-1.txz</URL>
-<SHA256>6a4ef8ea99c4a738d3cb56125b4a1103a6996b558a18d72a3cc6353c5b2c31e6</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.19.2-noarch-1.txz">
+<URL>https://github.com/jcofer555/auto_mover/releases/download/2025.07.19.2/unraid-automover-2025.07.19.2-noarch-1.txz</URL>
+<SHA256>a01fef6c063128ab550934b077ccf13572fc50c3eecf748a14dc615aea1ebd45</SHA256>
 </FILE>
 
 <!--
@@ -40,14 +40,15 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.19.2-noarch-1.txz
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.19.1')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.19.2')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.19.1"
+echo " Version: 2025.07.19.2"
 echo "----------------------------------------------------"
 echo ""
 ]]>
@@ -60,6 +61,7 @@ The 'remove' script.
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 <![CDATA[
+removepkg unraid-automover
 
 rm -rf /usr/local/emhttp/plugins/automover
 rm -rf /boot/config/plugins/automover
