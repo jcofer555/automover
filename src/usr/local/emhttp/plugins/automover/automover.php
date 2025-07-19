@@ -1,3 +1,10 @@
+Menu="Utilities"
+Type="xmenu"
+Title="Automover"
+Icon="zip.png"
+Tag="zip.png"
+Markdown="false"
+---
 <?php
 $config_path = "/boot/config/plugins/automover/settings.cfg";
 $trigger_log_path = "/boot/config/plugins/automover/last_triggered.log";
