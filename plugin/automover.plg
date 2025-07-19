@@ -1,0 +1,16 @@
+<PLUGIN name="diskwatch" author="Jonathan" version="1.0">
+  <category>Tools</category>
+  <min>6.12</min>
+  <pluginURL>https://yourpluginrepo.com/diskwatch.plg</pluginURL>
+
+  <file>diskwatch.php</file>
+  <file>diskwatch_monitor.py</file>
+  <file>diskwatch_monitor.sh</file>
+
+  <script>
+    cp diskwatch.php /usr/local/emhttp/plugins/diskwatch/
+    cp diskwatch_monitor.py /usr/local/bin/
+    cp diskwatch_monitor.sh /usr/local/bin/
+    chmod +x /usr/local/bin/diskwatch_monitor.sh
+  </script>
+</PLUGIN>
