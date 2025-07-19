@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.07.19"
+  version="2025.07.19.1"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/auto_mover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.07.19.1
+
+- Initial release
+
 ### 2025.07.19
 
 - Initial release
@@ -25,9 +29,9 @@ For older releases, see https://github.com/jcofer555/auto_mover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.19-noarch-1.txz">
-<URL>https://github.com/jcofer555/auto_mover/releases/download/2025.07.19/unraid-automover-2025.07.19-noarch-1.txz</URL>
-<SHA256>4ff89f8779b15d0e70a39ead9569accc582dd52329be3df9838ab85b9d534386</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.19.1-noarch-1.txz">
+<URL>https://github.com/jcofer555/auto_mover/releases/download/2025.07.19.1/unraid-automover-2025.07.19.1-noarch-1.txz</URL>
+<SHA256>6a4ef8ea99c4a738d3cb56125b4a1103a6996b558a18d72a3cc6353c5b2c31e6</SHA256>
 </FILE>
 
 <!--
@@ -38,12 +42,12 @@ The 'install' script.
 <![CDATA[
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.19')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.19.1')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.19"
+echo " Version: 2025.07.19.1"
 echo "----------------------------------------------------"
 echo ""
 ]]>
