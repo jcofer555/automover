@@ -2,6 +2,7 @@
 
 CONFIG="/boot/config/plugins/automover/settings.cfg"
 PIDFILE="/var/run/automover.pid"
+LAST_RUN_FILE="/var/run/automover_last_run.txt"
 
 # Trap cleanup on exit
 cleanup() {
@@ -31,7 +32,7 @@ source "$CONFIG"
 
 MOUNT_POINT="/mnt/${POOL_NAME}"
 
-echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL_SECS}s, DryRun=$DRY_RUN)"
+echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN)"
 
 while true; do
   # Wait if mover is running
@@ -53,6 +54,9 @@ while true; do
         else
           echo "🛠️ Starting mover..."
           mover start
+          
+          # Record the last run time only if mover started
+          date '+%Y-%m-%d %H:%M:%S' > "$LAST_RUN_FILE"
         fi
       else
         echo "✅ Usage below threshold — nothing to do"
