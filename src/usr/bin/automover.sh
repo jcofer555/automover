@@ -1,7 +1,5 @@
 #!/bin/bash
 
-exec >> /boot/config/plugins/automover/automover.log 2>&1
-
 CONFIG="/boot/config/plugins/automover/settings.cfg"
 PIDFILE="/var/run/automover.pid"
 LAST_RUN_FILE="/var/run/automover_last_run.txt"
