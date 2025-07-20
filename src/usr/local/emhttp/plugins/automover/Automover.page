@@ -3,146 +3,133 @@ Type="xmenu"
 Title="Automover"
 Icon="zip.png"
 Tag="zip.png"
-Markdown="false"
 ---
 <?php
-$config_path = "/boot/config/plugins/automover/settings.cfg";
-$trigger_log_path = "/boot/config/plugins/automover/last_triggered.log";
-$go_path = "/boot/config/go";
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-// Handle form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $config = [
-    'POOL_NAME'    => $_POST['POOL_NAME'],
-    'THRESHOLD'    => $_POST['THRESHOLD'],
-    'DRY_RUN'      => $_POST['DRY_RUN'] ?? 'no',
-    'LOOP_INTERVAL'=> $_POST['LOOP_INTERVAL'],
-    'AUTOSTART'    => $_POST['AUTOSTART'] ?? 'no',
+// Load settings
+$configPath = "/boot/config/plugins/automover/settings.cfg";
+$settings = @parse_ini_file($configPath) ?: [];
+
+// Set defaults
+$threshold = $settings['THRESHOLD'] ?? 80;
+$dryRun = $settings['DRY_RUN'] ?? 'no';
+$interval = $settings['INTERVAL'] ?? 60;
+$selectedDisk = $settings['POOL_NAME'] ?? 'cache';
+
+// Load disk list
+$diskData = @parse_ini_file("/var/local/emhttp/disks.ini", true) ?: [];
+$disks = [];
+
+foreach ($diskData as $disk) {
+  if (!isset($disk['name'])) continue;
+  $name = $disk['name'];
+  if (in_array($name, ['parity', 'parity2', 'flash']) || strpos($name, 'disk') !== false) continue;
+  $disks[] = $name;
+}
+
+// Save settings
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
+  $newSettings = [
+    'POOL_NAME' => $_POST['POOL_NAME'] ?? '',
+    'THRESHOLD' => $_POST['THRESHOLD'] ?? '',
+    'DRY_RUN' => $_POST['DRY_RUN'] ?? 'no',
+    'INTERVAL' => $_POST['INTERVAL'] ?? 60,
   ];
-  file_put_contents($config_path, implode("\n", array_map(fn($k) => "$k={$config[$k]}", array_keys($config))));
+  file_put_contents($configPath, http_build_query($newSettings, '', PHP_EOL));
+  echo "<div style='color: green;'>✅ Settings saved!</div>";
+  $threshold = $newSettings['THRESHOLD'];
+  $dryRun = $newSettings['DRY_RUN'];
+  $interval = $newSettings['INTERVAL'];
+  $selectedDisk = $newSettings['POOL_NAME'];
+}
 
-  $start_cmd = "nohup /usr/bin/automover_monitor.sh >/dev/null 2>&1 &";
-  $go_contents = file_exists($go_path) ? file_get_contents($go_path) : '';
+// Handle start/stop
+$pidFile = "/var/run/automover.pid";
 
-  if ($config['AUTOSTART'] === 'yes' && strpos($go_contents, $start_cmd) === false) {
-    file_put_contents($go_path, trim($go_contents) . "\n$start_cmd\n");
-  } elseif ($config['AUTOSTART'] === 'no' && strpos($go_contents, $start_cmd) !== false) {
-    file_put_contents($go_path, str_replace($start_cmd, '', $go_contents));
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if (isset($_POST['start'])) {
+    exec("/usr/bin/automover.sh >/dev/null 2>&1 &");
+    echo "<div style='color: green;'>▶️ Automover started</div>";
   }
-
-  header("Location: " . $_SERVER['REQUEST_URI'] . "?saved=1");
-  exit;
-}
-
-// Load config
-$config = file_exists($config_path) ? parse_ini_file($config_path) : [];
-$pool       = $config['POOL_NAME'] ?? 'cache';
-$threshold  = $config['THRESHOLD'] ?? 90;
-$dry_run    = $config['DRY_RUN'] ?? 'no';
-$interval   = $config['LOOP_INTERVAL'] ?? 300;
-$autostart  = $config['AUTOSTART'] ?? 'no';
-$last_run   = file_exists($trigger_log_path) ? trim(file_get_contents($trigger_log_path)) : '—';
-
-// Get usage
-$usage = 0;
-$mount = "/mnt/{$pool}";
-if (is_dir($mount)) {
-  $raw = shell_exec("df -h --si \"$mount\" | awk 'NR==2 {print \$5}' | sed 's/%//'");
-  $usage = is_numeric(trim($raw)) ? intval(trim($raw)) : 0;
-}
-
-// Parse pools
-$pools = [];
-$ini = parse_ini_file("/var/local/emhttp/disks.ini", true);
-foreach ($ini as $d => $info) {
-  $label = strtolower($info['name'] ?? '');
-  if (in_array($label, ['parity', 'parity2', 'flash'])) continue;
-  if (strpos($label, 'disk') === 0) continue;
-  $pools[] = $label;
-}
-
-// Monitor status
-$pidfile = "/var/run/automover_monitor.pid";
-$status = "🔴 <span style='color:red;'>Stopped</span>";
-if (file_exists($pidfile)) {
-  $pid = trim(file_get_contents($pidfile));
-  if (ctype_digit($pid) && posix_kill((int)$pid, 0)) {
-    $status = "🟢 <span style='color:green;'>Running</span>";
+  if (isset($_POST['stop'])) {
+    if (file_exists($pidFile)) {
+      $pid = trim(file_get_contents($pidFile));
+      if (is_numeric($pid)) {
+        exec("kill $pid");
+        echo "<div style='color: red;'>⛔ Automover stopped</div>";
+        unlink($pidFile);
+      }
+    } else {
+      echo "<div style='color: gray;'>ℹ️ No running process</div>";
+    }
   }
 }
 
-// Action buttons
-if (isset($_GET['action'])) {
-  $cmd = match ($_GET['action']) {
-    'start' => "nohup /usr/bin/automover_monitor.sh >/dev/null 2>&1 &",
-    'stop'  => "pkill -f automover_monitor.sh",
-    'restart' => "pkill -f automover_monitor.sh && nohup /usr/bin/automover_monitor.sh >/dev/null 2>&1 &",
-    default => ''
-  };
-  if ($cmd) exec($cmd);
-  header("Location: " . $_SERVER['REQUEST_URI']);
-  exit;
+// Service status for initial load (will be live updated)
+$serviceStatus = "⚪ Not Running";
+if (file_exists($pidFile)) {
+  $pid = trim(file_get_contents($pidFile));
+  if (is_numeric($pid) && file_exists("/proc/$pid")) {
+    $serviceStatus = "🟢 Running";
+  } else {
+    $serviceStatus = "⚠️ Stale PID";
+  }
 }
 ?>
 
-<h2>🛠️ Automover Plugin Settings</h2>
-  <p><strong>🧠 Monitor Status:</strong> <?= $status ?></p>
+<h2>Automover Plugin</h2>
 
-  <?php if (isset($_GET['saved'])): ?>
-    <div style="color:green;">✅ Settings saved successfully.</div>
-  <?php endif ?>
+<form method="POST">
+  <label><strong>Disk / Pool:</strong></label><br>
+  <select name="POOL_NAME">
+    <?php foreach ($disks as $disk):
+      $mountPoint = "/mnt/{$disk}";
+      $usedPercent = trim(shell_exec("df --output=pcent $mountPoint | tail -1 | tr -d ' %\n'"));
+      if ($usedPercent === '') $usedPercent = 'N/A';
+    ?>
+      <option value="<?=htmlspecialchars($disk)?>" <?= $disk === $selectedDisk ? 'selected' : '' ?>>
+        <?=htmlspecialchars($disk)?> [<?=htmlspecialchars($usedPercent)?>%]
+      </option>
+    <?php endforeach; ?>
+  </select><br><br>
 
-  <form method="POST">
-    <div class="form-row">
-      <label><strong>📁 Select Pool:</strong></label><br>
-      <select name="POOL_NAME">
-        <?php foreach ($pools as $opt): ?>
-          <option value="<?= $opt ?>" <?= $opt === $pool ? 'selected' : '' ?>><?= ucfirst($opt) ?></option>
-        <?php endforeach ?>
-      </select>
-    </div>
+  <label><strong>Threshold (%)</strong></label><br>
+  <input type="number" name="THRESHOLD" value="<?=htmlspecialchars($threshold)?>" min="1" max="100"><br><br>
 
-    <div class="form-row">
-      <label><strong>📊 Threshold (%):</strong></label><br>
-      <input type="number" name="THRESHOLD" value="<?= $threshold ?>" min="1" max="100">
-    </div>
+  <label><strong>Dry Run:</strong></label><br>
+  <select name="DRY_RUN">
+    <option value="no" <?= $dryRun === 'no' ? 'selected' : '' ?>>No</option>
+    <option value="yes" <?= $dryRun === 'yes' ? 'selected' : '' ?>>Yes</option>
+  </select><br><br>
 
-    <div class="form-row">
-      <label><strong>🧪 Dry Run Mode:</strong></label><br>
-      <select name="DRY_RUN">
-        <option value="yes" <?= $dry_run === 'yes' ? 'selected' : '' ?>>Yes</option>
-        <option value="no" <?= $dry_run === 'no' ? 'selected' : '' ?>>No</option>
-      </select>
-    </div>
+  <label><strong>Interval (seconds):</strong></label><br>
+  <input type="number" name="INTERVAL" value="<?=htmlspecialchars($interval)?>" min="10"><br><br>
 
-    <div class="form-row">
-      <label><strong>⏱️ Check Interval (seconds):</strong></label><br>
-      <input type="number" name="LOOP_INTERVAL" value="<?= $interval ?>" min="10">
-    </div>
+  <button type="submit" name="save">💾 Save Settings</button>
+  <button type="submit" name="start">▶️ Start</button>
+  <button type="submit" name="stop">⛔ Stop</button>
+</form>
 
-    <div class="form-row">
-      <label><input type="checkbox" name="AUTOSTART" value="yes" <?= $autostart === 'yes' ? 'checked' : '' ?>>
-        Enable auto-start on system boot</label>
-    </div>
+<hr>
+<p><strong>Status:</strong> <span id="statusText"><?= $serviceStatus ?></span></p>
 
-    <input type="submit" value="💾 Save Settings">
-  </form>
+<script>
+function updateStatus() {
+    fetch('/plugins/automover/helpers/status.php')
+        .then(response => response.text())
+        .then(status => {
+            document.getElementById('statusText').textContent = status;
+        })
+        .catch(err => {
+            console.error('Error fetching status:', err);
+        });
+}
 
-  <hr>
-  <h3>📈 Usage for <code><?= ucfirst($pool) ?></code></h3>
-  <?php
-    $color = ($usage < $threshold - 10) ? 'low' : (($usage <= $threshold) ? 'mid' : 'high');
-  ?>
-  <div class="usage-bar">
-    <div class="usage-fill <?= $color ?>" style="width:<?= $usage ?>%">
-      <?= $usage ?>%
-    </div>
-  </div>
-  <p style="margin-top:6px;">🕒 Last Triggered: <strong><?= $last_run ?></strong></p>
+// Initial call to show status immediately
+updateStatus();
 
-  <h3>🚀 Script Control</h3>
-  <form method="GET">
-    <button name="action" value="start">▶️ Start</button>
-    <button name="action" value="stop">⏹️ Stop</button>
-    <button name="action" value="restart">🔄 Restart</button>
-  </form>
+// Update status every 5 seconds
+setInterval(updateStatus, 5000);
+</script>
