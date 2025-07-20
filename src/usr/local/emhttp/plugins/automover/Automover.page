@@ -22,6 +22,7 @@ $threshold = $settings['THRESHOLD'] ?? 80;
 $dryRun = $settings['DRY_RUN'] ?? 'no';
 $interval = $settings['INTERVAL'] ?? 60;
 $selectedDisk = $settings['POOL_NAME'] ?? 'cache';
+$autostartEnabled = ($settings['AUTOSTART'] ?? 'no') === 'yes';
 
 // Load disk list
 $diskData = @parse_ini_file("/var/local/emhttp/disks.ini", true) ?: [];
@@ -52,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'THRESHOLD' => $_POST['THRESHOLD'] ?? '',
             'DRY_RUN' => $_POST['DRY_RUN'] ?? 'no',
             'INTERVAL' => $_POST['INTERVAL'] ?? 60,
+	    'AUTOSTART' => isset($_POST['AUTOSTART']) ? 'yes' : 'no',
         ];
         file_put_contents($configPath, http_build_query($newSettings, '', PHP_EOL));
         $threshold = $newSettings['THRESHOLD'];
