@@ -41,6 +41,7 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN"
 
 while true; do
+{
   # Update last run timestamp
   date '+%Y-%m-%d %H:%M:%S' > "$LAST_RUN_FILE"
 
@@ -53,7 +54,7 @@ while true; do
     if [ -z "$USED" ]; then
       echo "❌ Could not retrieve usage for $MOUNT_POINT"
     else
-      echo "📊 $POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)"
+      echo "📊 $POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%) at $(date '+%Y-%m-%d %H:%M:%S')"
 
       if [ "$USED" -gt "$THRESHOLD" ]; then
         echo "⚠️ Usage exceeds threshold!"
@@ -70,5 +71,6 @@ while true; do
     fi
   fi
 
+} >> "/boot/config/plugins/automover/automover.log" 2>&1
   sleep "$INTERVAL"
 done
