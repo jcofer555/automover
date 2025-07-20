@@ -2,7 +2,7 @@
 
 CONFIG="/boot/config/plugins/automover/settings.cfg"
 PIDFILE="/var/run/automover.pid"
-LAST_RUN_FILE="/var/run/automover_last_run.txt"
+LAST_RUN_FILE="/boot/config/plugins/automover/automover_last_run.txt"
 
 # Trap cleanup on exit
 cleanup() {
