@@ -144,6 +144,29 @@ function updateStatus() {
 updateStatus();
 setInterval(updateStatus, 5000);
 
+function updatePoolUsage() {
+    fetch('/plugins/automover/helpers/pool_usage.php')
+        .then(res => res.json())
+        .then(data => {
+            const select = document.querySelector('select[name="POOL_NAME"]');
+            if (!select) return;
+
+            [...select.options].forEach(opt => {
+                const disk = opt.value;
+                if (data[disk]) {
+                    opt.textContent = `${disk} [${data[disk]}%]`;
+                }
+            });
+        })
+        .catch(err => console.error("Failed to update pool usage:", err));
+}
+
+// Initial fetch
+updatePoolUsage();
+
+// Refresh every 10 seconds
+setInterval(updatePoolUsage, 10000);
+
 function updateLastRun() {
     fetch('/plugins/automover/helpers/last_run.php')
         .then(res => res.text())
