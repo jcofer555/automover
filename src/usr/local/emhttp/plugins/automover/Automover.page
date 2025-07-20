@@ -10,9 +10,6 @@ Tag="icon.png"
 $configPath = "/boot/config/plugins/automover/settings.cfg";
 $pidFile = "/var/run/automover.pid";
 $lastRunFile = "/boot/config/plugins/automover/automover_last_run.txt";
-$goFile = "/boot/config/go";
-$autostartComment = "# Start Automover on boot";
-$autostartLine = "/usr/bin/automover.sh >/dev/null 2>&1 &";
 
 // Load settings
 $settings = @parse_ini_file($configPath) ?: [];
@@ -22,7 +19,6 @@ $threshold = $settings['THRESHOLD'] ?? 80;
 $dryRun = $settings['DRY_RUN'] ?? 'no';
 $interval = $settings['INTERVAL'] ?? 60;
 $selectedDisk = $settings['POOL_NAME'] ?? 'cache';
-$autostartEnabled = ($settings['AUTOSTART'] ?? 'no') === 'yes';
 
 // Load disk list
 $diskData = @parse_ini_file("/var/local/emhttp/disks.ini", true) ?: [];
@@ -40,10 +36,6 @@ if (file_exists($lastRunFile)) {
     $lastRun = trim(file_get_contents($lastRunFile));
 }
 
-// Check autostart status
-$goContents = file_exists($goFile) ? file($goFile, FILE_IGNORE_NEW_LINES) : [];
-$autostartEnabled = in_array($autostartLine, $goContents);
-
 // Save settings
 $message = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -53,27 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'THRESHOLD' => $_POST['THRESHOLD'] ?? '',
             'DRY_RUN' => $_POST['DRY_RUN'] ?? 'no',
             'INTERVAL' => $_POST['INTERVAL'] ?? 60,
-	    'AUTOSTART' => isset($_POST['AUTOSTART']) ? 'yes' : 'no',
         ];
         file_put_contents($configPath, http_build_query($newSettings, '', PHP_EOL));
         $threshold = $newSettings['THRESHOLD'];
         $dryRun = $newSettings['DRY_RUN'];
         $interval = $newSettings['INTERVAL'];
         $selectedDisk = $newSettings['POOL_NAME'];
-		
-		// Handle autostart checkbox
-        $enableAutostart = isset($_POST['AUTOSTART']);
-        if ($enableAutostart && !$autostartEnabled) {
-            file_put_contents($goFile, PHP_EOL . $autostartComment . PHP_EOL . $autostartLine . PHP_EOL, FILE_APPEND);
-            $autostartEnabled = true;
-        } elseif (!$enableAutostart && $autostartEnabled) {
-            $goContents = array_filter($goContents, function ($line) use ($autostartLine, $autostartComment) {
-                return trim($line) !== $autostartLine && trim($line) !== $autostartComment;
-            });
-            file_put_contents($goFile, implode(PHP_EOL, $goContents) . PHP_EOL);
-            $autostartEnabled = false;
-        }
-		
         $message = "<div id='messageBox'>✅ Settings saved!</div>";
     }
     if (isset($_POST['start'])) {
@@ -135,10 +112,6 @@ if (file_exists($pidFile)) {
 
     <label><strong>Interval (seconds):</strong></label><br>
     <input type="number" name="INTERVAL" value="<?=htmlspecialchars($interval)?>" min="10"><br><br>
-	
-	<label>
-		<input type="checkbox" name="AUTOSTART" <?= $autostartEnabled ? 'checked' : '' ?>> Start Automover on boot
-    </label><br><br>
 
     <button type="submit" name="save">💾 Save Settings</button>
     <button type="submit" name="start">▶️ Start</button>
