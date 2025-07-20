@@ -38,7 +38,7 @@ fi
 
 MOUNT_POINT="/mnt/${POOL_NAME}"
 
-echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN, Autostart=$AUTOSTART)"
+echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN"
 
 while true; do
   # Update last run timestamp
