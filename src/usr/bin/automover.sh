@@ -2,7 +2,7 @@
 
 CONFIG="/boot/config/plugins/automover/settings.cfg"
 PIDFILE="/var/run/automover.pid"
-LAST_RUN_FILE="/boot/config/plugins/automover/automover_last_run.txt"
+LAST_RUN_FILE="/var/run/automover_last_run.txt"
 
 # Trap cleanup on exit
 cleanup() {
@@ -28,19 +28,28 @@ fi
 echo $$ > "$PIDFILE"
 
 # Load settings
-source "$CONFIG"
+if [ -f "$CONFIG" ]; then
+  source "$CONFIG"
+else
+  echo "❌ Config file not found: $CONFIG"
+  rm -f "$PIDFILE"
+  exit 1
+fi
 
 MOUNT_POINT="/mnt/${POOL_NAME}"
 
-echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN)"
+echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN, Autostart=$AUTOSTART)"
 
 while true; do
-  # Wait if mover is running
+  # Update last run timestamp
+  date '+%Y-%m-%d %H:%M:%S' > "$LAST_RUN_FILE"
+
+  # Wait if mover is already running
   if pgrep -x mover &>/dev/null; then
     echo "⏳ Mover already running — skipping this check"
   else
     USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
-    
+
     if [ -z "$USED" ]; then
       echo "❌ Could not retrieve usage for $MOUNT_POINT"
     else
@@ -54,9 +63,6 @@ while true; do
         else
           echo "🛠️ Starting mover..."
           mover start
-          
-          # Record the last run time only if mover started
-          date '+%Y-%m-%d %H:%M:%S' > "$LAST_RUN_FILE"
         fi
       else
         echo "✅ Usage below threshold — nothing to do"
