@@ -12,7 +12,7 @@ $pidFile = "/var/run/automover.pid";
 $lastRunFile = "/boot/config/plugins/automover/automover_last_run.txt";
 $goFile = "/boot/config/go";
 $autostartComment = "# Start Automover on boot";
-$autostartLine = "/usr/bin/automover.sh &";
+$autostartLine = "/usr/bin/automover.sh >/dev/null 2>&1 &";
 
 // Load settings
 $settings = @parse_ini_file($configPath) ?: [];
