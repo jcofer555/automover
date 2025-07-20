@@ -5,13 +5,14 @@ Icon="zip.png"
 Tag="zip.png"
 ---
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 
 // Paths
 $configPath = "/boot/config/plugins/automover/settings.cfg";
 $pidFile = "/var/run/automover.pid";
 $lastRunFile = "/boot/config/plugins/automover/automover_last_run.txt";
+$goFile = "/boot/config/go";
+$autostartComment = "# Start Automover on boot";
+$autostartLine = "/boot/config/plugins/automover/automover.sh &";
 
 // Load settings
 $settings = @parse_ini_file($configPath) ?: [];
@@ -38,6 +39,10 @@ if (file_exists($lastRunFile)) {
     $lastRun = trim(file_get_contents($lastRunFile));
 }
 
+// Check autostart status
+$goContents = file_exists($goFile) ? file($goFile, FILE_IGNORE_NEW_LINES) : [];
+$autostartEnabled = in_array($autostartLine, $goContents);
+
 // Save settings
 $message = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -53,11 +58,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dryRun = $newSettings['DRY_RUN'];
         $interval = $newSettings['INTERVAL'];
         $selectedDisk = $newSettings['POOL_NAME'];
-        $message = "<div style='color: green;'>✅ Settings saved!</div>";
+		
+		// Handle autostart checkbox
+        $enableAutostart = isset($_POST['AUTOSTART']);
+        if ($enableAutostart && !$autostartEnabled) {
+            file_put_contents($goFile, PHP_EOL . $autostartComment . PHP_EOL . $autostartLine . PHP_EOL, FILE_APPEND);
+            $autostartEnabled = true;
+        } elseif (!$enableAutostart && $autostartEnabled) {
+            $goContents = array_filter($goContents, function ($line) use ($autostartLine, $autostartComment) {
+                return trim($line) !== $autostartLine && trim($line) !== $autostartComment;
+            });
+            file_put_contents($goFile, implode(PHP_EOL, $goContents) . PHP_EOL);
+            $autostartEnabled = false;
+        }
+		
+        $message = "<div id='messageBox'>✅ Settings saved!</div>";
     }
     if (isset($_POST['start'])) {
         exec("/usr/bin/automover.sh >/dev/null 2>&1 &");
-        $message = "<div style='color: green;'>▶️ Automover started</div>";
+        $message = "<div id='messageBox'>▶️ Automover started</div>";
     }
     if (isset($_POST['stop'])) {
         if (file_exists($pidFile)) {
@@ -65,10 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (is_numeric($pid)) {
                 exec("kill $pid");
                 unlink($pidFile);
-                $message = "<div style='color: red;'>⛔ Automover stopped</div>";
+                $message = "<div id='messageBox'>⛔ Automover stopped</div>";
             }
         } else {
-            $message = "<div style='color: gray;'>ℹ️ No running process</div>";
+            $message = "<div id='messageBox'>ℹ️ No running process</div>";
         }
     }
 }
@@ -90,7 +109,7 @@ if (file_exists($pidFile)) {
 <?= $message ?>
 
 <form method="POST">
-    <label><strong>Disk / Pool:</strong></label><br>
+    <label><strong>Pool:</strong></label><br>
     <select name="POOL_NAME">
         <?php foreach ($disks as $disk):
             $mountPoint = "/mnt/{$disk}";
@@ -114,6 +133,10 @@ if (file_exists($pidFile)) {
 
     <label><strong>Interval (seconds):</strong></label><br>
     <input type="number" name="INTERVAL" value="<?=htmlspecialchars($interval)?>" min="10"><br><br>
+	
+	<label>
+		<input type="checkbox" name="AUTOSTART" <?= $autostartEnabled ? 'checked' : '' ?>> Start Automover on boot
+    </label><br><br>
 
     <button type="submit" name="save">💾 Save Settings</button>
     <button type="submit" name="start">▶️ Start</button>
@@ -124,19 +147,49 @@ if (file_exists($pidFile)) {
 <p><strong>Status:</strong> <span id="statusText"><?= $serviceStatus ?></span></p>
 <p><strong>Last Mover Run:</strong> <span id="lastRunText"><?= htmlspecialchars($lastRun) ?></span></p>
 
+<style>
+#messageBox {
+	font-size: 14px;
+    padding: 10px;
+    margin-top: 10px;
+    transition: opacity 0.5s ease;
+}
+</style>
+
 <script>
 function updateStatus() {
-    fetch('/boot/config/plugins/automover/status.php')
+    fetch('/plugins/automover/helpers/status.php')
         .then(res => res.text())
         .then(text => {
             document.getElementById('statusText').textContent = text;
         })
         .catch(err => console.error('Error fetching status:', err));
 }
-
 // Initial update
 updateStatus();
-
-// Repeat every 5 seconds
 setInterval(updateStatus, 5000);
+
+function updateLastRun() {
+    fetch('/plugins/automover/helpers/last_run.php')
+        .then(res => res.text())
+        .then(text => {
+            document.getElementById('lastRunText').textContent = text;
+        })
+        .catch(err => console.error('Error fetching last run:', err));
+}
+// Initial update
+updateLastRun();
+// Repeat every 10 seconds
+setInterval(updateLastRun, 10000);
+
+// Auto-hide message
+document.addEventListener('DOMContentLoaded', () => {
+    const msg = document.getElementById('messageBox');
+    if (msg && msg.textContent.trim() !== '') {
+        setTimeout(() => {
+            msg.style.opacity = '0';
+            setTimeout(() => msg.style.display = 'none', 500);
+        }, 3000);
+    }
+});
 </script>
