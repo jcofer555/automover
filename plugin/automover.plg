@@ -4,9 +4,9 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.07.19.2"
+  version="2025.07.19.3"
   launch="Settings/Automover"
-  pluginURL="https://raw.githubusercontent.com/jcofer555/auto_mover/main/plugin/automover.plg"
+  pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
   min="7.0.0"
   
@@ -16,22 +16,22 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.07.19.3
+
+- Initial release
+
 ### 2025.07.19.2
 
 -Initial release
 
-### 2025.07.19
 
-- Initial release
-
-
-For older releases, see https://github.com/jcofer555/auto_mover/releases
+For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.19.2-noarch-1.txz">
-<URL>https://github.com/jcofer555/auto_mover/releases/download/2025.07.19.2/unraid-automover-2025.07.19.2-noarch-1.txz</URL>
-<SHA256>a01fef6c063128ab550934b077ccf13572fc50c3eecf748a14dc615aea1ebd45</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.19.3-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.07.19.3/unraid-automover-2025.07.19.3-noarch-1.txz</URL>
+<SHA256>b0c228c69522323375b35d8d987f8eb8fee27e60ea855c90668881522426de3a</SHA256>
 </FILE>
 
 <!--
@@ -40,15 +40,15 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.19.2-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.19.3-noarch-1.txz
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.19.2')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.19.3')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.19.2"
+echo " Version: 2025.07.19.3"
 echo "----------------------------------------------------"
 echo ""
 ]]>
