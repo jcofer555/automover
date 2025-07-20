@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.07.20.5"
+  version="2025.07.20.6"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.07.20.6
+
+- Added usage refresh to the webui
+
 ### 2025.07.20.5
 
 - Removed autostart
@@ -24,19 +28,14 @@
 
 - Fix autostart
 
-### 2025.07.20.3
-
-- Final fix for autostart
-- Added log output for script
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.20.5-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.07.20.5/unraid-automover-2025.07.20.5-noarch-1.txz</URL>
-<SHA256>f28a1b6e1ee1d00b4c2a2a08c45e056a6a737d62279b2ed1d5c0a766c33c6808</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.20.6-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.07.20.6/unraid-automover-2025.07.20.6-noarch-1.txz</URL>
+<SHA256>45e0f44fff74e325e5f6366653e750a9d30b95ebbfe45fa0d1d3305d35a18b32</SHA256>
 </FILE>
 
 <!--
@@ -45,15 +44,15 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.20.5-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.20.6-noarch-1.txz
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.20.5')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.20.6')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.20.5"
+echo " Version: 2025.07.20.6"
 echo "----------------------------------------------------"
 echo ""
 ]]>
