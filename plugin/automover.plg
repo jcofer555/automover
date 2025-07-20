@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.07.20.4"
+  version="2025.07.20.5"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.07.20.5
+
+- Removed autostart
+
 ### 2025.07.20.4
 
 - Fix autostart
@@ -25,19 +29,14 @@
 - Final fix for autostart
 - Added log output for script
 
-### 2025.07.20.2
-
-- Added readme and slack-desc
-- Fixed autostart
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.20.4-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.07.20.4/unraid-automover-2025.07.20.4-noarch-1.txz</URL>
-<SHA256>813b049c01ad3693262a087417b175590b4f9ca2801f7d6d3ec2669b6a2e8e0e</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.20.5-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.07.20.5/unraid-automover-2025.07.20.5-noarch-1.txz</URL>
+<SHA256>f28a1b6e1ee1d00b4c2a2a08c45e056a6a737d62279b2ed1d5c0a766c33c6808</SHA256>
 </FILE>
 
 <!--
@@ -46,15 +45,15 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.20.4-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.20.5-noarch-1.txz
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.20.4')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.20.5')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.20.4"
+echo " Version: 2025.07.20.5"
 echo "----------------------------------------------------"
 echo ""
 ]]>
