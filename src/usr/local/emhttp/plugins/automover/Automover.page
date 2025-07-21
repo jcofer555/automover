@@ -9,7 +9,7 @@ Tag="icon.png"
 // Paths
 $configPath = "/boot/config/plugins/automover/settings.cfg";
 $pidFile = "/var/run/automover.pid";
-$lastRunFile = "/boot/config/plugins/automover/automover_last_run.txt";
+$lastRunFile = "/var/log/automover_last_run.log";
 
 // Load settings
 $settings = @parse_ini_file($configPath) ?: [];
