@@ -45,6 +45,27 @@ while true; do
   # Update last run timestamp
   date '+%Y-%m-%d %H:%M:%S' > "$LAST_RUN_FILE"
 
+# Define parity completion handler
+check_parity_done() {
+    while grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; do
+        sleep 10
+    done
+
+    echo "✅ Parity done. Restarting Automover..." >> /var/log/automover_run_details.log
+
+    rm -f /var/run/automover.pid
+
+    # Relaunch the script (adjust the path if needed)
+    /usr/bin/automover.sh &
+}
+
+# Main logic
+if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; then
+    echo "⚠️ Parity check in progress. Delaying Automover..." >> /var/log/automover_run_details.log
+    check_parity_done &
+    exit 0
+fi
+
   # Wait if mover is already running
   if pgrep -x mover &>/dev/null; then
     echo "⏳ Mover already running — skipping this check"
