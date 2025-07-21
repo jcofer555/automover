@@ -1,5 +1,5 @@
 <?php
-$lastRunFile = "/boot/config/plugins/automover/automover_last_run.txt";
+$lastRunFile = "/var/log/automover_last_run.log";
 if (file_exists($lastRunFile)) {
     echo trim(file_get_contents($lastRunFile));
 } else {
