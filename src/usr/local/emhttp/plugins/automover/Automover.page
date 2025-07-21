@@ -26,7 +26,6 @@ $defaultSettings = [
     'THRESHOLD' => 80,
     'DRY_RUN' => 'no',
     'INTERVAL' => 60,
-    'DISALLOW_DURING_PARITY' => 'yes',
 ];
 // Create config file with defaults if it doesn't exist
 if (!file_exists($configPath)) {
