@@ -20,6 +20,14 @@ $dryRun = $settings['DRY_RUN'] ?? 'no';
 $interval = $settings['INTERVAL'] ?? 60;
 $selectedDisk = $settings['POOL_NAME'] ?? 'cache';
 
+// Create default settings.cfg
+$defaultSettings = [
+    'POOL_NAME' => 'cache',
+    'THRESHOLD' => 80,
+    'DRY_RUN' => 'no',
+    'INTERVAL' => 60,
+    'DISALLOW_DURING_PARITY' => 'yes',
+];
 // Create config file with defaults if it doesn't exist
 if (!file_exists($configPath)) {
     $lines = [];
