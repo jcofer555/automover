@@ -2,7 +2,7 @@
 
 CONFIG="/boot/config/plugins/automover/settings.cfg"
 PIDFILE="/var/run/automover.pid"
-LAST_RUN_FILE="/boot/config/plugins/automover/automover_last_run.txt"
+LAST_RUN_FILE="/var/log/automover_last_run.log"
 
 # Trap cleanup on exit
 cleanup() {
@@ -71,6 +71,6 @@ while true; do
     fi
   fi
 
-} >> "/boot/config/plugins/automover/automover.log" 2>&1
+} >> "/var/log/automover_run_details.log" 2>&1
   sleep "$INTERVAL"
 done
