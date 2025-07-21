@@ -20,6 +20,15 @@ $dryRun = $settings['DRY_RUN'] ?? 'no';
 $interval = $settings['INTERVAL'] ?? 60;
 $selectedDisk = $settings['POOL_NAME'] ?? 'cache';
 
+// Create config file with defaults if it doesn't exist
+if (!file_exists($configPath)) {
+    $lines = [];
+    foreach ($defaultSettings as $key => $value) {
+        $lines[] = "$key=$value";
+    }
+    file_put_contents($configPath, implode(PHP_EOL, $lines));
+}
+
 // Load disk list
 $diskData = @parse_ini_file("/var/local/emhttp/disks.ini", true) ?: [];
 $disks = [];
