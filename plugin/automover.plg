@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.07.23.2"
+  version="2025.07.23.3"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.07.23.3
+
+- Fix
+
 ### 2025.07.23.2
 
 - Fix
@@ -24,18 +28,14 @@
 
 - Fix
 
-### 2025.07.23
-
--Initial release
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.23.2-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.07.23.2/unraid-automover-2025.07.23.2-noarch-1.txz</URL>
-<SHA256>1ba0ef4a87f131b26ca9439c766abacef8102d5adb6ecf89211f167c464c1963</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.23.3-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.07.23.3/unraid-automover-2025.07.23.3-noarch-1.txz</URL>
+<SHA256>6f409e42bcd35a8b957924f11c5fa4f1bb534e1bcaeb792bc9d75aa7e0ee473c</SHA256>
 </FILE>
 
 <!--
@@ -44,7 +44,7 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.23.2-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.23.3-noarch-1.txz
 cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
 
 SETTINGS="/boot/config/plugins/automover/settings.cfg"
@@ -76,12 +76,12 @@ echo "*/$INTERVAL * * * * $AUTOMOVER &> /dev/null 2>&1" > "$CRON_FILE"
 update_cron
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.23.2')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.23.3')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.23.2"
+echo " Version: 2025.07.23.3"
 echo "----------------------------------------------------"
 echo ""
 ]]>
