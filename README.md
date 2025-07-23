@@ -15,4 +15,5 @@
 - Allow or deny moving to run when parity is checking
 - Interval setting to check threshold with a minimum of 1 minute
 
-<img width="1915" height="740" alt="image" src="https://github.com/user-attachments/assets/c73730cd-81c2-4215-a2cd-40244c7c318d" />
+<img width="1917" height="758" alt="image" src="https://github.com/user-attachments/assets/7a544076-b4c9-48a5-bb11-a3463c08ae54" />
+
