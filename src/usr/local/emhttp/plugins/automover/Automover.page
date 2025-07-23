@@ -39,7 +39,6 @@ body {
   font-family: sans-serif;
   margin: 0;
   padding: 30px;
-  color: #f0f8ff;
 }
 
 #automover-settings {
@@ -377,6 +376,30 @@ input.invalid + .field-warning {
   border: 1px solid var(--primary-blue);
   max-height: 75vh;
   overflow-y: auto;
+}
+
+#log-filter {
+  background-color: #0d0d0d; /* dark background to match log panel */
+  border: 1px solid var(--primary-blue); /* your glowing blue theme */
+  color: #00ffaa; /* same green as mover log text */
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: monospace;
+  width: 100%;
+  box-shadow: 0 0 6px rgba(0, 128, 128, 0.3); /* soft glow */
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s;
+}
+
+#log-filter:focus {
+  border-color: #00bfff; /* blue glow on focus */
+  box-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+  outline: none;
+}
+
+#log-filter::placeholder {
+  color: #008080; /* subtle placeholder tone */
+  opacity: 0.7;
 }
 </style>
 
