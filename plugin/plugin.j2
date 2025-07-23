@@ -42,8 +42,6 @@ if [ -e "$SETTINGS" ]; then
 fi
 
 if [ "$AUTOSTART" == "no" ]; then
-  echo "no"
-
   # Clean up old versions
   rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
 
@@ -55,7 +53,7 @@ if [ "$AUTOSTART" == "no" ]; then
   echo ""
   exit 0
 fi
-echo "yes"
+
 # ✅ Extract interval
 INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
 
