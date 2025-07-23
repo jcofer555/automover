@@ -43,7 +43,7 @@ if [ -e "$SETTINGS" ]; then
 fi
 
 if [ "$AUTORUN" == "no" ]; then
-  echo "[INFO] Cron not started: autorun disabled in settings.cfg"
+  echo "no"
 
   # Clean up old versions
   rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
