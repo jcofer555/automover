@@ -11,3 +11,6 @@
 - Selected pool usage % displayed
 - Threshold setting to prevent moving unless pool is at least that % full
 - Logging to /var/log/automover_last_run.log and /var/log/automover_files_moved.log
+- Autostart at boot option
+- Allow or deny moving to run when parity is checking
+- Interval setting to check threshold with a minimum of 1 minute
