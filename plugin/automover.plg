@@ -7,7 +7,7 @@
   version="2025.07.23"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
-  support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
+  support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
   min="7.0.0"
   
   icon="icon.png"
@@ -18,7 +18,7 @@
 
 ### 2025.07.23
 
-- Test
+- Initial release
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -27,7 +27,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 
 <FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.23-noarch-1.txz">
 <URL>https://github.com/jcofer555/automover/releases/download/2025.07.23/unraid-automover-2025.07.23-noarch-1.txz</URL>
-<SHA256>b3c3df57a6d2a12f7a5adb4a3fb6a575d2ed66556911c8db74876a1a6906d4e3</SHA256>
+<SHA256>b7d9aeb4431fb4b63422d373d6d714df84c2cb34c0100cb3f928cbd7b9426be6</SHA256>
 </FILE>
 
 <!--
