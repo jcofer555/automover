@@ -46,7 +46,7 @@ if [ "$AUTORUN" == "no" ]; then
   echo "[INFO] Cron not started: autorun disabled in settings.cfg"
 
   # Clean up old versions
-  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.22.6')
+  rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
 
   echo ""
   echo "----------------------------------------------------"
