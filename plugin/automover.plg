@@ -18,15 +18,7 @@
 
 ### 2025.07.23
 
-- Fix for plugin install
-
-### 2025.07.22.7
-
-- Fixed variable naming
-
-### 2025.07.22.6
-
-- Fix autostart
+-Initial release
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -35,7 +27,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 
 <FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.23-noarch-1.txz">
 <URL>https://github.com/jcofer555/automover/releases/download/2025.07.23/unraid-automover-2025.07.23-noarch-1.txz</URL>
-<SHA256>8b28aee0cbddf5469fdd5d736591e2caf174d7b341e99a6316e31d3609694ba3</SHA256>
+<SHA256>9ffb252687f0037a48869331fae2b85d64481a62c40a95d92b0c6929dc49a568</SHA256>
 </FILE>
 
 <!--
@@ -72,12 +64,6 @@ fi
 
 # ✅ Extract interval
 INTERVAL=$(grep interval "$SETTINGS" | cut -d '"' -f2)
-
-# ✅ Validate interval
-if [[ -z "$INTERVAL" || "$INTERVAL" -lt 1 || "$INTERVAL" -gt 60 ]]; then
-  echo "[ERROR] Invalid interval. Must be between 1 and 60."
-  exit 1
-fi
 
 # ✅ Write cron schedule
 echo "*/$INTERVAL * * * * $AUTOMOVER &> /dev/null 2>&1" > "$CRON_FILE"
