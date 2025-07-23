@@ -1,9 +1,9 @@
 <?php
 $cronFile = '/boot/config/plugins/automover/automover.cron';
-$interval = isset($_GET['interval']) ? intval($_GET['interval']) : 5; // Default to every 5 minutes
+$INTERVAL = isset($_GET['INTERVAL']) ? intval($_GET['INTERVAL']) : 5;
 
 // ✅ Build cron string
-$cronEntry = "*/{$interval} * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
+$cronEntry = "*/{$INTERVAL} * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
 
 // ✅ Write to cron file
 if (file_put_contents($cronFile, $cronEntry) === false) {

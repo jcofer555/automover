@@ -11,10 +11,6 @@ else
   exit 1
 fi
 
-POOL_NAME="$pool"
-THRESHOLD="$threshold"
-DRY_RUN="$dry_run"
-ALLOW_PARITY="$allow_during_parity"
 MOUNT_POINT="/mnt/${POOL_NAME}"
 
 # Header + last run marker
@@ -23,7 +19,7 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 } >> "$LAST_RUN_FILE"
 
 # Check if parity check is running — only block if allow_during_parity is "no"
-if [[ "$ALLOW_PARITY" == "no" ]]; then
+if [[ "$ALLOW_DURING_PARITY_CHECK" == "no" ]]; then
   if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; then
     echo "⚠️ Parity check in progress. Skipping this run. If you want to allow moving while parity check is running set allow during parity check to yes" >> "$LAST_RUN_FILE"
     exit 0

@@ -11,12 +11,12 @@ $cfgPath = '/boot/config/plugins/automover/settings.cfg';
 // Create default if missing
 if (!file_exists($cfgPath)) {
     $defaults = [
-        'pool' => 'cache',
-        'threshold' => 50,
-        'interval' => 60,
-        'dry_run' => 'no',
-        'allow_during_parity' => 'no',
-        'autostart' => 'no'
+        'POOL_NAME' => 'cache',
+        'THRESHOLD' => 50,
+        'INTERVAL' => 60,
+        'DRY_RUN' => 'no',
+        'ALLOW_DURING_PARITY_CHECK' => 'no',
+        'AUTOSTART' => 'no'
     ];
     $configText = '';
     foreach ($defaults as $key => $value) {
@@ -272,14 +272,14 @@ input.invalid + .field-warning {
 <form id="automover-settings">
   <div class="form-pair">
     <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
-    <select id="pool" class="short-input" data-selected="<?php echo htmlspecialchars($settings['pool'] ?? '') ?>"></select>
+    <select id="pool" class="short-input" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
   </div>
 
 <div class="form-pair">
   <label for="threshold" class="tooltip" data-tooltip="Set the disk usage percentage threshold that triggers the mover.">Threshold (%):</label>
   <div class="input-wrapper">
     <input type="number" id="threshold" class="short-input" min="0" max="100"
-      value="<?php echo htmlspecialchars($settings['threshold'] ?? '') ?>">
+      value="<?php echo htmlspecialchars($settings['THRESHOLD'] ?? '') ?>">
     <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
   </div>
 </div>
@@ -288,7 +288,7 @@ input.invalid + .field-warning {
   <label for="interval" class="tooltip" data-tooltip="Interval between usage checks in seconds.">Interval (minutes):</label>
   <div class="input-wrapper">
     <input type="number" id="interval" class="short-input" min="1"
-      value="<?php echo htmlspecialchars($settings['interval'] ?? '') ?>">
+      value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? '') ?>">
     <div id="interval-warning" class="field-warning">Interval must be at least 1</div>
   </div>
 </div>
@@ -296,17 +296,17 @@ input.invalid + .field-warning {
 <div class="checkbox-row">
   <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
     <input type="checkbox" id="dry_run"
-      <?php echo ($settings['dry_run'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
+      <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
   </label>
 
   <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check.">
     <input type="checkbox" id="allow_during_parity"
-      <?php echo ($settings['allow_during_parity'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
+      <?php echo ($settings['ALLOW_DURING_PARITY_CHECK'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
   </label>
 
   <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
     <input type="checkbox" id="autostart"
-      <?php echo ($settings['autostart'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+      <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
   </label>
 </div>
 
@@ -346,10 +346,8 @@ function updateStatus() {
       document.getElementById('status-text').textContent = 'No details available';
     });
 }
-
 // Initial load
 updateStatus();
-
 // Optional: refresh every 10 seconds
 setInterval(updateStatus, 10000);
 
@@ -455,12 +453,12 @@ saveBtn.addEventListener('click', function () {
   }
 
   const settings = {
-    pool: poolSelect.value,
-    threshold: thresholdInput.value,
-    interval: intervalInput.value,
-    dry_run: document.getElementById('dry_run').checked ? 'yes' : 'no',
-    allow_during_parity: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-    autostart: document.getElementById('autostart').checked ? 'yes' : 'no'
+    POOL_NAME: poolSelect.value,
+    THRESHOLD: thresholdInput.value,
+    INTERVAL: intervalInput.value,
+    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+    ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no'
   };
 
   const query = new URLSearchParams(settings).toString();

@@ -6,12 +6,12 @@ $cmd = '/usr/local/emhttp/plugins/automover/helpers/save_settings.sh';
 
 // Grab arguments from query string
 $args = [
-    $_GET['pool'] ?? '',
-    $_GET['threshold'] ?? '',
-    $_GET['interval'] ?? '',
-    $_GET['dry_run'] ?? '',
-    $_GET['allow_during_parity'] ?? '',
-    $_GET['autostart'] ?? ''
+    $_GET['POOL_NAME'] ?? '',
+    $_GET['THRESHOLD'] ?? '',
+    $_GET['INTERVAL'] ?? '',
+    $_GET['DRY_RUN'] ?? '',
+    $_GET['ALLOW_DURING_PARITY_CHECK'] ?? '',
+    $_GET['AUTOSTART'] ?? ''
 ];
 
 // Escape each argument for safety
