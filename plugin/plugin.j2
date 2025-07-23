@@ -61,12 +61,6 @@ fi
 # ✅ Extract interval
 INTERVAL=$(grep interval "$SETTINGS" | cut -d '"' -f2)
 
-# ✅ Validate interval
-if [[ -z "$INTERVAL" || "$INTERVAL" -lt 1 || "$INTERVAL" -gt 60 ]]; then
-  echo "[ERROR] Invalid interval. Must be between 1 and 60."
-  exit 1
-fi
-
 # ✅ Write cron schedule
 echo "*/$INTERVAL * * * * $AUTOMOVER &> /dev/null 2>&1" > "$CRON_FILE"
 
