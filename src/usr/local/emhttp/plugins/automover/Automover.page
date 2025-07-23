@@ -311,10 +311,10 @@ input.invalid + .field-warning {
 </div>
 
   <div class="form-group">
-    <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings.">Save & Start</button>
-    <button type="button" id="stop-button"class="btn tooltip" data-tooltip="Stop Automover monitoring loop.">Stop</button>
+    <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
+    <button type="button" id="stop-button"class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
   </div>
-  <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved & Started</div>
+  <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved Settings</div>
   <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
   <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
 
@@ -381,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 // start cron
-document.getElementById('start-button').addEventListener('click', function () {
+document.getElementById('save-settings').addEventListener('click', function () {
   const interval = document.getElementById('interval').value;
 
   fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ interval })}`)
