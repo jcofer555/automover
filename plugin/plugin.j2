@@ -33,9 +33,8 @@ The 'install' script.
 <INLINE>
 <![CDATA[
 upgradepkg --install-new /boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz
-cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
 
-SETTINGS="/boot/config/plugins/automover/settings.cfg"
+SETTINGS="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
 
 if [ -e "$SETTINGS" ]; then
@@ -50,8 +49,8 @@ if [ "$AUTORUN" == "no" ]; then
 
   echo ""
   echo "----------------------------------------------------"
-  echo " automover has been installed."
-  echo " Version: 2025.07.22.6"
+  echo " {{ name }} has been installed."
+  echo " Version: {{ env['PLUGIN_VERSION'] }}"
   echo "----------------------------------------------------"
   echo ""
   exit 0
