@@ -3,191 +3,506 @@ Type="xmenu"
 Title="Automover"
 Icon="icon.png"
 Tag="icon.png"
+Markdown="false"
 ---
 <?php
+$cfgPath = '/boot/config/plugins/automover/settings.cfg';
 
-// Paths
-$configPath = "/boot/config/plugins/automover/settings.cfg";
-$pidFile = "/var/run/automover.pid";
-$lastRunFile = "/boot/config/plugins/automover/automover_last_run.txt";
-
-// Load settings
-$settings = @parse_ini_file($configPath) ?: [];
-
-// Defaults
-$threshold = $settings['THRESHOLD'] ?? 80;
-$dryRun = $settings['DRY_RUN'] ?? 'no';
-$interval = $settings['INTERVAL'] ?? 60;
-$selectedDisk = $settings['POOL_NAME'] ?? 'cache';
-
-// Load disk list
-$diskData = @parse_ini_file("/var/local/emhttp/disks.ini", true) ?: [];
-$disks = [];
-foreach ($diskData as $disk) {
-    if (!isset($disk['name'])) continue;
-    $name = $disk['name'];
-    if (in_array($name, ['parity', 'parity2', 'flash']) || strpos($name, 'disk') !== false) continue;
-    $disks[] = $name;
+// Create default if missing
+if (!file_exists($cfgPath)) {
+    $defaults = [
+        'pool' => 'cache',
+        'threshold' => 50,
+        'interval' => 60,
+        'dry_run' => 'no',
+        'allow_during_parity' => 'no',
+        'autostart' => 'no'
+    ];
+    $configText = '';
+    foreach ($defaults as $key => $value) {
+        $configText .= "$key=\"$value\"\n";
+    }
+    @file_put_contents($cfgPath, $configText);
 }
 
-// Read last run timestamp
-$lastRun = "Never";
-if (file_exists($lastRunFile)) {
-    $lastRun = trim(file_get_contents($lastRunFile));
-}
-
-// Save settings
-$message = "";
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['save'])) {
-        $newSettings = [
-            'POOL_NAME' => $_POST['POOL_NAME'] ?? '',
-            'THRESHOLD' => $_POST['THRESHOLD'] ?? '',
-            'DRY_RUN' => $_POST['DRY_RUN'] ?? 'no',
-            'INTERVAL' => $_POST['INTERVAL'] ?? 60,
-        ];
-        file_put_contents($configPath, http_build_query($newSettings, '', PHP_EOL));
-        $threshold = $newSettings['THRESHOLD'];
-        $dryRun = $newSettings['DRY_RUN'];
-        $interval = $newSettings['INTERVAL'];
-        $selectedDisk = $newSettings['POOL_NAME'];
-        $message = "<div id='messageBox'>✅ Settings saved!</div>";
-    }
-    if (isset($_POST['start'])) {
-        exec("/usr/bin/automover.sh >/dev/null 2>&1 &");
-        $message = "<div id='messageBox'>▶️ Automover started</div>";
-    }
-    if (isset($_POST['stop'])) {
-        if (file_exists($pidFile)) {
-            $pid = trim(file_get_contents($pidFile));
-            if (is_numeric($pid)) {
-                exec("kill $pid");
-                unlink($pidFile);
-                $message = "<div id='messageBox'>⛔ Automover stopped</div>";
-            }
-        } else {
-            $message = "<div id='messageBox'>ℹ️ No running process</div>";
-        }
-    }
-}
-
-// Initial service status
-$serviceStatus = "⚪ Not Running";
-if (file_exists($pidFile)) {
-    $pid = trim(file_get_contents($pidFile));
-    if (is_numeric($pid) && file_exists("/proc/$pid")) {
-        $serviceStatus = "🟢 Running";
-    } else {
-        $serviceStatus = "⚠️ Stale PID";
-    }
-}
+$settings = parse_ini_file($cfgPath) ?: [];
 ?>
 
-<h2>Automover Plugin</h2>
-
-<?= $message ?>
-
-<form method="POST">
-    <label><strong>Pool:</strong></label><br>
-    <select name="POOL_NAME">
-        <?php foreach ($disks as $disk):
-            $mountPoint = "/mnt/{$disk}";
-            $usedPercent = trim(shell_exec("df --output=pcent $mountPoint | tail -1 | tr -d ' %\n'"));
-            if ($usedPercent === '') $usedPercent = 'N/A';
-        ?>
-            <option value="<?=htmlspecialchars($disk)?>" <?= $disk === $selectedDisk ? 'selected' : '' ?>>
-                <?=htmlspecialchars($disk)?> [<?=htmlspecialchars($usedPercent)?>%]
-            </option>
-        <?php endforeach; ?>
-    </select><br><br>
-
-    <label><strong>Threshold (%)</strong></label><br>
-    <input type="number" name="THRESHOLD" value="<?=htmlspecialchars($threshold)?>" min="1" max="100"><br><br>
-
-    <label><strong>Dry Run:</strong></label><br>
-    <select name="DRY_RUN">
-        <option value="no" <?= $dryRun === 'no' ? 'selected' : '' ?>>No</option>
-        <option value="yes" <?= $dryRun === 'yes' ? 'selected' : '' ?>>Yes</option>
-    </select><br><br>
-
-    <label><strong>Interval (seconds):</strong></label><br>
-    <input type="number" name="INTERVAL" value="<?=htmlspecialchars($interval)?>" min="10"><br><br>
-
-    <button type="submit" name="save">💾 Save Settings</button>
-    <button type="submit" name="start">▶️ Start</button>
-    <button type="submit" name="stop">⛔ Stop</button>
-</form>
-
-<hr>
-<p><strong>Status:</strong> <span id="statusText"><?= $serviceStatus ?></span></p>
-<p><strong>Last Mover Run:</strong> <span id="lastRunText"><?= htmlspecialchars($lastRun) ?></span></p>
-
 <style>
-#messageBox {
-	font-size: 14px;
-    padding: 10px;
-    margin-top: 10px;
-    transition: opacity 0.5s ease;
+:root {
+  --primary-blue: #00aaff;
+  --status-green: #2ECC40;
+}
+
+body {
+  background-color: #111111;
+  font-family: sans-serif;
+  margin: 0;
+  padding: 30px;
+  color: #f0f8ff;
+}
+
+#automover-settings {
+  width: fit-content;
+  padding: 20px;
+  background: #111111;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0, 128, 128, 0.3);
+  text-align: left;
+}
+
+.form-row {
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+label {
+  color: var(--primary-blue);
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+input, select {
+  border: 1px solid var(--primary-blue);
+  border-radius: 5px;
+  padding: 8px;
+  background: #111111;
+  color: #ffffff;
+}
+
+button {
+  margin-right: 10px;
+  padding: 8px 15px;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.checkbox-row {
+  justify-content: space-evenly;
+  align-items: center;
+  margin-top: 25px;
+  margin-bottom: 15px;
+}
+
+.form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-blue);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--primary-blue);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.form-check input {
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.status-container {
+  margin-top: 20px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.status-label {
+  color: var(--primary-blue);
+  font-weight: bold;
+  width: 75px;
+}
+
+#status-text,
+#last-run-text {
+  color: var(--status-green);
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 0;
+  background-color: #333;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0.9;
+  z-index: 10;
+  text-transform: none;
+}
+
+.form-pair {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-pair label {
+  color: var(--primary-blue);
+  font-weight: bold;
+  width: 100px;
+  margin-right: 10px;
+}
+
+.form-pair input,
+.form-pair select {
+  background: #111111;
+  color: #fff;
+}
+
+.short-input {
+  width: 250px;
+  min-width: 250px;
+  max-width: 250px;
+  flex: 0 0 auto;
+}
+
+#pool.short-input {
+  width: 250px !important;
+  min-width: 250px;
+  max-width: 250px;
+  flex: 0 0 auto;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 20px;
+}
+
+input.invalid {
+  border-color: red;
+  color: red;
+}
+
+.field-warning {
+  display: none;
+  color: red;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+input.invalid + .field-warning {
+  display: block;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
+}
+
+#automover-settings.shake {
+  animation: shake 0.3s;
+}
+
+#save-confirmation {
+  display: block;
+  clear: both;
+  background: var(--primary-blue);
+  color: white;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  animation: flash 0.4s ease;
+}
+
+#start-confirmation {
+  display: block;
+  clear: both;
+  background: var(--primary-blue);
+  color: white;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  animation: flash 0.4s ease;
+}
+
+#stop-confirmation {
+  display: block;
+  clear: both;
+  background: var(--primary-blue);
+  color: white;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  animation: flash 0.4s ease;
+}
+
+@keyframes flash {
+  0% { opacity: 0; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
 }
 </style>
 
+<form id="automover-settings">
+  <div class="form-pair">
+    <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
+    <select id="pool" class="short-input" data-selected="<?php echo htmlspecialchars($settings['pool'] ?? '') ?>"></select>
+  </div>
+
+<div class="form-pair">
+  <label for="threshold" class="tooltip" data-tooltip="Set the disk usage percentage threshold that triggers the mover.">Threshold (%):</label>
+  <div class="input-wrapper">
+    <input type="number" id="threshold" class="short-input" min="0" max="100"
+      value="<?php echo htmlspecialchars($settings['threshold'] ?? '') ?>">
+    <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
+  </div>
+</div>
+
+<div class="form-pair">
+  <label for="interval" class="tooltip" data-tooltip="Interval between usage checks in seconds.">Interval (minutes):</label>
+  <div class="input-wrapper">
+    <input type="number" id="interval" class="short-input" min="1"
+      value="<?php echo htmlspecialchars($settings['interval'] ?? '') ?>">
+    <div id="interval-warning" class="field-warning">Interval must be at least 1</div>
+  </div>
+</div>
+
+<div class="checkbox-row">
+  <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
+    <input type="checkbox" id="dry_run"
+      <?php echo ($settings['dry_run'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
+  </label>
+
+  <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check.">
+    <input type="checkbox" id="allow_during_parity"
+      <?php echo ($settings['allow_during_parity'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
+  </label>
+
+  <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
+    <input type="checkbox" id="autostart"
+      <?php echo ($settings['autostart'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+  </label>
+</div>
+
+  <div class="form-group">
+    <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings.">Save & Start</button>
+    <button type="button" id="stop-button"class="btn tooltip" data-tooltip="Stop Automover monitoring loop.">Stop</button>
+  </div>
+  <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Settings Saved</div>
+  <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
+  <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
+
+  <div class="status-container">
+    <div class="status-row">
+      <span class="status-label">Status:</span>
+      <span id="status-text">Stopped</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Last Run:</span>
+      <span id="last-run-text">Cannot find last run</span>
+    </div>
+  </div>
+</form>
+
 <script>
+const startBadge = document.getElementById('start-confirmation');
+const stopBadge = document.getElementById('stop-confirmation');
+
 function updateStatus() {
-    fetch('/plugins/automover/helpers/status.php')
-        .then(res => res.text())
-        .then(text => {
-            document.getElementById('statusText').textContent = text;
-        })
-        .catch(err => console.error('Error fetching status:', err));
+  fetch('/plugins/automover/helpers/status_check.php')
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('status-text').textContent = data.status;
+      document.getElementById('last-run-text').textContent = data.last_run;
+    })
+    .catch(err => {
+      console.error('Failed to fetch Automover status:', err);
+      document.getElementById('status-text').textContent = 'No details available';
+    });
 }
-// Initial update
+
+// Initial load
 updateStatus();
-setInterval(updateStatus, 5000);
 
-function updatePoolUsage() {
-    fetch('/plugins/automover/helpers/pool_usage.php')
-        .then(res => res.json())
-        .then(data => {
-            const select = document.querySelector('select[name="POOL_NAME"]');
-            if (!select) return;
+// Optional: refresh every 10 seconds
+setInterval(updateStatus, 10000);
 
-            [...select.options].forEach(opt => {
-                const disk = opt.value;
-                if (data[disk]) {
-                    opt.textContent = `${disk} [${data[disk]}%]`;
-                }
-            });
-        })
-        .catch(err => console.error("Failed to update pool usage:", err));
-}
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('automover-settings');
+  const poolSelect = document.getElementById('pool');
+  const selectedPool = poolSelect.dataset.selected;
+  const intervalInput = document.getElementById('interval');
+  const thresholdInput = document.getElementById('threshold');
+  const saveBtn = document.getElementById('save-settings');
+  const confirmBadge = document.getElementById('save-confirmation');
 
-// Initial fetch
-updatePoolUsage();
+  fetch('/plugins/automover/helpers/pool_usage.php')
+    .then(res => res.json())
+    .then(data => {
+      poolSelect.innerHTML = '';
+      const pools = Object.keys(data).filter(name => data[name] !== 'N/A');
+      if (pools.length === 0) {
+        poolSelect.innerHTML = '<option disabled>No pools detected</option>';
+      } else {
+        pools.forEach(pool => {
+          const option = document.createElement('option');
+          option.value = pool;
+          option.textContent = `${pool} (${data[pool]}%)`;
+          if (pool === selectedPool) option.selected = true;
+          poolSelect.appendChild(option);
+        });
+      }
+    });
 
-// Refresh every 10 seconds
-setInterval(updatePoolUsage, 10000);
+// start cron
+document.getElementById('start-button').addEventListener('click', function () {
+  const interval = document.getElementById('interval').value;
 
-function updateLastRun() {
-    fetch('/plugins/automover/helpers/last_run.php')
-        .then(res => res.text())
-        .then(text => {
-            document.getElementById('lastRunText').textContent = text;
-        })
-        .catch(err => console.error('Error fetching last run:', err));
-}
-// Initial update
-updateLastRun();
-// Repeat every 10 seconds
-setInterval(updateLastRun, 10000);
+  fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ interval })}`)
+    .then(res => res.json())
+    .then(data => {
+      console.log('Start response:', data);
+      updateStatus(); // Refresh your status UI
+      // Show start confirmation badge
+startBadge.style.display = 'inline-block';
+startBadge.style.opacity = '0';
+startBadge.style.animation = 'none';
+void startBadge.offsetWidth;
+startBadge.style.animation = 'flash 0.4s ease';
+startBadge.style.opacity = '1';
+setTimeout(() => {
+  startBadge.style.opacity = '0';
+  startBadge.style.display = 'none';
+}, 3000);
+    })
+    .catch(err => {
+      console.error('Failed to start Automover:', err);
+      document.getElementById('status-text').textContent = 'Error starting cron';
+    });
+});
 
-// Auto-hide message
-document.addEventListener('DOMContentLoaded', () => {
-    const msg = document.getElementById('messageBox');
-    if (msg && msg.textContent.trim() !== '') {
-        setTimeout(() => {
-            msg.style.opacity = '0';
-            setTimeout(() => msg.style.display = 'none', 500);
-        }, 3000);
-    }
+// stop cron
+document.getElementById('stop-button').addEventListener('click', function () {
+  fetch('/plugins/automover/helpers/stop_cron.php')
+    .then(res => res.json())
+    .then(data => {
+      console.log('Stop response:', data);
+      updateStatus(); // Refresh status view
+      // Show stop confirmation badge
+stopBadge.style.display = 'inline-block';
+stopBadge.style.opacity = '0';
+stopBadge.style.animation = 'none';
+void stopBadge.offsetWidth;
+stopBadge.style.animation = 'flash 0.4s ease';
+stopBadge.style.opacity = '1';
+setTimeout(() => {
+  stopBadge.style.opacity = '0';
+  stopBadge.style.display = 'none';
+}, 3000);
+    })
+    .catch(err => {
+      console.error('Failed to stop Automover:', err);
+      document.getElementById('status-text').textContent = 'Error stopping cron';
+    });
+});
+
+  function validateField(input, rules, warningId) {
+    const value = input.value.trim();
+    const number = parseFloat(value);
+    const invalid = isNaN(number) || (rules.min !== undefined && number < rules.min) || (rules.max !== undefined && number > rules.max);
+    input.classList.toggle('invalid', invalid);
+    document.getElementById(warningId).style.display = invalid ? 'block' : 'none';
+    return !invalid;
+  }
+
+  intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 1 }, 'interval-warning'));
+  thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
+
+saveBtn.addEventListener('click', function () {
+  const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+  const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+
+  if (!intervalValid || !thresholdValid) {
+    form.classList.add('shake');
+    setTimeout(() => form.classList.remove('shake'), 300);
+    return;
+  }
+
+  const settings = {
+    pool: poolSelect.value,
+    threshold: thresholdInput.value,
+    interval: intervalInput.value,
+    dry_run: document.getElementById('dry_run').checked ? 'yes' : 'no',
+    allow_during_parity: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+    autostart: document.getElementById('autostart').checked ? 'yes' : 'no'
+  };
+
+  const query = new URLSearchParams(settings).toString();
+
+  fetch('/plugins/automover/helpers/save_settings.php?' + query)
+    .then(res => res.text())
+    .then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (data.status === 'ok') {
+          // show confirmation badge
+          confirmBadge.style.display = 'inline-block';
+          confirmBadge.style.opacity = '0';
+          confirmBadge.style.animation = 'none';
+          void confirmBadge.offsetWidth;
+          confirmBadge.style.animation = 'flash 0.4s ease';
+          confirmBadge.style.opacity = '1';
+          setTimeout(() => {
+            confirmBadge.style.opacity = '0';
+            confirmBadge.style.display = 'none';
+          }, 3000);
+
+          // reload cron with updated interval
+const updatedInterval = document.getElementById('interval').value;
+fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ interval: updatedInterval })}`)
+    .then(res => res.json())
+    .then(data => {
+      console.log('Start response:', data);
+      updateStatus(); // Refresh your status UI
+    })
+    .catch(err => {
+      console.error('Failed to start Automover:', err);
+      document.getElementById('status-text').textContent = 'Error starting cron';
+    });
+        } else {
+          console.error('Save failed:', data.message);
+        }
+      } catch (err) {
+        console.error('Response parse failed:', err, 'Raw:', text);
+      }
+    })
+    .catch(err => console.error('Save failed:', err));
+});
 });
 </script>

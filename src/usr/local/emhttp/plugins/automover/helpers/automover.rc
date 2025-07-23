@@ -1,0 +1,29 @@
+#!/bin/bash
+
+SETTINGS="/boot/config/plugins/automover/settings.cfg"
+CRON_FILE="/boot/config/plugins/automover/automover.cron"
+BOOT_FAIL="/var/tmp/automover_boot_failure"
+
+# Clear old failure message
+rm -f "$BOOT_FAIL"
+
+# Check autostart toggle
+AUTOSTART=$(grep autostart "$SETTINGS" | cut -d '"' -f2)
+if [[ "$AUTOSTART" != "yes" ]]; then
+  echo "Autostart skipped: disabled in settings.cfg" > "$BOOT_FAIL"
+  exit 0
+fi
+
+# Extract mover interval from settings
+INTERVAL=$(grep interval "$SETTINGS" | cut -d '"' -f2)
+if [[ -z "$INTERVAL" ]]; then
+  echo "Autostart failed: No interval set in settings.cfg" > "$BOOT_FAIL"
+  exit 1
+fi
+
+# Write cron schedule and reload
+echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
+update_cron
+
+# Optional: fire Automover immediately after boot
+/usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null &
