@@ -1,6 +1,6 @@
 <?php
 $cronFile = '/boot/config/plugins/automover/automover.cron';
-$INTERVAL = isset($_GET['INTERVAL']) ? intval($_GET['INTERVAL']) : 5;
+$INTERVAL = isset($_GET['INTERVAL']) ? intval($_GET['INTERVAL']) : 60;
 
 // ✅ Build cron string
 $cronEntry = "*/{$INTERVAL} * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
