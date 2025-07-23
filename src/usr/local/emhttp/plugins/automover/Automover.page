@@ -314,7 +314,7 @@ input.invalid + .field-warning {
     <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings.">Save & Start</button>
     <button type="button" id="stop-button"class="btn tooltip" data-tooltip="Stop Automover monitoring loop.">Stop</button>
   </div>
-  <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Settings Saved</div>
+  <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved & Started</div>
   <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
   <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
 
