@@ -4,8 +4,10 @@
 
 ## 📦 Features
 
-- ✅ Monitor selected **pool disks only** (cache, other pools — excludes array)
-- 🧪 Enable **dry-run mode** to simulate triggers
-- 🧠 Automatically blocks mover if already running
-- 🔧 Easy-to-use settings page in Unraid’s **Settings** tab
-- 📊 Disk usage preview + last triggered timestamp
+- Monitor selected **pool disks only** (cache, other pools — excludes array)
+- Enable **dry-run mode** to simulate triggers
+- Automatically blocks mover if already running
+- Easy-to-use settings page in Unraid’s **Settings** tab
+- Selected pool usage % displayed
+- Threshold setting to prevent moving unless pool is at least that % full
+- Logging to /var/log/automover_last_run.log and /var/log/automover_files_moved.log
