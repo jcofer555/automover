@@ -2,7 +2,7 @@
 
 CONFIG="/boot/config/plugins/automover/settings.cfg"
 PIDFILE="/var/run/automover.pid"
-LAST_RUN_FILE="/boot/config/plugins/automover/automover_last_run.txt"
+LAST_RUN_FILE="/var/log/automover_last_run.log"
 
 # Trap cleanup on exit
 cleanup() {
@@ -38,11 +38,33 @@ fi
 
 MOUNT_POINT="/mnt/${POOL_NAME}"
 
-echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN, Autostart=$AUTOSTART)"
+echo "🔁 Automover loop started for $POOL_NAME (Threshold=${THRESHOLD}%, Interval=${INTERVAL}s, DryRun=$DRY_RUN"
 
 while true; do
+{
   # Update last run timestamp
   date '+%Y-%m-%d %H:%M:%S' > "$LAST_RUN_FILE"
+
+# Define parity completion handler
+check_parity_done() {
+    while grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; do
+        sleep 10
+    done
+
+    echo "✅ Parity done. Restarting Automover..." >> /var/log/automover_run_details.log
+
+    rm -f /var/run/automover.pid
+
+    # Relaunch the script (adjust the path if needed)
+    /usr/bin/automover.sh &
+}
+
+# Main logic
+if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; then
+    echo "⚠️ Parity check in progress. Delaying Automover..." >> /var/log/automover_run_details.log
+    check_parity_done &
+    exit 0
+fi
 
   # Wait if mover is already running
   if pgrep -x mover &>/dev/null; then
@@ -53,7 +75,7 @@ while true; do
     if [ -z "$USED" ]; then
       echo "❌ Could not retrieve usage for $MOUNT_POINT"
     else
-      echo "📊 $POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)"
+      echo "📊 $POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%) at $(date '+%Y-%m-%d %H:%M:%S')"
 
       if [ "$USED" -gt "$THRESHOLD" ]; then
         echo "⚠️ Usage exceeds threshold!"
@@ -70,5 +92,6 @@ while true; do
     fi
   fi
 
+} >> "/var/log/automover_run_details.log" 2>&1
   sleep "$INTERVAL"
 done
