@@ -15,7 +15,7 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 
 # Header + last run marker
 {
-  echo "$(date '+%Y-%m-%d %H:%M:%S')"
+  echo "Autorun session started - $(date '+%Y-%m-%d %H:%M:%S')"
 } >> "$LAST_RUN_FILE"
 
 # Check if parity check is running — only block if allow_during_parity is "no"
@@ -51,8 +51,12 @@ if [ "$USED" -gt "$THRESHOLD" ]; then
     echo "🛠️ Starting mover" >> "$LAST_RUN_FILE"
     /usr/local/emhttp/plugins/automover/helpers/mover_wrapper.sh
   fi
+  if [ "$DRY_RUN" == "yes" ]; then
+    echo
+  else
    echo "🛠️ Mover Finshed" >> "$LAST_RUN_FILE"
+  fi
 else
   echo "✅ Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"
 fi
-echo "Autorun session finished" >> "$LAST_RUN_FILE"
+echo "Autorun session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"

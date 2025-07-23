@@ -267,68 +267,199 @@ input.invalid + .field-warning {
   50% { opacity: 1; transform: scale(1.1); }
   100% { opacity: 1; transform: scale(1); }
 }
+
+/* Wrap both boxes side by side */
+#automover-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 30px; /* spacing between the boxes */
+  flex-wrap: wrap;
+}
+
+/* Existing settings box */
+#automover-settings {
+  flex: 1;
+  max-width: 450px;
+}
+
+/* New log box */
+#moved-log-container {
+  flex: 1;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #111111;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0, 128, 128, 0.3);
+  padding: 20px;
+  font-family: sans-serif;
+  color: #f0f8ff;
+}
+
+#moved-log-container h3 {
+  color: var(--primary-blue);
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+#automover-log {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: #1a1a1a;
+  padding: 10px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #00ffaa;
+  border: 1px solid var(--primary-blue);
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+#log-counts {
+  margin-top: 12px;
+  color: var(--primary-blue);
+  font-size: 14px;
+}
+
+.skipped-line {
+  color: #ffd700; /* bright yellow */
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.log-header h3 {
+  color: var(--primary-blue);
+  font-size: 18px;
+  margin: 0;
+}
+
+.log-stats {
+  text-align: right;
+  font-size: 14px;
+  color: #00ffaa;
+  white-space: nowrap;
+}
+
+#last-run-container {
+  flex: 1;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #111111;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0, 128, 128, 0.3);
+  padding: 20px;
+  font-family: sans-serif;
+  color: #f0f8ff;
+}
+
+#last-run-container h3 {
+  color: var(--primary-blue);
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+#last-run-log {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: #1a1a1a;
+  padding: 10px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #00ffaa;
+  border: 1px solid var(--primary-blue);
+  max-height: 75vh;
+  overflow-y: auto;
+}
 </style>
 
-<form id="automover-settings">
-  <div class="form-pair">
-    <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
-    <select id="pool" class="short-input" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
-  </div>
-
-<div class="form-pair">
-  <label for="threshold" class="tooltip" data-tooltip="Set the disk usage percentage threshold that triggers the mover.">Threshold (%):</label>
-  <div class="input-wrapper">
-    <input type="number" id="threshold" class="short-input" min="0" max="100"
-      value="<?php echo htmlspecialchars($settings['THRESHOLD'] ?? '') ?>">
-    <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
-  </div>
-</div>
-
-<div class="form-pair">
-  <label for="interval" class="tooltip" data-tooltip="Interval between usage checks in seconds.">Interval (minutes):</label>
-  <div class="input-wrapper">
-    <input type="number" id="interval" class="short-input" min="1"
-      value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? '') ?>">
-    <div id="interval-warning" class="field-warning">Interval must be at least 1</div>
-  </div>
-</div>
-
-<div class="checkbox-row">
-  <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
-    <input type="checkbox" id="dry_run"
-      <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
-  </label>
-
-  <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check.">
-    <input type="checkbox" id="allow_during_parity"
-      <?php echo ($settings['ALLOW_DURING_PARITY_CHECK'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
-  </label>
-
-  <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
-    <input type="checkbox" id="autostart"
-      <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
-  </label>
-</div>
-
-  <div class="form-group">
-    <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
-    <button type="button" id="stop-button"class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
-  </div>
-  <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved Settings</div>
-  <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
-  <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
-
-  <div class="status-container">
-    <div class="status-row">
-      <span class="status-label">Status:</span>
-      <span id="status-text">Stopped</span>
+<div id="automover-wrapper">
+  <!-- Existing Settings Form -->
+  <form id="automover-settings">
+    <div class="form-pair">
+      <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
+      <select id="pool" class="short-input" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
     </div>
-    <div class="status-row">
-      <span class="status-label">Last Run:</span>
-      <span id="last-run-text">Cannot find last run</span>
+
+    <div class="form-pair">
+      <label for="threshold" class="tooltip" data-tooltip="Set the disk usage percentage threshold that triggers the mover.">Threshold (%):</label>
+      <div class="input-wrapper">
+        <input type="number" id="threshold" class="short-input" min="0" max="100"
+          value="<?php echo htmlspecialchars($settings['THRESHOLD'] ?? '') ?>">
+        <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
+      </div>
     </div>
+
+    <div class="form-pair">
+      <label for="interval" class="tooltip" data-tooltip="Interval between usage checks in minutes.">Interval (minutes):</label>
+      <div class="input-wrapper">
+        <input type="number" id="interval" class="short-input" min="1"
+          value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? '') ?>">
+        <div id="interval-warning" class="field-warning">Interval must be at least 1</div>
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
+        <input type="checkbox" id="dry_run"
+          <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
+      </label>
+
+      <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check.">
+        <input type="checkbox" id="allow_during_parity"
+          <?php echo ($settings['ALLOW_DURING_PARITY_CHECK'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
+      </label>
+
+      <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
+        <input type="checkbox" id="autostart"
+          <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+      </label>
+    </div>
+
+    <div class="form-group">
+      <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
+      <button type="button" id="stop-button" class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
+    </div>
+
+    <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved Settings</div>
+    <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
+    <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
+
+    <div class="status-container">
+      <div class="status-row">
+        <span class="status-label">Status:</span>
+        <span id="status-text">Stopped</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Last Run:</span>
+        <span id="last-run-text">Cannot find last run</span>
+      </div>
+    </div>
+  </form>
+
+  <!-- Mover Log Panel -->
+  <div id="moved-log-container">
+    <div class="log-header">
+  <h3>Mover Log</h3>
+  <div id="log-duration" style="margin-bottom: 10px; color: var(--primary-blue); font-size: 14px;"></div>
+  <div id="log-counts" class="log-stats"></div>
+</div>
+    <input type="text" id="log-filter" class="short-input" placeholder="🔍 Filter keyword" style="margin-bottom: 12px;">
+    <pre id="automover-log">Loading...</pre>
+    <div id="log-counts"></div>
   </div>
-</form>
+  <div id="last-run-container">
+  <h3>Last Run Details</h3>
+  <pre id="last-run-log">Loading last run log...</pre>
+</div>
+</div>
 
 <script>
 const startBadge = document.getElementById('start-confirmation');
@@ -360,11 +491,16 @@ document.addEventListener('DOMContentLoaded', function () {
   const saveBtn = document.getElementById('save-settings');
   const confirmBadge = document.getElementById('save-confirmation');
 
+function updatePoolUsage() {
+  const poolSelect = document.getElementById('pool');
+  const selectedPool = poolSelect.dataset.selected;
+
   fetch('/plugins/automover/helpers/pool_usage.php')
     .then(res => res.json())
     .then(data => {
       poolSelect.innerHTML = '';
       const pools = Object.keys(data).filter(name => data[name] !== 'N/A');
+
       if (pools.length === 0) {
         poolSelect.innerHTML = '<option disabled>No pools detected</option>';
       } else {
@@ -376,7 +512,98 @@ document.addEventListener('DOMContentLoaded', function () {
           poolSelect.appendChild(option);
         });
       }
+    })
+    .catch(err => {
+      console.error('Pool usage fetch failed:', err);
+      poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>';
     });
+}
+updatePoolUsage(); // initial fetch
+setInterval(updatePoolUsage, 10000); // every 10 sec
+
+const filterInput = document.getElementById('log-filter');
+
+// Live update as the user types (with a short delay)
+let filterTimer;
+filterInput.addEventListener('input', () => {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(loadMoverLog, 300); // debounce so it doesn’t spam on each keystroke
+});
+
+function loadLastRunLog() {
+  fetch('/plugins/automover/helpers/fetch_last_run_log.php')
+    .then(res => res.text())
+    .then(data => {
+      document.getElementById('last-run-log').textContent = data || 'No last run data available.';
+    })
+    .catch(err => {
+      console.error('Failed to fetch last run log:', err);
+      document.getElementById('last-run-log').textContent = 'Error loading last run log.';
+    });
+}
+
+loadLastRunLog();
+setInterval(loadLastRunLog, 10000); // optional auto-refresh every 10s
+
+function formatDuration(secondsStr) {
+  const seconds = parseInt(secondsStr.replace(/[^\d]/g, ''), 10);
+  if (isNaN(seconds)) return null;
+
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+
+  return mins > 0
+    ? `${mins}m ${secs}s`
+    : `${secs}s`;
+}
+
+function loadMoverLog() {
+  const keyword = document.getElementById('log-filter').value.trim();
+  const query = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
+
+  fetch(`/plugins/automover/helpers/fetch_files_moved_log.php${query}`)
+    .then(res => res.json())
+    .then(data => {
+      // ✅ Format duration intelligently
+      const formattedDuration = data.duration
+        ? formatDuration(data.duration)
+        : null;
+
+      document.getElementById('log-duration').innerHTML = formattedDuration
+        ? `⏱ Duration: <strong>${formattedDuration}</strong>`
+        : '⏱ Duration unavailable';
+
+      // ✅ Log lines
+      const logContainer = document.getElementById('automover-log');
+      logContainer.innerHTML = '';
+      const lines = data.log.split('\n');
+
+      lines.forEach(line => {
+        const div = document.createElement('div');
+        div.textContent = line;
+        if (line.toLowerCase().includes('skipped')) {
+          div.classList.add('skipped-line');
+        }
+        logContainer.appendChild(div);
+      });
+
+      // ✅ Stats
+      document.getElementById('log-counts').innerHTML = `
+        📦 Files Moved: <strong>${data.moved}</strong><br>
+        🚫 Files Skipped: <strong>${data.skipped}</strong><br>
+        🔢 Total Entries: <strong>${data.total}</strong>
+      `;
+    })
+    .catch(err => {
+      console.error('Failed to fetch mover log:', err);
+      document.getElementById('automover-log').textContent = 'Error loading log.';
+      document.getElementById('log-counts').textContent = '';
+      document.getElementById('log-duration').textContent = '';
+    });
+}
+
+loadMoverLog(); // Call once at page load
+setInterval(loadMoverLog, 10000);
 
 // start cron
 document.getElementById('save-settings').addEventListener('click', function () {
