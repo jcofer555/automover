@@ -38,10 +38,16 @@ SETTINGS="/boot/config/plugins/automover/settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
 AUTOMOVER="/usr/local/emhttp/plugins/automover/helpers/automover.sh"
 
+echo "Reading configuration..."
+if [ -e "$SETTINGS" ]; then
+    source "$SETTINGS"
+fi
+
 # ✅ Check autorun toggle
-AUTORUN=$(grep autorun "$SETTINGS" | cut -d '"' -f2)
-if [[ "$AUTORUN" != "yes" ]]; then
+if [[ "$AUTORUN" == "no" ]]; then
   echo "[INFO] Cron not started: autorun disabled in settings.cfg"
+  # cleanup old versions
+rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
   echo ""
 echo "----------------------------------------------------"
 echo " {{ name }} has been installed."
