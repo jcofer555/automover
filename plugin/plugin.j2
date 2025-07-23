@@ -34,6 +34,40 @@ The 'install' script.
 <![CDATA[
 upgradepkg --install-new /boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz
 
+SETTINGS="/boot/config/plugins/automover/settings.cfg"
+CRON_FILE="/boot/config/plugins/automover/automover.cron"
+AUTOMOVER="/usr/local/emhttp/plugins/automover/helpers/automover.sh"
+
+# ✅ Check autorun toggle
+AUTORUN=$(grep autorun "$SETTINGS" | cut -d '"' -f2)
+if [[ "$AUTORUN" != "yes" ]]; then
+  echo "[INFO] Cron not started: autorun disabled in settings.cfg"
+  echo ""
+echo "----------------------------------------------------"
+echo " {{ name }} has been installed."
+echo " Version: {{ env['PLUGIN_VERSION'] }}"
+echo "----------------------------------------------------"
+echo ""
+  exit 0
+fi
+
+# ✅ Extract interval
+INTERVAL=$(grep interval "$SETTINGS" | cut -d '"' -f2)
+
+# ✅ Validate interval
+if [[ -z "$INTERVAL" || "$INTERVAL" -lt 1 || "$INTERVAL" -gt 60 ]]; then
+  echo "[ERROR] Invalid interval. Must be between 1 and 60."
+  exit 1
+fi
+
+# ✅ Write cron schedule
+echo "*/$INTERVAL * * * * $AUTOMOVER &> /dev/null 2>&1" > "$CRON_FILE"
+
+# ✅ Reload Unraid cron
+update_cron
+
+echo "[INFO] Cron schedule applied: every $INTERVAL minute(s)"
+
 # cleanup old versions
 rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
 
