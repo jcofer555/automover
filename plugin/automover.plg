@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.07.22.7"
+  version="2025.07.23"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/191678-zip-manager-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.07.23
+
+- Fix for plugin install
+
 ### 2025.07.22.7
 
 - Fixed variable naming
@@ -24,18 +28,14 @@
 
 - Fix autostart
 
-### 2025.07.22.5
-
-- Fix autostart
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.22.7-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.07.22.7/unraid-automover-2025.07.22.7-noarch-1.txz</URL>
-<SHA256>31025c36504fa5700903dbe714714a92dbde5ed99fc0238ec52cfa04bb77ed78</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.07.23-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.07.23/unraid-automover-2025.07.23-noarch-1.txz</URL>
+<SHA256>8b28aee0cbddf5469fdd5d736591e2caf174d7b341e99a6316e31d3609694ba3</SHA256>
 </FILE>
 
 <!--
@@ -44,7 +44,8 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.22.7-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.23-noarch-1.txz
+cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
 
 SETTINGS="/boot/config/plugins/automover/settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
@@ -59,11 +60,11 @@ fi
 if [[ "$AUTORUN" == "no" ]]; then
   echo "[INFO] Cron not started: autorun disabled in settings.cfg"
   # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.22.7')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.23')
   echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.22.7"
+echo " Version: 2025.07.23"
 echo "----------------------------------------------------"
 echo ""
   exit 0
@@ -87,12 +88,12 @@ update_cron
 echo "[INFO] Cron schedule applied: every $INTERVAL minute(s)"
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.22.7')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.23')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.07.22.7"
+echo " Version: 2025.07.23"
 echo "----------------------------------------------------"
 echo ""
 ]]>
