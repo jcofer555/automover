@@ -50,9 +50,15 @@ SETTINGS="/boot/config/plugins/automover/settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
 AUTOMOVER="/usr/local/emhttp/plugins/automover/helpers/automover.sh"
 
-# ✅ Check autorun toggle
-AUTORUN=$(grep autorun "$SETTINGS" | cut -d '"' -f2)
-if [[ "$AUTORUN" != "yes" ]]; then
+echo "Reading configuration..."
+if [ -e "$SETTINGS" ]; then
+    source "$SETTINGS"
+fi
+
+if [[ "$AUTORUN" == "no" ]]; then
+# cleanup old versions
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.07.22.4')
+
   echo "[INFO] Cron not started: autorun disabled in settings.cfg"
   echo ""
 echo "----------------------------------------------------"
@@ -60,6 +66,7 @@ echo " automover has been installed."
 echo " Version: 2025.07.22.4"
 echo "----------------------------------------------------"
 echo ""
+
   exit 0
 fi
 
