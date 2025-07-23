@@ -59,7 +59,7 @@ echo ""
 fi
 
 # ✅ Extract interval
-INTERVAL=$(grep interval "$SETTINGS" | cut -d '"' -f2)
+INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
 
 # ✅ Write cron schedule
 echo "*/$INTERVAL * * * * $AUTOMOVER &> /dev/null 2>&1" > "$CRON_FILE"
