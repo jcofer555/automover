@@ -483,7 +483,7 @@ saveBtn.addEventListener('click', function () {
 
           // reload cron with updated interval
 const updatedInterval = document.getElementById('interval').value;
-fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ interval: updatedInterval })}`)
+fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ INTERVAL: updatedInterval })}`)
     .then(res => res.json())
     .then(data => {
       console.log('Start response:', data);
