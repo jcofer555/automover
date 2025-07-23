@@ -37,9 +37,12 @@ cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config
 
 SETTINGS="/boot/config/plugins/automover/settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
-AUTORUN=$(get_config_value "AUTORUN" "$SETTINGS")
 
-if [[ "${AUTORUN,,}" == "no" ]]; then
+if [ -e "$CONFIG" ]; then
+    source "$CONFIG"
+fi
+
+if [ "$AUTORUN" == "no" ]; then
   echo "[INFO] Cron not started: autorun disabled in settings.cfg"
 
   # Clean up old versions
@@ -58,7 +61,7 @@ fi
 INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
 
 # ✅ Write cron schedule
-echo "*/$INTERVAL * * * * $AUTOMOVER &> /dev/null 2>&1" > "$CRON_FILE"
+echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
 
 # ✅ Reload Unraid cron
 update_cron
