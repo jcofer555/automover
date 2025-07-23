@@ -56,7 +56,7 @@ if [ "$AUTORUN" == "no" ]; then
   echo ""
   exit 0
 fi
-
+echo "yes"
 # ✅ Extract interval
 INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
 
