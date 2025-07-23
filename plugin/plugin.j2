@@ -38,8 +38,8 @@ cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config
 SETTINGS="/boot/config/plugins/automover/settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
 
-if [ -e "$CONFIG" ]; then
-    source "$CONFIG"
+if [ -e "$SETTINGS" ]; then
+    source "$SETTINGS"
 fi
 
 if [ "$AUTORUN" == "no" ]; then
