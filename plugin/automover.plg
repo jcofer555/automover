@@ -45,9 +45,8 @@ The 'install' script.
 <INLINE>
 <![CDATA[
 upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.07.23.6-noarch-1.txz
-cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
 
-SETTINGS="/boot/config/plugins/automover/settings.cfg"
+SETTINGS="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
 
 if [ -e "$SETTINGS" ]; then
