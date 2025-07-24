@@ -11,7 +11,7 @@ $args = [
     $_GET['INTERVAL'] ?? '',
     $_GET['DRY_RUN'] ?? '',
     $_GET['ALLOW_DURING_PARITY_CHECK'] ?? '',
-    $_GET['AUTOSTART'] ?? ''
+    $_GET['AUTOSTART'] ?? '',
 ];
 
 // Escape each argument for safety

@@ -15,7 +15,7 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 
 # Header + last run marker
 {
-  echo "Autorun session started - $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
 } >> "$LAST_RUN_FILE"
 
 # Check if parity check is running — only block if allow_during_parity is "no"
@@ -59,4 +59,20 @@ if [ "$USED" -gt "$THRESHOLD" ]; then
 else
   echo "✅ Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"
 fi
-echo "Autorun session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
+echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
+printf "\n" >> "$LAST_RUN_FILE"
+
+# 🔄 Trim log to last 10 days
+TMP_LOG="/tmp/automover_trimmed.log"
+now=$(date +%s)
+
+grep -E '^Automover session started - [0-9]{4}-[0-9]{2}-[0-9]{2}' "$LAST_RUN_FILE" | while read -r line; do
+  timestamp=$(echo "$line" | cut -d '-' -f2- | xargs -I{} date -d "{}" +%s)
+  age=$(( (now - timestamp) / 86400 ))
+  if (( age <= 9 )); then
+    match_time=$(echo "$line" | cut -d'-' -f2-)
+    sed -n "/$match_time/,/^Automover session finished -/p" "$LAST_RUN_FILE" >> "$TMP_LOG"
+  fi
+done
+
+mv "$TMP_LOG" "$LAST_RUN_FILE"

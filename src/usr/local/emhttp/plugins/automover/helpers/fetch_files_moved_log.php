@@ -18,10 +18,10 @@ if (file_exists($lastRunLog)) {
     $lastRunLines = file($lastRunLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
     foreach ($lastRunLines as $line) {
-        if (stripos($line, 'Autorun session started -') === 0) {
+        if (stripos($line, 'Automover session started -') === 0) {
             $start = trim(substr($line, 26)); // Extract timestamp
         }
-        if (stripos($line, 'Autorun session finished -') === 0) {
+        if (stripos($line, 'Automover session finished -') === 0) {
             $end = trim(substr($line, 27)); // Extract timestamp
         }
     }
