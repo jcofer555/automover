@@ -3,6 +3,26 @@
 LAST_RUN_FILE="/var/log/automover_last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
 
+rotate_logs() {
+  local log="$1"
+  local max_size=$((10 * 1024 * 1024))  # 5MB in bytes
+
+  if [[ -f "$log" && $(stat -c%s "$log") -ge $max_size ]]; then
+    # Delete oldest if it exists
+    [[ -f "${log}.3" ]] && rm -f "${log}.3"
+    
+    # Shift older logs
+    [[ -f "${log}.2" ]] && mv "${log}.2" "${log}.3"
+    [[ -f "${log}.1" ]] && mv "${log}.1" "${log}.2"
+    mv "$log" "${log}.1"
+
+    # Touch new empty log
+    > "$log"
+  fi
+}
+
+rotate_logs "$LAST_RUN_FILE"
+
 # Load settings
 if [[ -f "$CFG_PATH" ]]; then
   source "$CFG_PATH"
