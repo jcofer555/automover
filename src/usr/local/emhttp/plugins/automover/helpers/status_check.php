@@ -24,15 +24,14 @@ if (file_exists($bootFail)) {
         }
     }
 
-    // ✅ Automover status from cron
-    if (file_exists($cronFile) && strpos(file_get_contents($cronFile), 'automover.sh') !== false) {
-        $status = 'Running';
-    }
+$automoverRunning = file_exists($cronFile) && strpos(file_get_contents($cronFile), 'automover.sh') !== false;
+$parityRunning    = file_exists('/var/local/emhttp/var.ini') && preg_match('/mdResync="([1-9][0-9]*)"/', file_get_contents('/var/local/emhttp/var.ini'));
 
-    // ✅ Parity check override
-    if (file_exists('/var/local/emhttp/var.ini') && preg_match('/mdResync="([1-9][0-9]*)"/', file_get_contents('/var/local/emhttp/var.ini'))) {
-        $status = 'Parity Check Running';
-    }
+if ($parityRunning) {
+    $status = 'Parity Check Happening While Automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
+} else {
+    $status = $automoverRunning ? 'Running' : 'Stopped';
+}
 
     // ✅ Compute readable time difference
     if ($lastRunTs) {
