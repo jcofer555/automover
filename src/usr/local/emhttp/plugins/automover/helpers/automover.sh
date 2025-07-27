@@ -31,6 +31,7 @@ fi
 MOUNT_POINT="/mnt/${POOL_NAME}"
 
 # Log header
+echo "------------------------------------------------" >> "$LAST_RUN_FILE"
 echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
 
 # Parity check block
@@ -76,7 +77,13 @@ printf "\n" >> "$LAST_RUN_FILE"
 
 # Trim to last 20 full sessions
 awk '
-  /Automover session started -/ {start = NR}
+  /Automover session started -/ {
+    start = NR
+    # Look backward for separator
+    for (i = NR - 1; i > 0; i--) {
+      if (lines[i] ~ /^-+$/) { start = i; break }
+    }
+  }
   /Automover session finished -/ {
     end = NR
     sessions[++count] = start "," end
@@ -88,6 +95,7 @@ awk '
       for (j = range[1]; j <= range[2]; j++) {
         print lines[j]
       }
+      print ""  # Preserve blank line after each session
     }
   }
 ' "$LAST_RUN_FILE" > "$TMP_LOG"

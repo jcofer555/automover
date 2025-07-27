@@ -189,14 +189,9 @@ input[type="checkbox"] {
 }
 
 #pool.short-input {
-  width: 250px !important;
-  min-width: 250px;
-  max-width: 250px;
+  min-width: 60px;
+  max-width: 100%;
   flex: 0 0 auto;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  padding-right: 20px;
 }
 
 input.invalid {
@@ -413,6 +408,20 @@ input[type="number"].short-input {
   -webkit-appearance: auto;
   -moz-appearance: auto;
 }
+
+.select-pool {
+  appearance: none;
+  width: auto;
+  max-width: 100%;     /* Prevent overflow */
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: width 0.2s ease-in-out;
+}
+
+.select-pool.expanded {
+  width: auto !important;
+}
 </style>
 
 <div id="automover-wrapper">
@@ -420,7 +429,7 @@ input[type="number"].short-input {
   <form id="automover-settings">
     <div class="form-pair">
       <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
-      <select id="pool" class="short-input" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
+      <select id="pool" class="select-pool" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
     </div>
 
     <div class="form-pair">
@@ -528,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function updatePoolUsage() {
   const poolSelect = document.getElementById('pool');
-  const selectedPool = poolSelect.dataset.selected;
+  const currentSelection = poolSelect.value;
 
   fetch('/plugins/automover/helpers/pool_usage.php')
     .then(res => res.json())
@@ -543,7 +552,7 @@ function updatePoolUsage() {
           const option = document.createElement('option');
           option.value = pool;
           option.textContent = `${pool} (${data[pool]}%)`;
-          if (pool === selectedPool) option.selected = true;
+          if (pool === currentSelection) option.selected = true;
           poolSelect.appendChild(option);
         });
       }
