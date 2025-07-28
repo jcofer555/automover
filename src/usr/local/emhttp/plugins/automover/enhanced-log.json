@@ -1,0 +1,6 @@
+{
+    "files": [
+        "/var/log/automover_last_run.log",
+        "/var/log/automover_files_moved.log"
+    ]
+}
