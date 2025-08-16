@@ -6,7 +6,7 @@
 
 - Monitor selected pool disks only (cache, other pools — excludes array)
 - Enable dry-run mode to simulate triggers
-- Automatically blocks mover if already running
+- Won't run if mover is already running
 - Easy-to-use settings page in Unraid’s Settings page
 - Selected pool usage % displayed
 - Threshold setting to prevent moving unless pool is at least that % full
