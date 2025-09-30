@@ -34,13 +34,6 @@ $settings = parse_ini_file($cfgPath) ?: [];
   --status-green: #2ECC40;
 }
 
-body {
-  background-color: #111111;
-  font-family: sans-serif;
-  margin: 0;
-  padding: 30px;
-}
-
 #automover-settings {
   width: fit-content;
   padding: 20px;
