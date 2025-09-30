@@ -608,7 +608,7 @@ function loadMoverLog() {
 
       document.getElementById('log-duration').innerHTML = formattedDuration
         ? `⏱ Duration: <strong>${formattedDuration}</strong>`
-        : '⏱ Duration Nothing to track yet';
+        : '⏱ Duration: Nothing to track yet';
 
       // ✅ Log lines
       const logContainer = document.getElementById('automover-log');
