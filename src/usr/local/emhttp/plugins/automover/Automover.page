@@ -530,7 +530,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function updatePoolUsage() {
   const poolSelect = document.getElementById('pool');
-  const currentSelection = poolSelect.value;
+  let currentSelection = poolSelect.dataset.selected || poolSelect.value;
+
+// After applying selection:
+if (pool === currentSelection) {
+  option.selected = true;
+  poolSelect.dataset.selected = ''; // clear it so only used on initial load
+}
 
   fetch('/plugins/automover/helpers/pool_usage.php')
     .then(res => res.json())
