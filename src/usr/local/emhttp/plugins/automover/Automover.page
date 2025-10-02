@@ -528,15 +528,10 @@ document.addEventListener('DOMContentLoaded', function () {
   const saveBtn = document.getElementById('save-settings');
   const confirmBadge = document.getElementById('save-confirmation');
 
+let currentPoolSelection = document.getElementById('pool').dataset.selected || '';
+
 function updatePoolUsage() {
   const poolSelect = document.getElementById('pool');
-  let currentSelection = poolSelect.dataset.selected || poolSelect.value;
-
-// After applying selection:
-if (pool === currentSelection) {
-  option.selected = true;
-  poolSelect.dataset.selected = ''; // clear it so only used on initial load
-}
 
   fetch('/plugins/automover/helpers/pool_usage.php')
     .then(res => res.json())
@@ -551,7 +546,7 @@ if (pool === currentSelection) {
           const option = document.createElement('option');
           option.value = pool;
           option.textContent = `${pool} (${data[pool]}%)`;
-          if (pool === currentSelection) option.selected = true;
+          if (pool === currentPoolSelection) option.selected = true;
           poolSelect.appendChild(option);
         });
       }
@@ -560,6 +555,11 @@ if (pool === currentSelection) {
       console.error('Pool usage fetch failed:', err);
       poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>';
     });
+
+  // update global selection when user changes dropdown
+  poolSelect.addEventListener('change', () => {
+    currentPoolSelection = poolSelect.value;
+  });
 }
 updatePoolUsage(); // initial fetch
 setInterval(updatePoolUsage, 5000); // every 5 sec
@@ -649,31 +649,25 @@ loadMoverLog(); // Call once at page load
 setInterval(loadMoverLog, 5000);
 
 // start cron
-document.getElementById('save-settings').addEventListener('click', function () {
-  const interval = document.getElementById('interval').value;
+const updatedSettings = {
+  INTERVAL: document.getElementById('interval').value,
+  POOL_NAME: poolSelect.value,
+  THRESHOLD: thresholdInput.value,
+  DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+  ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+  AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no'
+};
 
-  fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ INTERVAL })}`)
-    .then(res => res.json())
-    .then(data => {
-      console.log('Start response:', data);
-      updateStatus(); // Refresh your status UI
-      // Show start confirmation badge
-startBadge.style.display = 'inline-block';
-startBadge.style.opacity = '0';
-startBadge.style.animation = 'none';
-void startBadge.offsetWidth;
-startBadge.style.animation = 'flash 0.4s ease';
-startBadge.style.opacity = '1';
-setTimeout(() => {
-  startBadge.style.opacity = '0';
-  startBadge.style.display = 'none';
-}, 3000);
-    })
-    .catch(err => {
-      console.error('Failed to start Automover:', err);
-      document.getElementById('status-text').textContent = 'Error starting cron';
-    });
-});
+fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams(updatedSettings)}`)
+  .then(res => res.json())
+  .then(data => {
+    console.log('Start response:', data);
+    updateStatus();
+  })
+  .catch(err => {
+    console.error('Failed to start Automover:', err);
+    document.getElementById('status-text').textContent = 'Error starting cron';
+  });
 
 // stop cron
 document.getElementById('stop-button').addEventListener('click', function () {
@@ -682,6 +676,7 @@ document.getElementById('stop-button').addEventListener('click', function () {
     .then(data => {
       console.log('Stop response:', data);
       updateStatus(); // Refresh status view
+      updatePoolUsage();
       // Show stop confirmation badge
 stopBadge.style.display = 'inline-block';
 stopBadge.style.opacity = '0';
