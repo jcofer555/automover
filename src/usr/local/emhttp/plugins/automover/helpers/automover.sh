@@ -49,7 +49,19 @@ if pgrep -x mover &>/dev/null; then
 fi
 
 # Disk usage check
-USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
+POOL_NAME=$(basename "$MOUNT_POINT")
+
+# Try ZFS usage first
+ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
+
+if [[ -n "$ZFS_CAP" ]]; then
+  USED="$ZFS_CAP"
+else
+  # Fallback to df if not ZFS
+  USED=$(df -h --output=pcent "$MOUNT_POINT" 2>/dev/null | awk 'NR==2 {gsub("%",""); print}')
+fi
+
+# Validate result
 if [[ -z "$USED" ]]; then
   echo "Could not retrieve usage for $MOUNT_POINT" >> "$LAST_RUN_FILE"
   exit 1
