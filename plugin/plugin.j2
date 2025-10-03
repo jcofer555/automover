@@ -71,7 +71,7 @@ MESSAGE_PRINTED=0
 
 while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
     if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Waiting for Mover Tuning plugin to be installed..."
+        echo "Checking if mover.old exists..."
         MESSAGE_PRINTED=1
     fi
     sleep 2
@@ -124,7 +124,7 @@ MESSAGE_PRINTED=0
 
 while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
     if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Waiting for Mover Tuning plugin to be installed..."
+        echo "Checking if mover.old exists..."
         MESSAGE_PRINTED=1
     fi
     sleep 2
