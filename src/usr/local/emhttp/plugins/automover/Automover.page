@@ -425,6 +425,8 @@ input[type="number"].short-input {
       <select id="pool" class="select-pool" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
     </div>
 
+    <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has it being used in mover direction in either direction. You might want to use a different pool.</div>
+
     <div class="form-pair">
       <label for="threshold" class="tooltip" data-tooltip="Set the disk usage percentage threshold that triggers the mover.">Threshold (%):</label>
       <div class="input-wrapper">
@@ -767,5 +769,42 @@ fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ INTERVA
     })
     .catch(err => console.error('Save failed:', err));
 });
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const poolSelect = document.getElementById('pool');
+  const poolWarning = document.getElementById('pool-warning');
+
+  function checkPoolUsage(poolName) {
+    if (!poolName) {
+      poolWarning.style.display = 'none';
+      return;
+    }
+
+    fetch(`/plugins/automover/helpers/check_pool_usage.php?pool=${encodeURIComponent(poolName)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.in_use) {
+          poolWarning.style.display = 'block';
+        } else {
+          poolWarning.style.display = 'none';
+        }
+      })
+      .catch(err => {
+        console.error("Failed to check pool usage:", err);
+        poolWarning.style.display = 'none'; // fail safe
+      });
+  }
+
+  // Hook on change
+  poolSelect.addEventListener('change', () => {
+    checkPoolUsage(poolSelect.value);
+  });
+
+  // ✅ Run once after a short delay to give Unraid time to populate select
+  setTimeout(() => {
+    checkPoolUsage(poolSelect.value);
+  }, 250);
 });
 </script>
