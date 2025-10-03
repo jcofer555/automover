@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.10.03.4"
+  version="2025.10.03.5"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,11 +16,7 @@
 <CHANGES>
 <![CDATA[
 
-### 2025.10.03.4
-
-- Added cleanup for mover.automover
-
-### 2025.10.03.3
+### 2025.10.03.5
 
 - Added option to disable unraids mover schedule
 
@@ -28,14 +24,18 @@
 
 - Added warning if pool isn't apart of any share that has mover configured aka no mover direction
 
+### 2025.10.02
+
+- Fix for zfs pools to be reported correctly for % full
+
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.03.4-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.10.03.4/unraid-automover-2025.10.03.4-noarch-1.txz</URL>
-<SHA256>802617bcd00c683e3febf2ed10f31b50cdc8f04a425dab548b713145171e518a</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.03.5-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.10.03.5/unraid-automover-2025.10.03.5-noarch-1.txz</URL>
+<SHA256>3aefb74a7757cea62550c73a1378e436699c72d5d00fc1f9a01b05af209a2ea4</SHA256>
 </FILE>
 
 <!--
@@ -44,7 +44,7 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.03.4-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.03.5-noarch-1.txz
 
 # Copy default settings if not already present
 [ -f /boot/config/plugins/automover/settings.cfg ] || cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
@@ -83,7 +83,7 @@ MESSAGE_PRINTED=0
 
 while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
     if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Waiting for Mover Tuning plugin to be installed..."
+        echo "Checking if mover.old exists..."
         MESSAGE_PRINTED=1
     fi
     sleep 2
@@ -98,12 +98,12 @@ else
 fi
 
   # Clean up old versions
-  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.03.4')
+  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.03.5')
 
   echo ""
   echo "----------------------------------------------------"
   echo " automover has been installed."
-  echo " Version: 2025.10.03.4"
+  echo " Version: 2025.10.03.5"
   echo "----------------------------------------------------"
   echo ""
   exit 0
@@ -136,7 +136,7 @@ MESSAGE_PRINTED=0
 
 while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
     if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Waiting for Mover Tuning plugin to be installed..."
+        echo "Checking if mover.old exists..."
         MESSAGE_PRINTED=1
     fi
     sleep 2
@@ -160,12 +160,12 @@ echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.
 update_cron
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.03.4')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.03.5')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.10.03.4"
+echo " Version: 2025.10.03.5"
 echo "----------------------------------------------------"
 echo ""
 ]]>
