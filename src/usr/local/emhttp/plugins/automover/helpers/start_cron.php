@@ -1,21 +1,42 @@
 <?php
-$cronFile = '/boot/config/plugins/automover/automover.cron';
-$INTERVAL = isset($_GET['INTERVAL']) ? intval($_GET['INTERVAL']) : 60;
+$cfgPath = '/boot/config/plugins/automover/settings.cfg';
+$settings = parse_ini_file($cfgPath) ?: [];
 
-// ✅ Build cron string
-$cronEntry = "*/{$INTERVAL} * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
+$response = [ 'status' => 'ok', 'message' => '' ];
 
-// ✅ Write to cron file
-if (file_put_contents($cronFile, $cronEntry) === false) {
-    http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Failed to write cron file']);
-    exit;
+$moverPath   = '/usr/local/sbin/mover';
+$moverBackup = '/usr/local/sbin/mover.automover';
+$moverOld    = '/usr/local/sbin/mover.old';
+
+$disableSchedule = ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? 'no') === 'yes';
+
+if ($disableSchedule) {
+    // === DISABLE schedule ===
+    if (file_exists($moverOld)) {
+        // Mover Tuning controls schedule → leave everything untouched
+        $response['message'] = '⚠️ Schedule will still be enabled due to Mover Tuning being installed.';
+    } else {
+        if (file_exists($moverPath)) {
+            unlink($moverPath);
+        }
+        // Create empty stub
+        file_put_contents($moverPath, "");
+        chmod($moverPath, 0755);
+    }
+} else {
+    // === ENABLE schedule ===
+    if (file_exists($moverOld)) {
+        // Mover Tuning controls → do nothing
+    } else {
+        if (file_exists($moverPath)) {
+            unlink($moverPath);
+        }
+        if (file_exists($moverBackup)) {
+            copy($moverBackup, $moverPath);
+            chmod($moverPath, 0755);
+        }
+    }
 }
 
-// ✅ Trigger cron reload
-exec('update_cron');
-
-// ✅ Response
 header('Content-Type: application/json');
-echo json_encode(['status' => 'ok', 'message' => 'Cron updated']);
-?>
+echo json_encode($response);

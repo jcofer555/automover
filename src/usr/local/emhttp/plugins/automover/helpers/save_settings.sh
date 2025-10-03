@@ -9,5 +9,6 @@ echo "INTERVAL=\"$3\"" >> "$CONFIG"
 echo "DRY_RUN=\"$4\"" >> "$CONFIG"
 echo "ALLOW_DURING_PARITY_CHECK=\"$5\"" >> "$CONFIG"
 echo "AUTOSTART=\"$6\"" >> "$CONFIG"
+echo "DISABLE_UNRAID_MOVER_SCHEDULE=\"$7\"" >> "$CONFIG"
 
 echo '{"status":"ok"}'

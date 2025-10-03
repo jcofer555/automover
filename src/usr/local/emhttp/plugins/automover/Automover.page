@@ -16,7 +16,8 @@ if (!file_exists($cfgPath)) {
         'INTERVAL' => 60,
         'DRY_RUN' => 'no',
         'ALLOW_DURING_PARITY_CHECK' => 'no',
-        'AUTOSTART' => 'no'
+        'AUTOSTART' => 'no',
+        'DISABLE_UNRAID_MOVER_SCHEDULE' => 'no'
     ];
     $configText = '';
     foreach ($defaults as $key => $value) {
@@ -460,6 +461,11 @@ input[type="number"].short-input {
         <input type="checkbox" id="autostart"
           <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
       </label>
+
+      <label class="form-check tooltip" data-tooltip="Disables Unraid's built-in mover schedule.">
+        <input type="checkbox" id="disable_unraid_mover_schedule"
+          <?php echo ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '') === 'yes' ? 'checked' : '' ?>> Disable Unraid Mover Schedule
+      </label>
     </div>
 
     <div class="form-group">
@@ -719,14 +725,15 @@ saveBtn.addEventListener('click', function () {
     return;
   }
 
-  const settings = {
-    POOL_NAME: poolSelect.value,
-    THRESHOLD: thresholdInput.value,
-    INTERVAL: intervalInput.value,
-    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-    ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no'
-  };
+const settings = {
+  POOL_NAME: poolSelect.value,
+  THRESHOLD: thresholdInput.value,
+  INTERVAL: intervalInput.value,
+  DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+  ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+  AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+  DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no'
+};
 
   const query = new URLSearchParams(settings).toString();
 
@@ -753,6 +760,13 @@ const updatedInterval = document.getElementById('interval').value;
 fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ INTERVAL: updatedInterval })}`)
     .then(res => res.json())
     .then(data => {
+if (data.message) {
+  const msg = document.createElement('div');
+  msg.style.marginTop = '10px';
+  msg.style.color = 'orange';
+  msg.textContent = data.message;
+  document.getElementById('automover-settings').appendChild(msg);
+}
       console.log('Start response:', data);
       updateStatus(); // Refresh your status UI
     })

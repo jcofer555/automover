@@ -12,6 +12,7 @@ $args = [
     $_GET['DRY_RUN'] ?? '',
     $_GET['ALLOW_DURING_PARITY_CHECK'] ?? '',
     $_GET['AUTOSTART'] ?? '',
+    $_GET['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '',
 ];
 
 // Escape each argument for safety
