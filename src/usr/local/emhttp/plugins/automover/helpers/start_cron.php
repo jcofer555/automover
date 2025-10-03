@@ -34,7 +34,7 @@ if ($disableSchedule) {
             $response['messages'][] = 'Mover schedule restored.';
         }
     } else {
-        $response['messages'][] = 'Mover Tuning plugin controls schedule. No changes made.';
+        $response['messages'][] = 'Schedule cannot be disabled because mover tuning plugin is installed.';
     }
 }
 
