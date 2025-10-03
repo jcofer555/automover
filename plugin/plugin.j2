@@ -67,8 +67,13 @@ backup_mover() {
 # Wait
 WAIT_SECONDS=0
 MAX_WAIT=60   # max wait 60 seconds
+MESSAGE_PRINTED=0
+
 while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
-    echo "Waiting..."
+    if [ $MESSAGE_PRINTED -eq 0 ]; then
+        echo "Waiting for Mover Tuning plugin to be installed..."
+        MESSAGE_PRINTED=1
+    fi
     sleep 2
     WAIT_SECONDS=$((WAIT_SECONDS + 2))
 done
@@ -115,8 +120,13 @@ backup_mover() {
 # Wait
 WAIT_SECONDS=0
 MAX_WAIT=60   # max wait 60 seconds
+MESSAGE_PRINTED=0
+
 while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
-    echo "Waiting..."
+    if [ $MESSAGE_PRINTED -eq 0 ]; then
+        echo "Waiting for Mover Tuning plugin to be installed..."
+        MESSAGE_PRINTED=1
+    fi
     sleep 2
     WAIT_SECONDS=$((WAIT_SECONDS + 2))
 done
