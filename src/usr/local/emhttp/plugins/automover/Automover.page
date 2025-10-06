@@ -28,7 +28,6 @@ if (!file_exists($cfgPath)) {
 
 $settings = parse_ini_file($cfgPath) ?: [];
 ?>
-
 <style>
 :root {
   --primary-blue: #00aaff;
@@ -419,8 +418,9 @@ input[type="number"].short-input {
 </style>
 
 <div id="automover-wrapper">
-  <!-- Existing Settings Form -->
+  <!-- Settings Form -->
   <form id="automover-settings">
+    <!-- Pool -->
     <div class="form-pair">
       <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
       <select id="pool" class="select-pool" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
@@ -428,6 +428,7 @@ input[type="number"].short-input {
 
     <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has it being used in mover direction in either direction. You might want to use a different pool.</div>
 
+    <!-- Threshold -->
     <div class="form-pair">
       <label for="threshold" class="tooltip" data-tooltip="Set the disk usage percentage threshold that triggers the mover.">Threshold (%):</label>
       <div class="input-wrapper">
@@ -437,6 +438,7 @@ input[type="number"].short-input {
       </div>
     </div>
 
+    <!-- Interval -->
     <div class="form-pair">
       <label for="interval" class="tooltip" data-tooltip="Interval between usage checks in minutes.">Interval (minutes):</label>
       <div class="input-wrapper">
@@ -446,6 +448,7 @@ input[type="number"].short-input {
       </div>
     </div>
 
+    <!-- Checkboxes -->
     <div class="checkbox-row">
       <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
         <input type="checkbox" id="dry_run"
@@ -468,15 +471,18 @@ input[type="number"].short-input {
       </label>
     </div>
 
+    <!-- Buttons -->
     <div class="form-group">
       <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
       <button type="button" id="stop-button" class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
     </div>
 
+    <!-- Confirmations -->
     <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved Settings</div>
     <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
     <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
 
+    <!-- Status -->
     <div class="status-container">
       <div class="status-row">
         <span class="status-label">Status:</span>
@@ -492,18 +498,20 @@ input[type="number"].short-input {
   <!-- Mover Log Panel -->
   <div id="moved-log-container">
     <div class="log-header">
-  <h3>Mover Log For Last Run</h3>
-  <div id="log-duration" style="margin-bottom: 10px; color: var(--primary-blue); font-size: 14px;"></div>
-  <div id="log-counts" class="log-stats"></div>
-</div>
+      <h3>Mover Log For Last Run</h3>
+      <div id="log-duration" style="margin-bottom: 10px; color: var(--primary-blue); font-size: 14px;"></div>
+      <div id="log-counts" class="log-stats"></div>
+    </div>
     <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom: 12px;">
     <pre id="automover-log">Loading...</pre>
     <div id="log-counts"></div>
   </div>
+
+  <!-- Last Run Panel -->
   <div id="last-run-container">
-  <h3>Last Run Details</h3>
-  <pre id="last-run-log">Loading last run log...</pre>
-</div>
+    <h3>Last Run Details</h3>
+    <pre id="last-run-log">Loading last run log...</pre>
+  </div>
 </div>
 
 <script>
@@ -522,187 +530,142 @@ function updateStatus() {
       document.getElementById('status-text').textContent = 'No details available';
     });
 }
-// Initial load
+// Initial load + refresh loop
 updateStatus();
-// Optional: refresh every 5 seconds
 setInterval(updateStatus, 5000);
 
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('automover-settings');
   const poolSelect = document.getElementById('pool');
-  const selectedPool = poolSelect.dataset.selected;
   const intervalInput = document.getElementById('interval');
   const thresholdInput = document.getElementById('threshold');
   const saveBtn = document.getElementById('save-settings');
   const confirmBadge = document.getElementById('save-confirmation');
+  let currentPoolSelection = poolSelect.dataset.selected || '';
 
-let currentPoolSelection = document.getElementById('pool').dataset.selected || '';
-
-function updatePoolUsage() {
-  const poolSelect = document.getElementById('pool');
-
-  fetch('/plugins/automover/helpers/pool_usage.php')
-    .then(res => res.json())
-    .then(data => {
-      poolSelect.innerHTML = '';
-      const pools = Object.keys(data).filter(name => data[name] !== 'N/A');
-
-      if (pools.length === 0) {
-        poolSelect.innerHTML = '<option disabled>No pools detected</option>';
-      } else {
-        pools.forEach(pool => {
-          const option = document.createElement('option');
-          option.value = pool;
-          option.textContent = `${pool} (${data[pool]}%)`;
-          if (pool === currentPoolSelection) option.selected = true;
-          poolSelect.appendChild(option);
-        });
-      }
-    })
-    .catch(err => {
-      console.error('Pool usage fetch failed:', err);
-      poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>';
-    });
-
-  // update global selection when user changes dropdown
-  poolSelect.addEventListener('change', () => {
-    currentPoolSelection = poolSelect.value;
-  });
-}
-updatePoolUsage(); // initial fetch
-setInterval(updatePoolUsage, 5000); // every 5 sec
-
-const filterInput = document.getElementById('log-filter');
-
-// Live update as the user types (with a short delay)
-let filterTimer;
-filterInput.addEventListener('input', () => {
-  clearTimeout(filterTimer);
-  filterTimer = setTimeout(loadMoverLog, 500); // debounce so it doesn’t spam on each keystroke
-});
-
-function loadLastRunLog() {
-  fetch('/plugins/automover/helpers/fetch_last_run_log.php')
-    .then(res => res.text())
-    .then(data => {
-      document.getElementById('last-run-log').textContent = data || 'No last run data available.';
-    })
-    .catch(err => {
-      console.error('Failed to fetch last run log:', err);
-      document.getElementById('last-run-log').textContent = 'Error loading last run log.';
-    });
-}
-
-loadLastRunLog();
-setInterval(loadLastRunLog, 5000); // optional auto-refresh every 5s
-
-function formatDuration(secondsStr) {
-  const seconds = parseInt(secondsStr.replace(/[^\d]/g, ''), 10);
-  if (isNaN(seconds)) return null;
-
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-
-  return mins > 0
-    ? `${mins}m ${secs}s`
-    : `${secs}s`;
-}
-
-function loadMoverLog() {
-  const keyword = document.getElementById('log-filter').value.trim();
-  const query = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
-
-  fetch(`/plugins/automover/helpers/fetch_files_moved_log.php${query}`)
-    .then(res => res.json())
-    .then(data => {
-      // ✅ Format duration intelligently
-      const formattedDuration = data.duration
-        ? formatDuration(data.duration)
-        : null;
-
-      document.getElementById('log-duration').innerHTML = formattedDuration
-        ? `⏱ Duration: <strong>${formattedDuration}</strong>`
-        : '⏱ Duration: Nothing to track yet';
-
-      // ✅ Log lines
-      const logContainer = document.getElementById('automover-log');
-      logContainer.innerHTML = '';
-      const lines = data.log.split('\n');
-
-      lines.forEach(line => {
-        const div = document.createElement('div');
-        div.textContent = line;
-        if (line.toLowerCase().includes('skipped')) {
-          div.classList.add('skipped-line');
+  // --- Pool Usage ---
+  function updatePoolUsage() {
+    fetch('/plugins/automover/helpers/pool_usage.php')
+      .then(res => res.json())
+      .then(data => {
+        poolSelect.innerHTML = '';
+        const pools = Object.keys(data).filter(name => data[name] !== 'N/A');
+        if (pools.length === 0) {
+          poolSelect.innerHTML = '<option disabled>No pools detected</option>';
+        } else {
+          pools.forEach(pool => {
+            const option = document.createElement('option');
+            option.value = pool;
+            option.textContent = `${pool} (${data[pool]}%)`;
+            if (pool === currentPoolSelection) option.selected = true;
+            poolSelect.appendChild(option);
+          });
         }
-        logContainer.appendChild(div);
+      })
+      .catch(err => {
+        console.error('Pool usage fetch failed:', err);
+        poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>';
       });
 
-      // ✅ Stats
-      document.getElementById('log-counts').innerHTML = `
-        📦 Files Moved: <strong>${data.moved}</strong><br>
-        🚫 Files Skipped: <strong>${data.skipped}</strong><br>
-        🔢 Total Entries: <strong>${data.total}</strong>
-      `;
-    })
-    .catch(err => {
-      console.error('Failed to fetch mover log:', err);
-      document.getElementById('automover-log').textContent = 'Error loading log.';
-      document.getElementById('log-counts').textContent = '';
-      document.getElementById('log-duration').textContent = '';
+    poolSelect.addEventListener('change', () => {
+      currentPoolSelection = poolSelect.value;
     });
-}
+  }
+  updatePoolUsage();
+  setInterval(updatePoolUsage, 5000);
 
-loadMoverLog(); // Call once at page load
-setInterval(loadMoverLog, 5000);
-
-// start cron
-const updatedSettings = {
-  INTERVAL: document.getElementById('interval').value,
-  POOL_NAME: poolSelect.value,
-  THRESHOLD: thresholdInput.value,
-  DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-  ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-  AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no'
-};
-
-fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams(updatedSettings)}`)
-  .then(res => res.json())
-  .then(data => {
-    console.log('Start response:', data);
-    updateStatus();
-  })
-  .catch(err => {
-    console.error('Failed to start Automover:', err);
-    document.getElementById('status-text').textContent = 'Error starting cron';
+  // --- Log filtering ---
+  const filterInput = document.getElementById('log-filter');
+  let filterTimer;
+  filterInput.addEventListener('input', () => {
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(loadMoverLog, 500);
   });
 
-// stop cron
-document.getElementById('stop-button').addEventListener('click', function () {
-  fetch('/plugins/automover/helpers/stop_cron.php')
-    .then(res => res.json())
-    .then(data => {
-      console.log('Stop response:', data);
-      updateStatus(); // Refresh status view
-      updatePoolUsage();
-      // Show stop confirmation badge
-stopBadge.style.display = 'inline-block';
-stopBadge.style.opacity = '0';
-stopBadge.style.animation = 'none';
-void stopBadge.offsetWidth;
-stopBadge.style.animation = 'flash 0.4s ease';
-stopBadge.style.opacity = '1';
-setTimeout(() => {
-  stopBadge.style.opacity = '0';
-  stopBadge.style.display = 'none';
-}, 3000);
-    })
-    .catch(err => {
-      console.error('Failed to stop Automover:', err);
-      document.getElementById('status-text').textContent = 'Error stopping cron';
-    });
-});
+  function loadLastRunLog() {
+    fetch('/plugins/automover/helpers/fetch_last_run_log.php')
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById('last-run-log').textContent = data || 'No last run data available.';
+      })
+      .catch(err => {
+        console.error('Failed to fetch last run log:', err);
+        document.getElementById('last-run-log').textContent = 'Error loading last run log.';
+      });
+  }
+  loadLastRunLog();
+  setInterval(loadLastRunLog, 5000);
 
+  function formatDuration(secondsStr) {
+    const seconds = parseInt(secondsStr.replace(/[^\d]/g, ''), 10);
+    if (isNaN(seconds)) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  }
+
+  function loadMoverLog() {
+    const keyword = filterInput.value.trim();
+    const query = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
+    fetch(`/plugins/automover/helpers/fetch_files_moved_log.php${query}`)
+      .then(res => res.json())
+      .then(data => {
+        const formattedDuration = data.duration ? formatDuration(data.duration) : null;
+        document.getElementById('log-duration').innerHTML = formattedDuration
+          ? `⏱ Duration: <strong>${formattedDuration}</strong>`
+          : '⏱ Duration: Nothing to track yet';
+
+        const logContainer = document.getElementById('automover-log');
+        logContainer.innerHTML = '';
+        data.log.split('\n').forEach(line => {
+          const div = document.createElement('div');
+          div.textContent = line;
+          if (line.toLowerCase().includes('skipped')) div.classList.add('skipped-line');
+          logContainer.appendChild(div);
+        });
+
+        document.getElementById('log-counts').innerHTML = `
+          📦 Files Moved: <strong>${data.moved}</strong><br>
+          🚫 Files Skipped: <strong>${data.skipped}</strong><br>
+          🔢 Total Entries: <strong>${data.total}</strong>
+        `;
+      })
+      .catch(err => {
+        console.error('Failed to fetch mover log:', err);
+        document.getElementById('automover-log').textContent = 'Error loading log.';
+        document.getElementById('log-counts').textContent = '';
+        document.getElementById('log-duration').textContent = '';
+      });
+  }
+  loadMoverLog();
+  setInterval(loadMoverLog, 5000);
+
+  // --- Stop button ---
+  document.getElementById('stop-button').addEventListener('click', function () {
+    fetch('/plugins/automover/helpers/stop_cron.php')
+      .then(res => res.json())
+      .then(data => {
+        console.log('Stop response:', data);
+        updateStatus();
+        updatePoolUsage();
+        stopBadge.style.display = 'inline-block';
+        stopBadge.style.opacity = '0';
+        stopBadge.style.animation = 'none';
+        void stopBadge.offsetWidth;
+        stopBadge.style.animation = 'flash 0.4s ease';
+        stopBadge.style.opacity = '1';
+        setTimeout(() => {
+          stopBadge.style.opacity = '0';
+          stopBadge.style.display = 'none';
+        }, 3000);
+      })
+      .catch(err => {
+        console.error('Failed to stop Automover:', err);
+        document.getElementById('status-text').textContent = 'Error stopping cron';
+      });
+  });
+
+  // --- Validation ---
   function validateField(input, rules, warningId) {
     const value = input.value.trim();
     const number = parseFloat(value);
@@ -715,74 +678,63 @@ setTimeout(() => {
   intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 1 }, 'interval-warning'));
   thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
 
-saveBtn.addEventListener('click', function () {
-  const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
-  const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+  // --- Save & Start ---
+  saveBtn.addEventListener('click', function () {
+    const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+    const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+    if (!intervalValid || !thresholdValid) {
+      form.classList.add('shake');
+      setTimeout(() => form.classList.remove('shake'), 300);
+      return;
+    }
 
-  if (!intervalValid || !thresholdValid) {
-    form.classList.add('shake');
-    setTimeout(() => form.classList.remove('shake'), 300);
-    return;
-  }
+    const settings = {
+      POOL_NAME: poolSelect.value,
+      THRESHOLD: thresholdInput.value,
+      INTERVAL: intervalInput.value,
+      DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+      ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+      AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+      DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no'
+    };
+    const query = new URLSearchParams(settings).toString();
 
-const settings = {
-  POOL_NAME: poolSelect.value,
-  THRESHOLD: thresholdInput.value,
-  INTERVAL: intervalInput.value,
-  DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-  ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-  AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-  DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no'
-};
-
-  const query = new URLSearchParams(settings).toString();
-
-  fetch('/plugins/automover/helpers/save_settings.php?' + query)
-    .then(res => res.text())
-    .then(text => {
-      try {
-        const data = JSON.parse(text);
-        if (data.status === 'ok') {
-          // show confirmation badge
-          confirmBadge.style.display = 'inline-block';
-          confirmBadge.style.opacity = '0';
-          confirmBadge.style.animation = 'none';
-          void confirmBadge.offsetWidth;
-          confirmBadge.style.animation = 'flash 0.4s ease';
-          confirmBadge.style.opacity = '1';
-          setTimeout(() => {
+    fetch('/plugins/automover/helpers/save_settings.php?' + query)
+      .then(res => res.text())
+      .then(text => {
+        try {
+          const data = JSON.parse(text);
+          if (data.status === 'ok') {
+            confirmBadge.style.display = 'inline-block';
             confirmBadge.style.opacity = '0';
-            confirmBadge.style.display = 'none';
-          }, 3000);
+            confirmBadge.style.animation = 'none';
+            void confirmBadge.offsetWidth;
+            confirmBadge.style.animation = 'flash 0.4s ease';
+            confirmBadge.style.opacity = '1';
+            setTimeout(() => {
+              confirmBadge.style.opacity = '0';
+              confirmBadge.style.display = 'none';
+            }, 3000);
 
-          // reload cron with updated interval
-const updatedInterval = document.getElementById('interval').value;
-fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams({ INTERVAL: updatedInterval })}`)
-    .then(res => res.json())
-    .then(data => {
-if (data.message) {
-  const msg = document.createElement('div');
-  msg.style.marginTop = '10px';
-  msg.style.color = 'orange';
-  msg.textContent = data.message;
-  document.getElementById('automover-settings').appendChild(msg);
-}
-      console.log('Start response:', data);
-      updateStatus(); // Refresh your status UI
-    })
-    .catch(err => {
-      console.error('Failed to start Automover:', err);
-      document.getElementById('status-text').textContent = 'Error starting cron';
-    });
-        } else {
-          console.error('Save failed:', data.message);
+            fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams(settings)}`)
+              .then(res => res.json())
+              .then(data => {
+                console.log('Start response:', data);
+                updateStatus();
+              })
+              .catch(err => {
+                console.error('Failed to start Automover:', err);
+                document.getElementById('status-text').textContent = 'Error starting cron';
+              });
+          } else {
+            console.error('Save failed:', data.message);
+          }
+        } catch (err) {
+          console.error('Response parse failed:', err, 'Raw:', text);
         }
-      } catch (err) {
-        console.error('Response parse failed:', err, 'Raw:', text);
-      }
-    })
-    .catch(err => console.error('Save failed:', err));
-});
+      })
+      .catch(err => console.error('Save failed:', err));
+  });
 });
 </script>
 <script>
@@ -795,30 +747,19 @@ document.addEventListener("DOMContentLoaded", () => {
       poolWarning.style.display = 'none';
       return;
     }
-
     fetch(`/plugins/automover/helpers/check_pool_usage.php?pool=${encodeURIComponent(poolName)}`)
       .then(res => res.json())
       .then(data => {
-        if (!data.in_use) {
-          poolWarning.style.display = 'block';
-        } else {
-          poolWarning.style.display = 'none';
-        }
+        if (!data.in_use) poolWarning.style.display = 'block';
+        else poolWarning.style.display = 'none';
       })
       .catch(err => {
         console.error("Failed to check pool usage:", err);
-        poolWarning.style.display = 'none'; // fail safe
+        poolWarning.style.display = 'none';
       });
   }
 
-  // Hook on change
-  poolSelect.addEventListener('change', () => {
-    checkPoolUsage(poolSelect.value);
-  });
-
-  // ✅ Run once after a short delay to give Unraid time to populate select
-  setTimeout(() => {
-    checkPoolUsage(poolSelect.value);
-  }, 250);
+  poolSelect.addEventListener('change', () => checkPoolUsage(poolSelect.value));
+  setTimeout(() => { checkPoolUsage(poolSelect.value); }, 250);
 });
 </script>
