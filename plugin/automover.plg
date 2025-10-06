@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.10.03.7"
+  version="2025.10.6"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.10.6
+
+- Fix for cron updating
+
 ### 2025.10.03.7
 
 - Updated help text
@@ -24,18 +28,14 @@
 
 - Fixed cron start issue
 
-### 2025.10.03.5
-
-- Added option to disable unraids mover schedule
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.03.7-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.10.03.7/unraid-automover-2025.10.03.7-noarch-1.txz</URL>
-<SHA256>32834db00093cb31569feb5fa9097a2e943ab3242e6ab73bb08f50323bb63053</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.6-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.10.6/unraid-automover-2025.10.6-noarch-1.txz</URL>
+<SHA256>5c1c61d644bc3d47978ce011965cb3de49cf845853f0ab9a087a66cf19cdb2d3</SHA256>
 </FILE>
 
 <!--
@@ -44,7 +44,7 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.03.7-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.6-noarch-1.txz
 
 # Copy default settings if not already present
 [ -f /boot/config/plugins/automover/settings.cfg ] || cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
@@ -98,12 +98,12 @@ else
 fi
 
   # Clean up old versions
-  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.03.7')
+  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.6')
 
   echo ""
   echo "----------------------------------------------------"
   echo " automover has been installed."
-  echo " Version: 2025.10.03.7"
+  echo " Version: 2025.10.6"
   echo "----------------------------------------------------"
   echo ""
   exit 0
@@ -160,12 +160,12 @@ echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.
 update_cron
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.03.7')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.6')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.10.03.7"
+echo " Version: 2025.10.6"
 echo "----------------------------------------------------"
 echo ""
 ]]>
