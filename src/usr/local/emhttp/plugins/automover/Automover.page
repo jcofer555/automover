@@ -432,17 +432,6 @@ input[type="number"].short-input {
     </div>
 
     <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has it being used in mover direction in either direction. You might want to use a different pool.</div>
-
-<!-- Start cron messages -->
-<div id="save-messages" style="
-  display: none;
-  margin-top: 10px;
-  margin-bottom: 20px;
-  background: #111;
-  border-radius: 6px;
-  font-family: monospace;
-  color: red;
-"></div>
 <br>
 
     <!-- Threshold -->
@@ -498,6 +487,17 @@ input[type="number"].short-input {
     <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved Settings</div>
     <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
     <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
+
+    <!-- Start cron messages -->
+<div id="save-messages" style="
+  display: none;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  background: #111;
+  border-radius: 6px;
+  font-family: monospace;
+  color: red;
+"></div>
 
     <!-- Status -->
     <div class="status-container">
