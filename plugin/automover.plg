@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.10.7.4"
+  version="2025.10.7.5"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.10.7.5
+
+- Remove plugin install logic for mover tuning as it's not included within the plugin
+
 ### 2025.10.7.4
 
 - More messaging updates
@@ -24,19 +28,14 @@
 
 - Updated plugin messaging
 
-### 2025.10.7.2
-
-- Added safety checks for disabled mover schedule
-- Changed messages for disable mover schedule function
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.7.4-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.10.7.4/unraid-automover-2025.10.7.4-noarch-1.txz</URL>
-<SHA256>ca970bf68b80c579950a17593013835f5de8e31dcc86d70190fb8fb0807e26e9</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.7.5-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.10.7.5/unraid-automover-2025.10.7.5-noarch-1.txz</URL>
+<SHA256>4331bb76702da8a5173a72cbf68956b09784fb1baaf86ab02c22669d62c59b30</SHA256>
 </FILE>
 
 <!--
@@ -45,7 +44,7 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.7.4-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.7.5-noarch-1.txz
 
 # Copy default settings if not already present
 [ -f /boot/config/plugins/automover/settings.cfg ] || cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
@@ -59,99 +58,19 @@ fi
 
 if [ "$AUTOSTART" == "no" ]; then
 
-# --- Backup mover to mover.automover ---
-MOVER="/usr/local/sbin/mover"
-MOVER_BACKUP="/usr/local/sbin/mover.automover"
-MOVER_OLD="/usr/local/sbin/mover.old"
-
-# Function to create mover.automover with 755 permissions
-backup_mover() {
-    local src="$1"
-    local dst="$2"
-    if [ -f "$src" ]; then
-        cp "$src" "$dst"
-        chmod 755 "$dst"
-        echo "Created $dst from $src"
-    else
-        echo "Source $src not found, skipping backup"
-    fi
-}
-
-# Wait
-WAIT_SECONDS=0
-MAX_WAIT=60   # max wait 60 seconds
-MESSAGE_PRINTED=0
-
-while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
-    if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Checking if mover.old exists..."
-        MESSAGE_PRINTED=1
-    fi
-    sleep 2
-    WAIT_SECONDS=$((WAIT_SECONDS + 2))
-done
-
-# Decide which file to backup
-if [ -f "$MOVER_OLD" ]; then
-echo "mover.old exists"
-    backup_mover "$MOVER_OLD" "$MOVER_BACKUP"
-else
-echo "mover.old does not exist"
-    backup_mover "$MOVER" "$MOVER_BACKUP"
-fi
-
   # Clean up old versions
-  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.7.4')
+  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.7.5')
 
   echo ""
   echo "----------------------------------------------------"
   echo " automover has been installed."
-  echo " Version: 2025.10.7.4"
+  echo " Version: 2025.10.7.5"
   echo "----------------------------------------------------"
   echo ""
   exit 0
 fi
 
 if [ "$AUTOSTART" == "no" ]; then
-
-# --- Backup mover to mover.automover ---
-MOVER="/usr/local/sbin/mover"
-MOVER_BACKUP="/usr/local/sbin/mover.automover"
-MOVER_OLD="/usr/local/sbin/mover.old"
-
-# Function to create mover.automover with 755 permissions
-backup_mover() {
-    local src="$1"
-    local dst="$2"
-    if [ -f "$src" ]; then
-        cp "$src" "$dst"
-        chmod 755 "$dst"
-        echo "Created $dst from $src"
-    else
-        echo "Source $src not found, skipping backup"
-    fi
-}
-
-# Wait
-WAIT_SECONDS=0
-MAX_WAIT=60   # max wait 60 seconds
-MESSAGE_PRINTED=0
-
-while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
-    if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Checking if mover.old exists..."
-        MESSAGE_PRINTED=1
-    fi
-    sleep 2
-    WAIT_SECONDS=$((WAIT_SECONDS + 2))
-done
-
-# Decide which file to backup
-if [ -f "$MOVER_OLD" ]; then
-    backup_mover "$MOVER_OLD" "$MOVER_BACKUP"
-else
-    backup_mover "$MOVER" "$MOVER_BACKUP"
-fi
 
 # ✅ Extract interval
 INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
@@ -163,12 +82,12 @@ echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.
 update_cron
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.7.4')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.7.5')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.10.7.4"
+echo " Version: 2025.10.7.5"
 echo "----------------------------------------------------"
 echo ""
 ]]>
