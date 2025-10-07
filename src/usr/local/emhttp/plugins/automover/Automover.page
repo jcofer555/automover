@@ -656,29 +656,34 @@ document.addEventListener('DOMContentLoaded', function () {
   setInterval(loadMoverLog, 5000);
 
   // --- Stop button ---
-  document.getElementById('stop-button').addEventListener('click', function () {
-    fetch('/plugins/automover/helpers/stop_cron.php')
-      .then(res => res.json())
-      .then(data => {
-        console.log('Stop response:', data);
-        updateStatus();
-        updatePoolUsage();
-        stopBadge.style.display = 'inline-block';
+document.getElementById('stop-button').addEventListener('click', function () {
+  const messageBox = document.getElementById('save-messages');
+  messageBox.innerHTML = ''; // Clear previous messages
+  messageBox.style.display = 'none'; // Optionally hide it
+
+  fetch('/plugins/automover/helpers/stop_cron.php')
+    .then(res => res.json())
+    .then(data => {
+      console.log('Stop response:', data);
+      updateStatus();
+      updatePoolUsage();
+
+      stopBadge.style.display = 'inline-block';
+      stopBadge.style.opacity = '0';
+      stopBadge.style.animation = 'none';
+      void stopBadge.offsetWidth;
+      stopBadge.style.animation = 'flash 0.4s ease';
+      stopBadge.style.opacity = '1';
+      setTimeout(() => {
         stopBadge.style.opacity = '0';
-        stopBadge.style.animation = 'none';
-        void stopBadge.offsetWidth;
-        stopBadge.style.animation = 'flash 0.4s ease';
-        stopBadge.style.opacity = '1';
-        setTimeout(() => {
-          stopBadge.style.opacity = '0';
-          stopBadge.style.display = 'none';
-        }, 3000);
-      })
-      .catch(err => {
-        console.error('Failed to stop Automover:', err);
-        document.getElementById('status-text').textContent = 'Error stopping cron';
-      });
-  });
+        stopBadge.style.display = 'none';
+      }, 3000);
+    })
+    .catch(err => {
+      console.error('Failed to stop Automover:', err);
+      document.getElementById('status-text').textContent = 'Error stopping cron';
+    });
+});
 
   // --- Validation ---
   function validateField(input, rules, warningId) {
