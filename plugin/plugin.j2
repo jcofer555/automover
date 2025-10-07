@@ -46,47 +46,6 @@ fi
 
 if [ "$AUTOSTART" == "no" ]; then
 
-# --- Backup mover to mover.automover ---
-MOVER="/usr/local/sbin/mover"
-MOVER_BACKUP="/usr/local/sbin/mover.automover"
-MOVER_OLD="/usr/local/sbin/mover.old"
-
-# Function to create mover.automover with 755 permissions
-backup_mover() {
-    local src="$1"
-    local dst="$2"
-    if [ -f "$src" ]; then
-        cp "$src" "$dst"
-        chmod 755 "$dst"
-        echo "Created $dst from $src"
-    else
-        echo "Source $src not found, skipping backup"
-    fi
-}
-
-# Wait
-WAIT_SECONDS=0
-MAX_WAIT=60   # max wait 60 seconds
-MESSAGE_PRINTED=0
-
-while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
-    if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Checking if mover.old exists..."
-        MESSAGE_PRINTED=1
-    fi
-    sleep 2
-    WAIT_SECONDS=$((WAIT_SECONDS + 2))
-done
-
-# Decide which file to backup
-if [ -f "$MOVER_OLD" ]; then
-echo "mover.old exists"
-    backup_mover "$MOVER_OLD" "$MOVER_BACKUP"
-else
-echo "mover.old does not exist"
-    backup_mover "$MOVER" "$MOVER_BACKUP"
-fi
-
   # Clean up old versions
   rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
 
@@ -100,45 +59,6 @@ fi
 fi
 
 if [ "$AUTOSTART" == "no" ]; then
-
-# --- Backup mover to mover.automover ---
-MOVER="/usr/local/sbin/mover"
-MOVER_BACKUP="/usr/local/sbin/mover.automover"
-MOVER_OLD="/usr/local/sbin/mover.old"
-
-# Function to create mover.automover with 755 permissions
-backup_mover() {
-    local src="$1"
-    local dst="$2"
-    if [ -f "$src" ]; then
-        cp "$src" "$dst"
-        chmod 755 "$dst"
-        echo "Created $dst from $src"
-    else
-        echo "Source $src not found, skipping backup"
-    fi
-}
-
-# Wait
-WAIT_SECONDS=0
-MAX_WAIT=60   # max wait 60 seconds
-MESSAGE_PRINTED=0
-
-while [ ! -f "$MOVER_OLD" ] && [ $WAIT_SECONDS -lt $MAX_WAIT ]; do
-    if [ $MESSAGE_PRINTED -eq 0 ]; then
-        echo "Checking if mover.old exists..."
-        MESSAGE_PRINTED=1
-    fi
-    sleep 2
-    WAIT_SECONDS=$((WAIT_SECONDS + 2))
-done
-
-# Decide which file to backup
-if [ -f "$MOVER_OLD" ]; then
-    backup_mover "$MOVER_OLD" "$MOVER_BACKUP"
-else
-    backup_mover "$MOVER" "$MOVER_BACKUP"
-fi
 
 # ✅ Extract interval
 INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
