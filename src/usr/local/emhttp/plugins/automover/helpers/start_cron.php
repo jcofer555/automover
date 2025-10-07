@@ -1,48 +1,66 @@
 <?php
-$cfgPath    = '/boot/config/plugins/automover/settings.cfg';
-$cronFile   = '/boot/config/plugins/automover/automover.cron';
-$moverPath  = '/usr/local/sbin/mover';
-$moverBackup = '/usr/local/sbin/mover.automover';
-$moverOld   = '/usr/local/sbin/mover.old';
+$cfgPath      = '/boot/config/plugins/automover/settings.cfg';
+$cronFile     = '/boot/config/plugins/automover/automover.cron';
+$moverPath    = '/usr/local/sbin/mover';
+$moverBackup  = '/usr/local/sbin/mover.automover';
+$moverOld     = '/usr/local/sbin/mover.old';
 
 $settings = parse_ini_file($cfgPath) ?: [];
 $disableSchedule = ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? 'no') === 'yes';
 $INTERVAL = isset($_GET['INTERVAL']) ? intval($_GET['INTERVAL']) : 60;
 
 $response = [ 'status' => 'ok', 'messages' => [] ];
+$minSize = 4096; // 4KB
 
 // === Handle mover schedule logic ===
 if ($disableSchedule) {
+    // DISABLE_UNRAID_MOVER_SCHEDULE is "yes"
     if (file_exists($moverOld)) {
-        $response['messages'][] = '⚠️ Schedule remains enabled due to Mover Tuning plugin.';
+        $size = filesize($moverOld);
+        if ($size >= $minSize) {
+            file_put_contents($moverBackup, "");
+            copy($moverOld, $moverBackup);
+            chmod($moverBackup, 0755);
+            $response['messages'][] = '⚠️ Schedule cannot be disabled because mover tuning plugin is installed.';
+        } else {
+            $response['messages'][] = '⚠️ The mover file is not the right size so schedule was not disabled.';
+        }
     } else {
-        // Check mover file size before disabling
         if (file_exists($moverPath)) {
-            $moverSize = filesize($moverPath);
-            if ($moverSize === false || $moverSize < 4608) {
-                $response['messages'][] = '⚠️ The file isn\'t the expected size and schedule was not disabled.';
+            $size = filesize($moverPath);
+            if ($size >= $minSize) {
+                file_put_contents($moverBackup, "");
+                copy($moverPath, $moverBackup);
+                chmod($moverBackup, 0755);
             } else {
-                unlink($moverPath);
-                file_put_contents($moverPath, "");
-                chmod($moverPath, 0755);
-                $response['messages'][] = 'Mover schedule disabled.';
+                $response['messages'][] = '⚠️ The mover file is not the right size so schedule was not disabled.';
             }
         } else {
-            $response['messages'][] = '⚠️ Mover file not found; schedule not disabled.';
+            $response['messages'][] = '⚠️ Mover file not found, schedule was not disabled.';
         }
     }
 } else {
-    if (!file_exists($moverOld)) {
-        if (file_exists($moverPath)) {
-            unlink($moverPath);
-        }
-        if (file_exists($moverBackup)) {
-            copy($moverBackup, $moverPath);
-            chmod($moverPath, 0755);
-            $response['messages'][] = 'Mover schedule restored.';
+    // DISABLE_UNRAID_MOVER_SCHEDULE is "no"
+    if (file_exists($moverOld)) {
+        $size = file_exists($moverBackup) ? filesize($moverBackup) : 0;
+        if ($size >= $minSize) {
+            unlink($moverOld);
+            copy($moverBackup, $moverOld);
+            chmod($moverOld, 0755);
+        } else {
+            $response['messages'][] = '⚠️ The mover.automover file is not the right size so schedule was not restored.';
         }
     } else {
-        $response['messages'][] = 'Schedule cannot be disabled because Mover Tuning plugin is installed.';
+        $size = file_exists($moverBackup) ? filesize($moverBackup) : 0;
+        if ($size >= $minSize) {
+            if (file_exists($moverPath)) {
+                unlink($moverPath);
+            }
+            copy($moverBackup, $moverPath);
+            chmod($moverPath, 0755);
+        } else {
+            $response['messages'][] = '⚠️ The mover.automover file is not the right size so schedule was not restored.';
+        }
     }
 }
 

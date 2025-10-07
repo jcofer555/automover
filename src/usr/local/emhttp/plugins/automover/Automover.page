@@ -415,6 +415,11 @@ input[type="number"].short-input {
 .select-pool.expanded {
   width: auto !important;
 }
+
+#save-messages div {
+  opacity: 1;
+  transition: opacity 0.6s ease;
+}
 </style>
 
 <div id="automover-wrapper">
@@ -481,6 +486,16 @@ input[type="number"].short-input {
     <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved Settings</div>
     <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
     <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
+
+    <!-- Start cron messages -->
+<div id="save-messages" style="
+  display: none;
+  margin-top: 10px;
+  background: #111;
+  border-radius: 6px;
+  font-family: monospace;
+  color: red;
+"></div>
 
     <!-- Status -->
     <div class="status-container">
@@ -679,62 +694,94 @@ document.addEventListener('DOMContentLoaded', function () {
   thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
 
   // --- Save & Start ---
-  saveBtn.addEventListener('click', function () {
-    const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
-    const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
-    if (!intervalValid || !thresholdValid) {
-      form.classList.add('shake');
-      setTimeout(() => form.classList.remove('shake'), 300);
-      return;
-    }
+saveBtn.addEventListener('click', function () {
+  const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+  const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+  if (!intervalValid || !thresholdValid) {
+    form.classList.add('shake');
+    setTimeout(() => form.classList.remove('shake'), 300);
+    return;
+  }
 
-    const settings = {
-      POOL_NAME: poolSelect.value,
-      THRESHOLD: thresholdInput.value,
-      INTERVAL: intervalInput.value,
-      DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-      ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-      AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-      DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no'
-    };
-    const query = new URLSearchParams(settings).toString();
+  const settings = {
+    POOL_NAME: poolSelect.value,
+    THRESHOLD: thresholdInput.value,
+    INTERVAL: intervalInput.value,
+    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+    ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+    DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no'
+  };
+  const query = new URLSearchParams(settings).toString();
 
-    fetch('/plugins/automover/helpers/save_settings.php?' + query)
-      .then(res => res.text())
-      .then(text => {
-        try {
-          const data = JSON.parse(text);
-          if (data.status === 'ok') {
-            confirmBadge.style.display = 'inline-block';
+  const confirmBadge = document.getElementById('save-confirmation');
+  const messageBox = document.getElementById('save-messages');
+  messageBox.innerHTML = '';
+  messageBox.style.display = 'block';
+
+  fetch('/plugins/automover/helpers/save_settings.php?' + query)
+    .then(res => res.text())
+    .then(text => {
+      try {
+        const data = JSON.parse(text);
+
+        if (data.status === 'ok') {
+          // Show confirmation badge
+          confirmBadge.style.display = 'inline-block';
+          confirmBadge.style.opacity = '0';
+          confirmBadge.style.animation = 'none';
+          void confirmBadge.offsetWidth;
+          confirmBadge.style.animation = 'flash 0.4s ease';
+          confirmBadge.style.opacity = '1';
+          setTimeout(() => {
             confirmBadge.style.opacity = '0';
-            confirmBadge.style.animation = 'none';
-            void confirmBadge.offsetWidth;
-            confirmBadge.style.animation = 'flash 0.4s ease';
-            confirmBadge.style.opacity = '1';
-            setTimeout(() => {
-              confirmBadge.style.opacity = '0';
-              confirmBadge.style.display = 'none';
-            }, 3000);
+            confirmBadge.style.display = 'none';
+          }, 3000);
 
-            fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams(settings)}`)
-              .then(res => res.json())
-              .then(data => {
-                console.log('Start response:', data);
-                updateStatus();
-              })
-              .catch(err => {
-                console.error('Failed to start Automover:', err);
-                document.getElementById('status-text').textContent = 'Error starting cron';
-              });
-          } else {
-            console.error('Save failed:', data.message);
+          // Show save_settings.php messages
+          if (Array.isArray(data.messages) && data.messages.length > 0) {
+            data.messages.forEach(msg => {
+              const line = document.createElement('div');
+              line.textContent = msg;
+              messageBox.appendChild(line);
+            });
           }
-        } catch (err) {
-          console.error('Response parse failed:', err, 'Raw:', text);
+
+          // Start Automover and show its messages too
+          fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams(settings)}`)
+            .then(res => res.json())
+            .then(startData => {
+              console.log('Start response:', startData);
+              updateStatus();
+
+              if (Array.isArray(startData.messages) && startData.messages.length > 0) {
+                startData.messages.forEach(msg => {
+                  const line = document.createElement('div');
+                  line.textContent = msg;
+                  messageBox.appendChild(line);
+                });
+              }
+            })
+            .catch(err => {
+              console.error('Failed to start Automover:', err);
+              document.getElementById('status-text').textContent = 'Error starting cron';
+              messageBox.innerHTML += `<div style="color: red;">❌ Error starting Automover</div>`;
+            });
+        } else {
+          console.error('Save failed:', data.message);
+          messageBox.innerHTML = `<div style="color: red;">❌ ${data.message || 'Save failed'}</div>`;
         }
-      })
-      .catch(err => console.error('Save failed:', err));
-  });
+      } catch (err) {
+        console.error('Response parse failed:', err, 'Raw:', text);
+        messageBox.innerHTML = `<div style="color: red;">❌ Invalid response from server</div>`;
+      }
+    })
+    .catch(err => {
+      console.error('Save failed:', err);
+      messageBox.innerHTML = `<div style="color: red;">❌ Save request failed</div>`;
+    });
+});
+
 });
 </script>
 <script>
