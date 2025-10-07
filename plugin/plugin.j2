@@ -80,8 +80,10 @@ done
 
 # Decide which file to backup
 if [ -f "$MOVER_OLD" ]; then
+echo "mover.old exists"
     backup_mover "$MOVER_OLD" "$MOVER_BACKUP"
 else
+echo "mover.old does not exist"
     backup_mover "$MOVER" "$MOVER_BACKUP"
 fi
 
