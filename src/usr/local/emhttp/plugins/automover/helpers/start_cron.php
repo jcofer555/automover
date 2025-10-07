@@ -16,20 +16,12 @@ if ($disableSchedule) {
     if (file_exists($moverOld)) {
         $response['messages'][] = '⚠️ Schedule remains enabled due to Mover Tuning plugin.';
     } else {
-        // Check mover file size before disabling
         if (file_exists($moverPath)) {
-            $moverSize = filesize($moverPath);
-            if ($moverSize === false || $moverSize < 4608) {
-                $response['messages'][] = '⚠️ The file isn\'t the expected size and schedule was not disabled.';
-            } else {
-                unlink($moverPath);
-                file_put_contents($moverPath, "");
-                chmod($moverPath, 0755);
-                $response['messages'][] = 'Mover schedule disabled.';
-            }
-        } else {
-            $response['messages'][] = '⚠️ Mover file not found; schedule not disabled.';
+            unlink($moverPath);
         }
+        file_put_contents($moverPath, "");
+        chmod($moverPath, 0755);
+        $response['messages'][] = 'Mover schedule disabled.';
     }
 } else {
     if (!file_exists($moverOld)) {
@@ -42,7 +34,7 @@ if ($disableSchedule) {
             $response['messages'][] = 'Mover schedule restored.';
         }
     } else {
-        $response['messages'][] = 'Schedule cannot be disabled because Mover Tuning plugin is installed.';
+        $response['messages'][] = 'Schedule cannot be disabled because mover tuning plugin is installed.';
     }
 }
 
