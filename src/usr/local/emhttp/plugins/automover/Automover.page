@@ -814,4 +814,7 @@ document.addEventListener("DOMContentLoaded", () => {
   poolSelect.addEventListener('change', () => checkPoolUsage(poolSelect.value));
   setTimeout(() => { checkPoolUsage(poolSelect.value); }, 250);
 });
+if ( typeof caPluginUpdateCheck === "function" ) {
+        caPluginUpdateCheck("automover.plg",{name:"Automover"});
+    }
 </script>
