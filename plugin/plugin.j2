@@ -90,7 +90,16 @@ The 'remove' script.
 <![CDATA[
 removepkg {{ package_name }}
 
-rm -rf /usr/local/sbin/mover.automover
+if [[ -f /usr/local/sbin/mover.automover ]]; then
+  size=$(stat -c%s /usr/local/sbin/mover.automover)
+  if (( size >= 4096 )); then
+    rm -f /usr/local/sbin/mover
+    cp /usr/local/sbin/mover.automover /usr/local/sbin/mover
+  else
+    rm -f /usr/local/sbin/mover.automover
+    echo "⚠️ The mover.automover file is not the right size so schedule was not restored. Please reboot Unraid to fully re-enable Unraid's mover schedule."
+  fi
+fi
 rm -rf /usr/local/emhttp/plugins/{{ name }}
 rm -rf /boot/config/plugins/{{ name }}
 ]]>
