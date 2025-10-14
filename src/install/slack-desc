@@ -1,8 +1,8 @@
              |-----handy-ruler------------------------------------------------------|
 unraid-plugin: Automover
 unraid-plugin:
-unraid-plugin: Monitor pool disks, trigger the mover when thresholds are exceeded
-unraid-plugin: and keep your system tidy — all through a smart, customizable UI.
+unraid-plugin: Monitor pool disks, move files from pool only when thresholds
+unraid-plugin: are exceeded, and log what's been moved.
 unraid-plugin:
 unraid-plugin: Homepage: https://github.com/jcofer555/automover
 unraid-plugin:
