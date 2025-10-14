@@ -279,7 +279,7 @@ input.invalid + .field-warning {
 /* New log box */
 #moved-log-container {
   flex: 1;
-  max-width: 620px;
+  max-width: 850px;
   max-height: 90vh;
   overflow-y: auto;
   background: #111111;
