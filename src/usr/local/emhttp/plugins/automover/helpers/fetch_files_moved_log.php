@@ -10,64 +10,65 @@ $lines = file_exists($logFile)
 
 $matched = [];
 $movedCount = 0;
-$skippedCount = 0;
 
-// ⏱ Parse start and end from the last run log
-$start = $end = null;
-if (file_exists($lastRunLog)) {
-    $lastRunLines = file($lastRunLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-
-    foreach ($lastRunLines as $line) {
-        if (stripos($line, 'Automover session started -') === 0) {
-            $start = trim(substr($line, 26)); // Extract timestamp
-        }
-        if (stripos($line, 'Automover session finished -') === 0) {
-            $end = trim(substr($line, 27)); // Extract timestamp
-        }
-    }
-}
-
-// ⏱️ Compute duration
-$duration = null;
-if ($start && $end) {
-    $startTime = strtotime($start);
-    $endTime = strtotime($end);
-    if ($startTime && $endTime && $endTime >= $startTime) {
-        $duration = ($endTime - $startTime) . 's';
-    }
-}
-
+// 🔍 Filter and count moved lines
 foreach ($lines as $line) {
     $lower = strtolower($line);
 
-    if ($lower === 'mover: started' || $lower === 'mover: finished') {
-        continue;
-    }
-
+    // Apply keyword filter if set
     if ($keyword && strpos($lower, $keyword) === false) {
         continue;
     }
 
-    if (stripos($line, 'move:') === 0 && stripos($line, 'Success') !== false) {
-        $movedCount++;
-    }
-
-    if (stripos($line, 'move:') === 0 && stripos($line, 'Skipped') !== false) {
-        $skippedCount++;
-    }
-
+    // Count every remaining line as a moved file
+    $movedCount++;
     $matched[] = $line;
 }
 
+// 🔍 Check lastRunLog for dry run or no-op messages
+$lastMessage = "No files moved for this run";
+
+if (file_exists($lastRunLog)) {
+    $lastRunLines = array_reverse(file($lastRunLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));
+
+    foreach ($lastRunLines as $line) {
+        if (stripos($line, 'Dry run: No files would have been moved') !== false) {
+            $lastMessage = 'Dry run: No files would have been moved';
+            break;
+        }
+        if (stripos($line, 'No files moved for this run') !== false) {
+            $lastMessage = 'No files moved for this run';
+            break;
+        }
+    }
+}
+
+// ✅ Final log text
 $logText = count($matched) > 0
     ? implode("\n", $matched)
-    : "No files moved for this run.";
+    : $lastMessage;
+
+// ⏱ Extract most recent duration
+$duration = null;
+
+if (file_exists($lastRunLog)) {
+    foreach ($lastRunLines as $line) {
+        if (stripos($line, 'Duration:') === 0) {
+            $duration = trim(substr($line, 9));
+            break;
+        }
+    }
+
+    // Override duration if no files were moved
+    if ($lastMessage === 'Dry run: No files would have been moved' || $lastMessage === 'No files moved for this run') {
+        $duration = 'Nothing to track yet';
+    }
+}
 
 header('Content-Type: application/json');
 echo json_encode([
     'log' => $logText,
     'moved' => $movedCount,
-    'skipped' => $skippedCount,
     'duration' => $duration,
     'total' => count($matched)
 ]);

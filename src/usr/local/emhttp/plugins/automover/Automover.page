@@ -642,9 +642,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         document.getElementById('log-counts').innerHTML = `
-          📦 Files Moved: <strong>${data.moved}</strong><br>
-          🚫 Files Skipped: <strong>${data.skipped}</strong><br>
-          🔢 Total Entries: <strong>${data.total}</strong>
+          📦 Files Moved: <strong>${data.moved}</strong>
         `;
       })
       .catch(err => {

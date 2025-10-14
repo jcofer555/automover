@@ -1,3 +1,3 @@
 **Automover**
 
-Monitor pool disks, trigger the mover when thresholds are exceeded, and log what's been moved.
+Monitor pool disks, move files from pool only when thresholds are exceeded, and log what's been moved.
