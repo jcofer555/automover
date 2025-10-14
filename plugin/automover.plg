@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.10.7.8"
+  version="2025.10.14"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.10.14
+
+- Changed to rsync for the backend instead of mover
+
 ### 2025.10.7.8
 
 - Messaging update
@@ -24,18 +28,14 @@
 
 - Even more messaging updates
 
-### 2025.10.7.6
-
-- Changed default settings
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.7.8-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.10.7.8/unraid-automover-2025.10.7.8-noarch-1.txz</URL>
-<SHA256>b1c7feeac0eb17408236ceeba443b1e08f4c15d7babc17303cb7740f4d2b6e01</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.14-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.10.14/unraid-automover-2025.10.14-noarch-1.txz</URL>
+<SHA256>b3e4b0b297ae21aaa7079d35c03cd0bbe654bf53dabc29ae77ba2f6dac734233</SHA256>
 </FILE>
 
 <!--
@@ -44,7 +44,7 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.7.8-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.14-noarch-1.txz
 
 # Copy default settings if not already present
 [ -f /boot/config/plugins/automover/settings.cfg ] || cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
@@ -59,12 +59,12 @@ fi
 if [ "$AUTOSTART" == "no" ]; then
 
   # Clean up old versions
-  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.7.8')
+  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.14')
 
   echo ""
   echo "----------------------------------------------------"
   echo " automover has been installed."
-  echo " Version: 2025.10.7.8"
+  echo " Version: 2025.10.14"
   echo "----------------------------------------------------"
   echo ""
   exit 0
@@ -82,12 +82,12 @@ echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.
 update_cron
 
 # cleanup old versions
-rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.7.8')
+rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.14')
 
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.10.7.8"
+echo " Version: 2025.10.14"
 echo "----------------------------------------------------"
 echo ""
 ]]>
@@ -102,7 +102,16 @@ The 'remove' script.
 <![CDATA[
 removepkg unraid-automover
 
-rm -rf /usr/local/sbin/mover.automover
+if [[ -f /usr/local/sbin/mover.automover ]]; then
+  size=$(stat -c%s /usr/local/sbin/mover.automover)
+  if (( size >= 4096 )); then
+    rm -f /usr/local/sbin/mover
+    cp /usr/local/sbin/mover.automover /usr/local/sbin/mover
+  else
+    rm -f /usr/local/sbin/mover.automover
+    echo "⚠️ The mover.automover file is not the right size so schedule was not restored. Please reboot Unraid to fully re-enable Unraid's mover schedule."
+  fi
+fi
 rm -rf /usr/local/emhttp/plugins/automover
 rm -rf /boot/config/plugins/automover
 ]]>
