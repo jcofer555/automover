@@ -2,6 +2,7 @@
 $cronFile   = '/boot/config/plugins/automover/automover.cron';
 $logFile    = '/var/log/automover_last_run.log';
 $bootFail   = '/var/tmp/automover_boot_failure';
+$arrayStateFile = '/var/local/emhttp/var.ini';
 
 $status     = 'Stopped';
 $lastRun    = 'Cannot find last run';
@@ -24,14 +25,32 @@ if (file_exists($bootFail)) {
         }
     }
 
-$automoverRunning = file_exists($cronFile) && strpos(file_get_contents($cronFile), 'automover.sh') !== false;
-$parityRunning    = file_exists('/var/local/emhttp/var.ini') && preg_match('/mdResync="([1-9][0-9]*)"/', file_get_contents('/var/local/emhttp/var.ini'));
+    $automoverRunning = file_exists($cronFile) && strpos(file_get_contents($cronFile), 'automover.sh') !== false;
 
-if ($parityRunning) {
-    $status = 'Parity Check Happening While Automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
-} else {
-    $status = $automoverRunning ? 'Running' : 'Stopped';
-}
+    // ✅ Check array state
+    $arrayStopped = false;
+    $parityRunning = false;
+
+    if (file_exists($arrayStateFile)) {
+        $varIni = file_get_contents($arrayStateFile);
+
+        if (preg_match('/mdState="([^"]+)"/', $varIni, $match)) {
+            $arrayStopped = ($match[1] === 'STOPPED');
+        }
+
+        if (preg_match('/mdResync="([1-9][0-9]*)"/', $varIni)) {
+            $parityRunning = true;
+        }
+    }
+
+    // ✅ Status logic with array override
+    if ($arrayStopped) {
+        $status = 'Array Is Not Started While Automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
+    } elseif ($parityRunning) {
+        $status = 'Parity Check Happening While Automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
+    } else {
+        $status = $automoverRunning ? 'Running' : 'Stopped';
+    }
 
     // ✅ Compute readable time difference
     if ($lastRunTs) {

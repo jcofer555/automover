@@ -53,7 +53,8 @@ else
 fi
 
 if [[ -z "$USED" ]]; then
-  echo "Could not retrieve usage for $MOUNT_POINT" >> "$LAST_RUN_FILE"
+  echo "$MOUNT_POINT usage not detected — nothing to do" >> "$LAST_RUN_FILE"
+  log_session_end
   exit 1
 fi
 
@@ -65,7 +66,7 @@ if [[ "$USED" -le "$THRESHOLD" ]]; then
   exit 0
 fi
 
-echo "Usage exceeds threshold" >> "$LAST_RUN_FILE"
+echo "Usage exceeds threshold - starting move" >> "$LAST_RUN_FILE"
 
 dry_run_nothing=true
 moved_anything=false

@@ -14,7 +14,6 @@ $minSize = 4096; // 4KB
 
 // === Handle mover schedule logic ===
 if ($disableSchedule) {
-    // DISABLE_UNRAID_MOVER_SCHEDULE is "yes"
     if (file_exists($moverOld)) {
         $size = filesize($moverOld);
         if ($size >= $minSize) {
@@ -40,27 +39,31 @@ if ($disableSchedule) {
         }
     }
 } else {
-    // DISABLE_UNRAID_MOVER_SCHEDULE is "no"
     if (file_exists($moverOld)) {
-        $size = file_exists($moverBackup) ? filesize($moverBackup) : 0;
-        if ($size >= $minSize) {
-            unlink($moverOld);
-            copy($moverBackup, $moverOld);
-            chmod($moverOld, 0755);
-        } else {
-            $response['messages'][] = '⚠️ The mover.automover file is not the right size so schedule was not restored.';
+        if (file_exists($moverBackup)) {
+            $size = filesize($moverBackup);
+            if ($size >= $minSize) {
+                unlink($moverOld);
+                copy($moverBackup, $moverOld);
+                chmod($moverOld, 0755);
+            } else {
+                $response['messages'][] = '⚠️ The mover.automover file is not the right size so schedule was not restored.';
+            }
         }
     } else {
-        $size = file_exists($moverBackup) ? filesize($moverBackup) : 0;
-        if ($size >= $minSize) {
-            if (file_exists($moverPath)) {
-                unlink($moverPath);
+        if (file_exists($moverBackup)) {
+            $size = filesize($moverBackup);
+            if ($size >= $minSize) {
+                if (file_exists($moverPath)) {
+                    unlink($moverPath);
+                }
+                copy($moverBackup, $moverPath);
+                chmod($moverPath, 0755);
+            } else {
+                $response['messages'][] = '⚠️ The mover.automover file is not the right size so schedule was not restored.';
             }
-            copy($moverBackup, $moverPath);
-            chmod($moverPath, 0755);
-        } else {
-            $response['messages'][] = '⚠️ The mover.automover file is not the right size so schedule was not restored.';
         }
+        // If mover.automover doesn't exist, do nothing silently
     }
 }
 
