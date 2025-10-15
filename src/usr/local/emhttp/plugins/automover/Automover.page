@@ -568,7 +568,7 @@ document.addEventListener('DOMContentLoaded', function () {
         poolSelect.innerHTML = '';
         const pools = Object.keys(data).filter(name => data[name] !== 'N/A');
         if (pools.length === 0) {
-          poolSelect.innerHTML = '<option disabled>No pools detected</option>';
+          poolSelect.innerHTML = '<option disabled>No pools detected - Is the array started?</option>';
         } else {
           pools.forEach(pool => {
             const option = document.createElement('option');
