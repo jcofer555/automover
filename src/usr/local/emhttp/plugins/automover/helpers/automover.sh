@@ -61,19 +61,16 @@ echo "$POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)" >> "$LAST_RUN_FILE"
 
 if [[ "$USED" -le "$THRESHOLD" ]]; then
   echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"
-  echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
-  printf "\n" >> "$LAST_RUN_FILE"
+  log_session_end
   exit 0
 fi
 
 echo "Usage exceeds threshold" >> "$LAST_RUN_FILE"
 
 dry_run_nothing=true
-
-# Automover logic
-SHARE_CFG_DIR="/boot/config/shares"
 moved_anything=false
 
+SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
 
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
@@ -85,21 +82,39 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
   pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
 
-  [[ -z "$use_cache" || -z "$pool1" || -z "$pool2" ]] && continue
+  [[ -z "$use_cache" || -z "$pool1" ]] && continue
 
-  case "$use_cache" in
-    yes)
+  # Override logic when shareCachePool2 is blank
+  if [[ -z "$pool2" ]]; then
+    if [[ "$use_cache" == "yes" ]]; then
       src="/mnt/$pool1/$share_name"
-      dst="/mnt/$pool2/$share_name"
+      dst="/mnt/user0/$share_name"
       cleanup_path="$src"
-      ;;
-    prefer)
-      src="/mnt/$pool2/$share_name"
+      goto_case=true
+    elif [[ "$use_cache" == "prefer" ]]; then
+      src="/mnt/user0/$share_name"
       dst="/mnt/$pool1/$share_name"
       cleanup_path="$src"
-      ;;
-    *) continue ;;
-  esac
+      goto_case=true
+    fi
+  fi
+
+  # Only apply case logic if override wasn't triggered
+  if [[ -z "$goto_case" ]]; then
+    case "$use_cache" in
+      yes)
+        src="/mnt/$pool1/$share_name"
+        dst="/mnt/$pool2/$share_name"
+        cleanup_path="$src"
+        ;;
+      prefer)
+        src="/mnt/$pool2/$share_name"
+        dst="/mnt/$pool1/$share_name"
+        cleanup_path="$src"
+        ;;
+      *) continue ;;
+    esac
+  fi
 
   dst=$(readlink -f "$dst")
   dst_pool=$(basename "$(dirname "$dst")")
@@ -111,14 +126,13 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       file_lines=$(echo "$dry_output" | grep -v '^$')
       file_count=$(echo "$file_lines" | wc -l)
 
-if [[ "$file_count" -gt 0 ]]; then
-  echo "Dry run detected $file_count files to move for share: $share_name" >> "$AUTOMOVER_LOG"
-  echo "Dry run detected $file_count files to move for share: $share_name" >> "$LAST_RUN_FILE"
-  echo "$file_lines" | sed "s|^|$src/|;s|$| -> $dst/|" >> "$AUTOMOVER_LOG"
-  log_session_end
-  moved_anything=true
-  dry_run_nothing=false
-fi
+      if [[ "$file_count" -gt 0 ]]; then
+        echo "Dry run detected $file_count files to move for share: $share_name" >> "$AUTOMOVER_LOG"
+        echo "Dry run detected $file_count files to move for share: $share_name" >> "$LAST_RUN_FILE"
+        echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
+        moved_anything=true
+        dry_run_nothing=false
+      fi
     fi
   else
     if zpool list -H -o name | grep -qx "$dst_pool"; then
@@ -133,9 +147,8 @@ fi
       file_count=$(echo "$file_lines" | wc -l)
 
       if [[ "$file_count" -gt 0 ]]; then
-        echo "$file_lines" | sed "s|^|$src/|;s|$| -> $dst/|" >> "$AUTOMOVER_LOG"
+        echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
         echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
-        log_session_end
         moved_anything=true
       fi
     fi
@@ -159,16 +172,17 @@ fi
   fi
 done
 
-# Final summary if nothing was moved
-if [[ "$moved_anything" == false ]]; then
-  if [[ "$DRY_RUN" == "yes" && "$dry_run_nothing" == "true" ]]; then
+# Final summary and session end
+if [[ "$DRY_RUN" == "yes" ]]; then
+  if [[ "$dry_run_nothing" == "true" ]]; then
     echo "Dry run: No files would have been moved" >> "$AUTOMOVER_LOG"
     echo "Dry run: No files would have been moved" >> "$LAST_RUN_FILE"
-  else
+  fi
+else
+  if [[ "$moved_anything" == false ]]; then
     echo "No files moved for this run" >> "$AUTOMOVER_LOG"
     echo "No files moved for this run" >> "$LAST_RUN_FILE"
   fi
-  echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
-  printf "\n" >> "$LAST_RUN_FILE"
-  rm -f "$AUTOMOVER_LOG"
 fi
+
+log_session_end

@@ -627,11 +627,6 @@ document.addEventListener('DOMContentLoaded', function () {
     fetch(`/plugins/automover/helpers/fetch_files_moved_log.php${query}`)
       .then(res => res.json())
       .then(data => {
-        const formattedDuration = data.duration ? formatDuration(data.duration) : null;
-        document.getElementById('log-duration').innerHTML = formattedDuration
-          ? `⏱ Duration: <strong>${formattedDuration}</strong>`
-          : '⏱ Duration: Nothing to track yet';
-
         const logContainer = document.getElementById('automover-log');
         logContainer.innerHTML = '';
         data.log.split('\n').forEach(line => {
@@ -642,7 +637,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         document.getElementById('log-counts').innerHTML = `
-          📦 Files Moved: <strong>${data.moved}</strong>
+          📦 Total Files Moved: <strong>${data.moved}</strong>
         `;
       })
       .catch(err => {
