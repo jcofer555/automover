@@ -55,18 +55,16 @@ if [ "$AUTOSTART" == "no" ]; then
   echo " Version: {{ env['PLUGIN_VERSION'] }}"
   echo "----------------------------------------------------"
   echo ""
-  exit 0
-fi
+  
+else
 
-if [ "$AUTOSTART" == "no" ]; then
-
-# ✅ Extract interval
+# Extract interval
 INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
 
-# ✅ Write cron schedule
+# Write cron schedule
 echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
 
-# ✅ Reload Unraid cron
+# Reload Unraid cron
 update_cron
 
 # cleanup old versions
