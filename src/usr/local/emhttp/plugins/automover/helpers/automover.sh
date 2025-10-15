@@ -19,7 +19,6 @@ start_time=$(date +%s)
 echo "------------------------------------------------" >> "$LAST_RUN_FILE"
 echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
 
-# Session end function
 log_session_end() {
   end_time=$(date +%s)
   duration=$((end_time - start_time))
@@ -34,15 +33,16 @@ log_session_end() {
   printf "\n" >> "$LAST_RUN_FILE"
 }
 
-# Parity check block
+# Parity check
 if [[ "$ALLOW_DURING_PARITY_CHECK" == "no" ]]; then
   if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; then
     echo "Parity check in progress. Skipping this run." >> "$LAST_RUN_FILE"
+    log_session_end
     exit 0
   fi
 fi
 
-# Disk usage check
+# Usage check
 POOL_NAME=$(basename "$MOUNT_POINT")
 ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
 
@@ -85,7 +85,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
   [[ -z "$use_cache" || -z "$pool1" ]] && continue
 
-  # Override logic when shareCachePool2 is blank
+  # Override logic (no mount check needed)
   if [[ -z "$pool2" ]]; then
     if [[ "$use_cache" == "yes" ]]; then
       src="/mnt/$pool1/$share_name"
@@ -100,7 +100,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     fi
   fi
 
-  # Only apply case logic if override wasn't triggered
+  # Case logic if override not triggered
   if [[ -z "$goto_case" ]]; then
     case "$use_cache" in
       yes)
@@ -115,6 +115,18 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
         ;;
       *) continue ;;
     esac
+
+    # Pool-to-pool mount validation
+    if [[ -n "$pool1" && -n "$pool2" && "$use_cache" =~ ^(yes|prefer)$ ]]; then
+      if ! mountpoint -q "$src"; then
+        echo "Source not mounted: $src — skipping share: $share_name" >> "$LAST_RUN_FILE"
+        continue
+      fi
+      if ! mountpoint -q "$dst"; then
+        echo "Destination not mounted: $dst — skipping share: $share_name" >> "$LAST_RUN_FILE"
+        continue
+      fi
+    fi
   fi
 
   dst=$(readlink -f "$dst")
@@ -180,7 +192,7 @@ if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run: No files would have been moved" >> "$LAST_RUN_FILE"
   fi
 else
-  if [[ "$moved_anything" == false ]]; then
+    if [[ "$moved_anything" == false ]]; then
     echo "No files moved for this run" >> "$AUTOMOVER_LOG"
     echo "No files moved for this run" >> "$LAST_RUN_FILE"
   fi
