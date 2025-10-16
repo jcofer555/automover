@@ -3,6 +3,19 @@
 LAST_RUN_FILE="/var/log/automover_last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
 AUTOMOVER_LOG="/var/log/automover_files_moved.log"
+EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
+IN_USE_FILE="/boot/config/plugins/automover/in_use_files.txt"
+
+# Generate in-use file exclusion list
+> "$IN_USE_FILE"
+for dir in /mnt/*; do
+  [[ "$dir" == /mnt/disk* ]] && continue
+  [[ "$dir" == "/mnt/user" || "$dir" == "/mnt/addons" || "$dir" == "/mnt/rootshare" ]] && continue
+  if [ -d "$dir" ]; then
+    lsof +D "$dir" 2>/dev/null | awk '$4 ~ /^[0-9]+[rwu]$/ {print $9}' >> "$IN_USE_FILE"
+  fi
+done
+sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
 
 # Load settings
 if [[ -f "$CFG_PATH" ]]; then
@@ -85,7 +98,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
   [[ -z "$use_cache" || -z "$pool1" ]] && continue
 
-  # Override logic (no mount check needed)
   if [[ -z "$pool2" ]]; then
     if [[ "$use_cache" == "yes" ]]; then
       src="/mnt/$pool1/$share_name"
@@ -100,7 +112,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     fi
   fi
 
-  # Case logic if override not triggered
   if [[ -z "$goto_case" ]]; then
     case "$use_cache" in
       yes)
@@ -116,7 +127,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       *) continue ;;
     esac
 
-    # Pool-to-pool mount validation
     if [[ -n "$pool1" && -n "$pool2" && "$use_cache" =~ ^(yes|prefer)$ ]]; then
       if ! mountpoint -q "$src"; then
         echo "Source not mounted: $src — skipping share: $share_name" >> "$LAST_RUN_FILE"
@@ -133,11 +143,27 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   dst_pool=$(basename "$(dirname "$dst")")
   dst_share=$(basename "$dst")
 
+  # Load exclusions per share
+  excludes=()
+  src_clean="${src%/}"
+
+  for file in "$EXCLUSIONS_FILE" "$IN_USE_FILE"; do
+    [[ -f "$file" ]] || continue
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ -z "$line" || "$line" =~ ^# ]] && continue
+      line_clean="${line%/}"
+      if [[ "$line_clean" == "$src_clean"* ]]; then
+        rel="${line_clean#$src_clean/}"
+        excludes+=("--exclude=$rel")
+      fi
+    done < "$file"
+  done
+
   if [[ "$DRY_RUN" == "yes" ]]; then
     if [[ -d "$src" ]]; then
-      dry_output=$(rsync -anH --checksum --out-format="%n" "$src/" "$dst/" 2>/dev/null | grep -vE '/$|^\.$')
-      file_lines=$(echo "$dry_output" | grep -v '^$')
-      file_count=$(echo "$file_lines" | wc -l)
+      dry_output=$(rsync -ainH --checksum "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
+      file_lines=$(echo "$dry_output" | awk '$1 ~ /^>f/' | cut -c13-)
+      file_count=$(echo "$file_lines" | grep -c .)
 
       if [[ "$file_count" -gt 0 ]]; then
         echo "Dry run detected $file_count files to move for share: $share_name" >> "$AUTOMOVER_LOG"
@@ -155,18 +181,47 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     fi
 
     if [[ -d "$src" ]]; then
-      output=$(rsync -aH --checksum --remove-source-files --out-format="%n" "$src/" "$dst/" 2>/dev/null)
-      file_lines=$(echo "$output" | awk '!/\/$/ && $0 != "." && NF')
-      file_count=$(echo "$file_lines" | wc -l)
+      output=$(rsync -aiH --checksum --remove-source-files "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
+      file_lines=$(echo "$output" | awk '$1 ~ /^>f/' | cut -c13-)
+      file_count=$(echo "$file_lines" | grep -c .)
 
       if [[ "$file_count" -gt 0 ]]; then
         echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
         echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
         moved_anything=true
       fi
+
+      # Cleanup directories that had files moved
+      moved_dirs=()
+      while IFS= read -r file; do
+        full_path="$src/$file"
+        dir=$(dirname "$full_path")
+        while [[ "$dir" != "$src" && "$dir" != "/" ]]; do
+          moved_dirs+=("$dir")
+          dir=$(dirname "$dir")
+        done
+      done <<< "$file_lines"
+
+      unique_dirs=$(printf "%s\n" "${moved_dirs[@]}" | sort -u | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
+      for dir in $unique_dirs; do
+        [[ -d "$dir" && -z "$(ls -A "$dir")" ]] && rmdir "$dir" 2>/dev/null
+      done
+
+      # Additional cleanup: scan full source tree for empty folders not excluded
+      if [[ -d "$src" ]]; then
+        while IFS= read -r dir; do
+          skip=false
+          for ex in "${excludes[@]}"; do
+            ex_path="${ex#--exclude=}"
+            [[ "$dir" == "$src/$ex_path"* ]] && skip=true && break
+          done
+          [[ "$skip" == true ]] && continue
+          [[ -d "$dir" && -z "$(ls -A "$dir")" ]] && rmdir "$dir" 2>/dev/null
+        done < <(find "$src" -type d | sort -r)
+      fi
     fi
 
-    find "$cleanup_path" -type d -empty -delete
+    # ZFS dataset cleanup
     cleanup_path=$(readlink -f "$cleanup_path")
     zfs_dataset=$(zfs list -H -o name,mountpoint | awk -v path="$cleanup_path" '$2 == path {print $1}')
 
@@ -192,7 +247,7 @@ if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run: No files would have been moved" >> "$LAST_RUN_FILE"
   fi
 else
-    if [[ "$moved_anything" == false ]]; then
+  if [[ "$moved_anything" == false ]]; then
     echo "No files moved for this run" >> "$AUTOMOVER_LOG"
     echo "No files moved for this run" >> "$LAST_RUN_FILE"
   fi

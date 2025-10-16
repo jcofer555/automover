@@ -279,7 +279,7 @@ input.invalid + .field-warning {
 /* New log box */
 #moved-log-container {
   flex: 1;
-  max-width: 850px;
+  max-width: 870px;
   max-height: 90vh;
   overflow-y: auto;
   background: #111111;
@@ -306,7 +306,7 @@ input.invalid + .field-warning {
   font-size: 13px;
   color: #00ffaa;
   border: 1px solid var(--primary-blue);
-  max-height: 42vh;
+  max-height: 52vh;
   overflow-y: auto;
 }
 
@@ -369,7 +369,7 @@ input.invalid + .field-warning {
   font-size: 13px;
   color: #00ffaa;
   border: 1px solid var(--primary-blue);
-  max-height: 55vh;
+  max-height: 61vh;
   overflow-y: auto;
 }
 
