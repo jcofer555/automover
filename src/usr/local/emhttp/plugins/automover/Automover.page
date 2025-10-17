@@ -8,28 +8,45 @@ Markdown="false"
 <?php
 $cfgPath = '/boot/config/plugins/automover/settings.cfg';
 
-// Create default if missing
-if (!file_exists($cfgPath)) {
-    $defaults = [
-        'POOL_NAME' => 'cache',
-        'THRESHOLD' => 50,
-        'INTERVAL' => 60,
-        'DRY_RUN' => 'no',
-        'ALLOW_DURING_PARITY_CHECK' => 'no',
-        'AUTOSTART' => 'no',
-        'DISABLE_UNRAID_MOVER_SCHEDULE' => 'no',
-        'AGE_BASED_FILTER' => 'no',
-        'AGE_DAYS' => 0
-    ];
-    $configText = '';
-    foreach ($defaults as $key => $value) {
-        $configText .= "$key=\"$value\"\n";
-    }
-    @file_put_contents($cfgPath, $configText);
+// Define all default keys and their order
+$defaults = [
+    'POOL_NAME' => 'cache',
+    'THRESHOLD' => 0,
+    'INTERVAL' => 60,
+    'DRY_RUN' => 'no',
+    'ALLOW_DURING_PARITY_CHECK' => 'no',
+    'AUTOSTART' => 'no',
+    'DISABLE_UNRAID_MOVER_SCHEDULE' => 'no',
+    'AGE_BASED_FILTER' => 'no',
+    'AGE_DAYS' => 1
+];
+
+// Load existing config if present
+$existing = [];
+if (file_exists($cfgPath)) {
+    $existing = parse_ini_file($cfgPath) ?: [];
 }
 
-$settings = parse_ini_file($cfgPath) ?: [];
+// Merge without overwriting existing keys
+foreach ($defaults as $key => $value) {
+    if (!array_key_exists($key, $existing)) {
+        $existing[$key] = $value;
+    }
+}
+
+// Rebuild config text in the correct order
+$configText = '';
+foreach ($defaults as $key => $defaultValue) {
+    $val = $existing[$key];
+    $configText .= "$key=\"$val\"\n";
+}
+
+// Write back to file (safe atomic replace)
+@file_put_contents($cfgPath, $configText);
+
+$settings = $existing;
 ?>
+
 <style>
 :root {
   --primary-blue: #00aaff;
