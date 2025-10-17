@@ -273,13 +273,14 @@ input.invalid + .field-warning {
 /* Existing settings box */
 #automover-settings {
   flex: 1;
+  height: 69vh;
   max-width: 450px;
 }
 
-/* New log box */
 #moved-log-container {
   flex: 1;
   max-width: 870px;
+  height: 69vh;
   max-height: 90vh;
   overflow-y: auto;
   background: #111111;
@@ -288,6 +289,9 @@ input.invalid + .field-warning {
   padding: 20px;
   font-family: sans-serif;
   color: #f0f8ff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Align content to top-left */
 }
 
 #moved-log-container h3 {
@@ -297,6 +301,8 @@ input.invalid + .field-warning {
 }
 
 #automover-log {
+  width: 100%;               /* Take full width of parent */
+  box-sizing: border-box;    /* Include padding/border in width */
   white-space: pre-wrap;
   word-break: break-word;
   background-color: #111111;
@@ -306,8 +312,9 @@ input.invalid + .field-warning {
   font-size: 13px;
   color: #00ffaa;
   border: 1px solid var(--primary-blue);
-  max-height: 52vh;
-  overflow-y: auto;
+  height: auto;
+  max-height: none;
+  overflow-y: visible;
 }
 
 #log-counts {
@@ -343,6 +350,7 @@ input.invalid + .field-warning {
 #last-run-container {
   flex: 1;
   max-width: 420px;
+  height: 71vh;
   max-height: 90vh;
   overflow-y: auto;
   background: #111111;
