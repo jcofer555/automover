@@ -318,9 +318,11 @@ input.invalid + .field-warning {
 }
 
 #log-counts {
-  margin-top: 12px;
+  margin-bottom: 12px;
   color: var(--primary-blue);
   font-size: 14px;
+  text-align: left;
+  width: 100%;
 }
 
 .skipped-line {
@@ -329,8 +331,8 @@ input.invalid + .field-warning {
 
 .log-header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  flex-direction: column; /* stack children vertically */
+  align-items: flex-start; /* align left */
   margin-bottom: 12px;
 }
 
@@ -524,12 +526,10 @@ input[type="number"].short-input {
   <div id="moved-log-container">
     <div class="log-header">
       <h3>Mover Log For Last Run</h3>
-      <div id="log-duration" style="margin-bottom: 10px; color: var(--primary-blue); font-size: 14px;"></div>
       <div id="log-counts" class="log-stats"></div>
     </div>
     <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom: 12px;">
     <pre id="automover-log">Loading...</pre>
-    <div id="log-counts"></div>
   </div>
 
   <!-- Last Run Panel -->
@@ -621,14 +621,6 @@ document.addEventListener('DOMContentLoaded', function () {
   loadLastRunLog();
   setInterval(loadLastRunLog, 5000);
 
-  function formatDuration(secondsStr) {
-    const seconds = parseInt(secondsStr.replace(/[^\d]/g, ''), 10);
-    if (isNaN(seconds)) return null;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-  }
-
   function loadMoverLog() {
     const keyword = filterInput.value.trim();
     const query = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
@@ -645,7 +637,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         document.getElementById('log-counts').innerHTML = `
-          📦 Total Files Moved: <strong>${data.moved}</strong>
+          <h3>Total Files Moved: ${data.moved}</h3>
         `;
       })
       .catch(err => {
