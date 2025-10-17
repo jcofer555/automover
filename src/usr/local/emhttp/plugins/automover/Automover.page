@@ -458,7 +458,7 @@ input[type="number"].short-input {
       <div class="input-wrapper">
         <input type="number" id="interval" class="short-input" min="1" step="1"
           value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? '') ?>">
-        <div id="interval-warning" class="field-warning">Interval must be at least 1</div>
+        <div id="interval-warning" class="field-warning">Interval must be at least 5</div>
       </div>
     </div>
 
@@ -698,7 +698,7 @@ document.getElementById('stop-button').addEventListener('click', function () {
     return !invalid;
   }
 
-  intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 1 }, 'interval-warning'));
+  intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 5 }, 'interval-warning'));
   thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
 
   // --- Save & Start ---
