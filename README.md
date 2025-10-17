@@ -1,8 +1,8 @@
-# 🛡️ Automover Plugin for unRAID
+Automover Plugin for unRAID
 
 **Monitor pool disks, move files from pool only when thresholds are exceeded, and log what's been moved.**
 
-## 📦 Features
+## Features ##
 
 - Monitor selected pool disks only (cache, other pools — excludes array)
 - Enable dry-run mode to simulate triggers
@@ -16,5 +16,6 @@
 - Ability to disable unraids built in mover schedule
 - Recommend not combining with mover tuning plugin
 
-<img width="1917" height="758" alt="image" src="https://github.com/user-attachments/assets/7a544076-b4c9-48a5-bb11-a3463c08ae54" />
+<img width="1000" height="479" alt="image thumb png 578135af9fd232ad42238fec22f76930" src="https://github.com/user-attachments/assets/58acd420-f6ed-420f-9c73-1a3d1b0eebca" />
+
 
