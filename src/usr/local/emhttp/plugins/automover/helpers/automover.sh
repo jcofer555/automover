@@ -6,15 +6,32 @@ AUTOMOVER_LOG="/var/log/automover_files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
 IN_USE_FILE="/boot/config/plugins/automover/in_use_files.txt"
 
-# Generate in-use file exclusion list
+# Generate in-use file exclusion list with disk path translation
 > "$IN_USE_FILE"
+
+EXCLUDES=("user" "user0" "addons" "disks" "remotes" "rootshare")
+
 for dir in /mnt/*; do
-  [[ "$dir" == /mnt/disk* ]] && continue
-  [[ "$dir" == "/mnt/user" || "$dir" == "/mnt/addons" || "$dir" == "/mnt/rootshare" ]] && continue
-  if [ -d "$dir" ]; then
-    lsof +D "$dir" 2>/dev/null | awk '$4 ~ /^[0-9]+[rwu]$/ {print $9}' >> "$IN_USE_FILE"
-  fi
+  base="$(basename "$dir")"
+
+  # Skip excluded names
+  [[ " ${EXCLUDES[*]} " =~ " $base " ]] && continue
+
+  # Skip non-directories
+  [[ -d "$dir" ]] || continue
+
+  # Scan for open files and translate disk paths
+  lsof +D "$dir" 2>/dev/null | awk -v path="$dir" '
+    $4 ~ /^[0-9]+[rwu]$/ && $9 ~ "^/mnt/" {
+      file=$9
+      if (file ~ "^/mnt/disk[0-9]+/") {
+        sub("^/mnt/disk[0-9]+", "/mnt/user0", file)
+      }
+      print file
+    }
+  ' >> "$IN_USE_FILE"
 done
+
 sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
 
 # Load settings
