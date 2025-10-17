@@ -13,6 +13,8 @@ $args = [
     $_GET['ALLOW_DURING_PARITY_CHECK'] ?? '',
     $_GET['AUTOSTART'] ?? '',
     $_GET['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '',
+    $_GET['AGE_BASED_FILTER'] ?? '',
+    $_GET['AGE_DAYS'] ?? '',
 ];
 
 // Escape each argument for safety

@@ -17,7 +17,9 @@ if (!file_exists($cfgPath)) {
         'DRY_RUN' => 'no',
         'ALLOW_DURING_PARITY_CHECK' => 'no',
         'AUTOSTART' => 'no',
-        'DISABLE_UNRAID_MOVER_SCHEDULE' => 'no'
+        'DISABLE_UNRAID_MOVER_SCHEDULE' => 'no',
+        'AGE_BASED_FILTER' => 'no',
+        'AGE_DAYS' => 0
     ];
     $configText = '';
     foreach ($defaults as $key => $value) {
@@ -464,6 +466,15 @@ input[type="number"].short-input {
       </div>
     </div>
 
+    <div class="form-pair" id="age-days-container" style="display: none;">
+  <label for="age_days" class="tooltip" data-tooltip="Only move files older than this many days.">Age (days):</label>
+  <div class="input-wrapper">
+    <input type="number" id="age_days" class="short-input" min="0" step="1"
+      value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
+    <div id="age-days-warning" class="field-warning">Age must be 0 or greater</div>
+  </div>
+</div>
+
     <!-- Checkboxes -->
     <div class="checkbox-row">
       <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
@@ -484,6 +495,11 @@ input[type="number"].short-input {
       <label class="form-check tooltip" data-tooltip="Disables Unraid's built-in mover schedule.">
         <input type="checkbox" id="disable_unraid_mover_schedule"
           <?php echo ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '') === 'yes' ? 'checked' : '' ?>> Disable Unraid Mover Schedule
+      </label>
+
+      <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old.">
+        <input type="checkbox" id="age_based_filter"
+          <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable age Based Filter
       </label>
     </div>
 
@@ -567,6 +583,14 @@ document.addEventListener('DOMContentLoaded', function () {
   const saveBtn = document.getElementById('save-settings');
   const confirmBadge = document.getElementById('save-confirmation');
   let currentPoolSelection = poolSelect.dataset.selected || '';
+  const ageFilterCheckbox = document.getElementById('age_based_filter');
+  const ageDaysContainer = document.getElementById('age-days-container');
+
+function toggleAgeInput() {
+  ageDaysContainer.style.display = ageFilterCheckbox.checked ? 'flex' : 'none';
+}
+ageFilterCheckbox.addEventListener('change', toggleAgeInput);
+toggleAgeInput(); // Initial state
 
   // --- Pool Usage ---
   function updatePoolUsage() {
@@ -693,6 +717,10 @@ document.getElementById('stop-button').addEventListener('click', function () {
   intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 5 }, 'interval-warning'));
   thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
 
+  const ageDaysInput = document.getElementById('age_days');
+  ageDaysInput.addEventListener('input', () => validateField(ageDaysInput, { min: 1 }, 'age-days-warning'));
+
+
   // --- Save & Start ---
 saveBtn.addEventListener('click', function () {
   const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
@@ -703,15 +731,17 @@ saveBtn.addEventListener('click', function () {
     return;
   }
 
-  const settings = {
-    POOL_NAME: poolSelect.value,
-    THRESHOLD: thresholdInput.value,
-    INTERVAL: intervalInput.value,
-    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-    ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-    DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no'
-  };
+const settings = {
+  POOL_NAME: poolSelect.value,
+  THRESHOLD: thresholdInput.value,
+  INTERVAL: intervalInput.value,
+  DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+  ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+  AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+  DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no',
+  AGE_BASED_FILTER: ageFilterCheckbox.checked ? 'yes' : 'no',
+  AGE_DAYS: ageDaysInput.value
+};
   const query = new URLSearchParams(settings).toString();
 
   const confirmBadge = document.getElementById('save-confirmation');

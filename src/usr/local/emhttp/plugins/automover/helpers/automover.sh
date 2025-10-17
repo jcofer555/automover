@@ -13,14 +13,9 @@ EXCLUDES=("user" "user0" "addons" "disks" "remotes" "rootshare")
 
 for dir in /mnt/*; do
   base="$(basename "$dir")"
-
-  # Skip excluded names
   [[ " ${EXCLUDES[*]} " =~ " $base " ]] && continue
-
-  # Skip non-directories
   [[ -d "$dir" ]] || continue
 
-  # Scan for open files and translate disk paths
   lsof +D "$dir" 2>/dev/null | awk -v path="$dir" '
     $4 ~ /^[0-9]+[rwu]$/ && $9 ~ "^/mnt/" {
       file=$9
@@ -40,6 +35,21 @@ if [[ -f "$CFG_PATH" ]]; then
 else
   echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
   exit 1
+fi
+
+# Normalize quoted values
+for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY_CHECK AGE_BASED_FILTER; do
+  eval "$var=\$(echo \${$var} | tr -d '\"')"
+done
+
+# Age-based configuration
+if [[ "$AGE_BASED_FILTER" == "yes" && "$AGE_DAYS" =~ ^[0-9]+$ && "$AGE_DAYS" -gt 0 ]]; then
+  AGE_FILTER_ENABLED=true
+  AGE_DAYS_CLEAN=$AGE_DAYS
+  ((AGE_DAYS_CLEAN > 0)) || AGE_DAYS_CLEAN=1
+  MTIME_ARG="+$((AGE_DAYS_CLEAN - 1))"
+else
+  AGE_FILTER_ENABLED=false
 fi
 
 MOUNT_POINT="/mnt/${POOL_NAME}"
@@ -105,6 +115,7 @@ SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
 
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
+  goto_case=false
   [[ -f "$cfg" ]] || continue
   share_name="${cfg##*/}"
   share_name="${share_name%.cfg}"
@@ -176,9 +187,24 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     done < "$file"
   done
 
+  # DRY RUN
   if [[ "$DRY_RUN" == "yes" ]]; then
     if [[ -d "$src" ]]; then
-      dry_output=$(rsync -ainH --checksum "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
+      if [[ "$AGE_FILTER_ENABLED" == true ]]; then
+        mapfile -t aged_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
+        mapfile -t aged_dirs  < <(cd "$src" && find . -type d -empty -mtime "$MTIME_ARG" -printf '%P/\n' 2>/dev/null)
+        all_aged_items=("${aged_files[@]}" "${aged_dirs[@]}")
+
+        if (( ${#all_aged_items[@]} == 0 )); then
+          continue
+        fi
+
+        rsync_filter=("--files-from=-")
+        dry_output=$(printf '%s\n' "${all_aged_items[@]}" | rsync -ainH --checksum "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
+      else
+        dry_output=$(rsync -ainH --checksum "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
+      fi
+
       file_lines=$(echo "$dry_output" | awk '$1 ~ /^>f/' | cut -c13-)
       file_count=$(echo "$file_lines" | grep -c .)
 
@@ -190,6 +216,8 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
         dry_run_nothing=false
       fi
     fi
+
+  # ACTUAL MOVE
   else
     if zpool list -H -o name | grep -qx "$dst_pool"; then
       if ! zfs list -H -o name | grep -qx "$dst_pool/$dst_share"; then
@@ -198,7 +226,19 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     fi
 
     if [[ -d "$src" ]]; then
-      output=$(rsync -aiH --checksum --remove-source-files "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
+      if [[ "$AGE_FILTER_ENABLED" == true ]]; then
+        mapfile -t aged_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
+        mapfile -t aged_dirs  < <(cd "$src" && find . -type d -empty -mtime "$MTIME_ARG" -printf '%P/\n' 2>/dev/null)
+        all_aged_items=("${aged_files[@]}" "${aged_dirs[@]}")
+        if (( ${#all_aged_items[@]} == 0 )); then
+          continue
+        fi
+        rsync_filter=("--files-from=-")
+        output=$(printf '%s\n' "${all_aged_items[@]}" | rsync -aiH --checksum --remove-source-files "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
+      else
+        output=$(rsync -aiH --checksum --remove-source-files "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
+      fi
+
       file_lines=$(echo "$output" | awk '$1 ~ /^>f/' | cut -c13-)
       file_count=$(echo "$file_lines" | grep -c .)
 
@@ -207,35 +247,28 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
         echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
         moved_anything=true
       fi
+    fi
 
-      # Cleanup directories that had files moved
-      moved_dirs=()
-      while IFS= read -r file; do
-        full_path="$src/$file"
-        dir=$(dirname "$full_path")
-        while [[ "$dir" != "$src" && "$dir" != "/" ]]; do
-          moved_dirs+=("$dir")
-          dir=$(dirname "$dir")
+    # Always perform empty directory cleanup (even if AGE filter off)
+    if [[ -d "$src" ]]; then
+      while IFS= read -r dir; do
+        skip=false
+        for ex in "${excludes[@]}"; do
+          ex_path="${ex#--exclude=}"
+          [[ "$dir" == "$src/$ex_path"* ]] && skip=true && break
         done
-      done <<< "$file_lines"
+        [[ "$skip" == true ]] && continue
 
-      unique_dirs=$(printf "%s\n" "${moved_dirs[@]}" | sort -u | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
-      for dir in $unique_dirs; do
-        [[ -d "$dir" && -z "$(ls -A "$dir")" ]] && rmdir "$dir" 2>/dev/null
-      done
-
-      # Additional cleanup: scan full source tree for empty folders not excluded
-      if [[ -d "$src" ]]; then
-        while IFS= read -r dir; do
-          skip=false
-          for ex in "${excludes[@]}"; do
-            ex_path="${ex#--exclude=}"
-            [[ "$dir" == "$src/$ex_path"* ]] && skip=true && break
-          done
-          [[ "$skip" == true ]] && continue
-          [[ -d "$dir" && -z "$(ls -A "$dir")" ]] && rmdir "$dir" 2>/dev/null
-        done < <(find "$src" -type d | sort -r)
-      fi
+        if [[ -d "$dir" && -z "$(ls -A "$dir")" ]]; then
+          if [[ "$AGE_FILTER_ENABLED" == true ]]; then
+            if find "$dir" -maxdepth 0 -type d -mtime "$MTIME_ARG" | grep -q .; then
+              rmdir "$dir" 2>/dev/null
+            fi
+          else
+            rmdir "$dir" 2>/dev/null
+          fi
+        fi
+      done < <(find "$src" -type d | sort -r)
     fi
 
     # ZFS dataset cleanup
@@ -257,7 +290,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   fi
 done
 
-# Final summary and session end
+# Final summary
 if [[ "$DRY_RUN" == "yes" ]]; then
   if [[ "$dry_run_nothing" == "true" ]]; then
     echo "Dry run: No files would have been moved" >> "$AUTOMOVER_LOG"
