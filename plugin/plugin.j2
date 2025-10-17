@@ -34,8 +34,49 @@ The 'install' script.
 <![CDATA[
 upgradepkg --install-new /boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz
 
-# Copy default settings if not already present
-[ -f /boot/config/plugins/automover/settings.cfg ] || cp /usr/local/emhttp/plugins/automover/helpers/default_settings.cfg /boot/config/plugins/automover/settings.cfg
+USER_CFG="/boot/config/plugins/automover/settings.cfg"
+DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
+TMP_CFG="/tmp/automover_settings.tmp"
+
+# Define the desired key order
+ordered_keys=(
+    "POOL_NAME"
+    "THRESHOLD"
+    "INTERVAL"
+    "DRY_RUN"
+    "ALLOW_DURING_PARITY_CHECK"
+    "AUTOSTART"
+    "DISABLE_UNRAID_MOVER_SCHEDULE"
+    "AGE_BASED_FILTER"
+    "AGE_DAYS"
+)
+
+# If user config doesn't exist, copy the default
+if [ ! -f "$USER_CFG" ]; then
+    cp "$DEFAULT_CFG" "$USER_CFG"
+else
+    # Add missing keys from default config
+    while IFS='=' read -r key val; do
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        if ! grep -q -E "^[[:space:]]*${key}[[:space:]]*=" "$USER_CFG"; then
+            echo "$key=$val" >> "$USER_CFG"
+        fi
+    done < "$DEFAULT_CFG"
+fi
+
+# Sort config: priority keys first, then the rest
+{
+    # Print ordered keys in order if they exist
+    for key in "${ordered_keys[@]}"; do
+        grep -E "^[[:space:]]*${key}[[:space:]]*=" "$USER_CFG"
+    done
+
+    # Print remaining keys not in the ordered list
+    grep -v -E "^($(IFS='|'; echo "${ordered_keys[*]}"))=" "$USER_CFG"
+} > "$TMP_CFG"
+
+# Replace original config with sorted version
+mv "$TMP_CFG" "$USER_CFG"
 
 SETTINGS="/boot/config/plugins/automover/settings.cfg"
 CRON_FILE="/boot/config/plugins/automover/automover.cron"
