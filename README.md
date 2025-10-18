@@ -11,6 +11,7 @@
 - Autostart at boot option
 - Allow or deny moving when parity is checking
 - Interval setting to check threshold with a minimum of 5 minute
+- Ability to manually set file/folder excludes
 - Ability to disable unraids built in mover schedule
 - Ability to exclude files from moving unless they are X amount of days or older
 - Ability to exclude files from moving unless they are at least X MB in size or larger
