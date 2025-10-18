@@ -17,7 +17,8 @@
 - Logging to /var/log/automover_last_run.log and /var/log/automover_files_moved.log
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="480" alt="image thumb png 96e376ee5b030002898480ba738df32f" src="https://github.com/user-attachments/assets/7642f963-39f5-49b3-8723-c3d26ab073c8" />
+<img width="1917" height="829" alt="image" src="https://github.com/user-attachments/assets/72dbfc38-cc09-4ca2-90f5-3700e2195d19" />
+
 
 
 
