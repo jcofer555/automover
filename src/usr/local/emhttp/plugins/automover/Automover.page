@@ -5,12 +5,43 @@ Icon="icon.png"
 Tag="icon.png"
 Markdown="false"
 ---
-<?php
-$csrf_token = $_GET['csrf_token'] ?? '';
-?>
 <script>
-const csrfToken = "<?= $csrf_token ?>";
+// UNIVERSAL CSRF TOKEN DISCOVERY for Unraid plugin pages
+let csrfToken = "<?= $_GET['csrf_token'] ?? ($_COOKIE['csrf_token'] ?? '') ?>";
+
+// Try dynamic lookup from global scope, cookie, or meta
+if (!csrfToken || csrfToken === "undefined" || csrfToken === "") {
+  try {
+    // 1️⃣ Try the global variable used by Unraid's WebGUI JS
+    if (typeof window.csrf_token !== "undefined" && window.csrf_token) {
+      csrfToken = window.csrf_token;
+    }
+
+    // 2️⃣ Try any embedded meta tag
+    if ((!csrfToken || csrfToken === "") && document.querySelector("meta[name='csrf_token']")) {
+      csrfToken = document.querySelector("meta[name='csrf_token']").getAttribute("content");
+    }
+
+    // 3️⃣ Try cookie (most Unraid builds set it)
+    if ((!csrfToken || csrfToken === "") && document.cookie.includes("csrf_token=")) {
+      const m = document.cookie.match(/csrf_token=([^;]+)/);
+      if (m) csrfToken = decodeURIComponent(m[1]);
+    }
+
+    // 4️⃣ Fallback: try to extract from any script tag in the parent frame
+    if ((!csrfToken || csrfToken === "") && window.parent) {
+      try {
+        if (window.parent.csrf_token) csrfToken = window.parent.csrf_token;
+      } catch (e) { /* ignore cross-frame */ }
+    }
+  } catch (err) {
+    console.warn("CSRF token discovery failed:", err);
+  }
+}
+
+console.log("Resolved CSRF token:", csrfToken || "<empty>");
 </script>
+
 
 <?php
 $cfgPath = '/boot/config/plugins/automover/settings.cfg';
@@ -882,8 +913,8 @@ document.addEventListener('change', (e) => {
 
   if (selectedExts.size > 0) {
     const label = Array.from(selectedExts).map(e => `*.${e}`).join(', ');
-    addExtBtn.textContent = `Add ext's as wildcards`;
-    removeExtBtn.textContent = `Remove ext's as wildcards`;
+    addExtBtn.textContent = `Add extensions as wildcards`;
+    removeExtBtn.textContent = `Remove extensions as wildcards`;
     addExtBtn.style.display = 'inline-block';
     removeExtBtn.style.display = 'inline-block';
   } else {
