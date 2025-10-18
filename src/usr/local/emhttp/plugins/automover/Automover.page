@@ -6,6 +6,13 @@ Tag="icon.png"
 Markdown="false"
 ---
 <?php
+$csrf_token = $_GET['csrf_token'] ?? '';
+?>
+<script>
+const csrfToken = "<?= $csrf_token ?>";
+</script>
+
+<?php
 $cfgPath = '/boot/config/plugins/automover/settings.cfg';
 
 // Define all default keys and their order
@@ -20,7 +27,8 @@ $defaults = [
     'AGE_BASED_FILTER' => 'no',
     'AGE_DAYS' => 1,
     'SIZE_BASED_FILTER' => 'no',
-    'SIZE_MB' => 1
+    'SIZE_MB' => 1,
+    'EXCLUSIONS_ENABLED' => 'no'
 ];
 
 // Load existing config if present
@@ -28,448 +36,165 @@ $existing = [];
 if (file_exists($cfgPath)) {
     $existing = parse_ini_file($cfgPath) ?: [];
 }
-
 // Merge without overwriting existing keys
 foreach ($defaults as $key => $value) {
     if (!array_key_exists($key, $existing)) {
         $existing[$key] = $value;
     }
 }
-
 // Rebuild config text in the correct order
 $configText = '';
 foreach ($defaults as $key => $defaultValue) {
     $val = $existing[$key];
     $configText .= "$key=\"$val\"\n";
 }
-
-// Write back to file (safe atomic replace)
 @file_put_contents($cfgPath, $configText);
-
 $settings = $existing;
 ?>
 
 <style>
-:root {
-  --primary-blue: #00aaff;
-  --status-green: #2ECC40;
-}
-
-#automover-settings {
-  width: fit-content;
-  padding: 20px;
-  background: #111111;
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 128, 128, 0.3);
-  text-align: left;
-}
-
-.form-row {
-  flex-direction: column;
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-label {
-  color: var(--primary-blue);
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-input, select {
-  border: 1px solid var(--primary-blue);
-  border-radius: 5px;
-  padding: 8px;
-  background: #111111;
-  color: #ffffff;
-}
-
-button {
-  margin-right: 10px;
-  padding: 8px 15px;
-  border: none;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.checkbox-row {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 2 columns */
-  gap: 0px 30px; /* vertical and horizontal spacing */
-  margin-top: 10px;
-  align-items: center;
-}
-
-.checkbox-row label {
-  display: flex;
-  align-items: center; /* vertically center checkbox + text */
-  gap: 1px; /* spacing between box and label text */
-  font-size: 15px;
-  line-height: 1.4;
-  cursor: pointer;
-}
-
-.checkbox-row input[type="checkbox"] {
-  transform: scale(1.2); /* make checkbox slightly larger */
-  accent-color: var(--primary-blue); /* match your Unraid plugin color theme */
-}
-
-.form-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--primary-blue);
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-input[type="checkbox"] {
-  accent-color: var(--primary-blue);
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
-.form-check input {
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.status-container {
-  margin-top: 20px;
-}
-
-.status-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.status-label {
-  color: var(--primary-blue);
-  font-weight: bold;
-  width: 75px;
-}
-
-#status-text,
-#last-run-text {
-  color: var(--status-green);
-}
-
-.tooltip {
+:root { --primary-blue:#00aaff; --status-green:#2ECC40; }
+#automover-settings{width:fit-content;padding:20px;background:#111;border-radius:12px;box-shadow:0 0 12px rgba(0,128,128,.3);text-align:left}
+.form-row{flex-direction:column;gap:15px;margin-bottom:20px}
+label{color:var(--primary-blue);font-weight:bold;margin-bottom:5px}
+input,select{border:1px solid var(--primary-blue);border-radius:5px;padding:8px;background:#111;color:#fff}
+button{margin-right:10px;padding:8px 15px;border:none;color:#fff;border-radius:4px;cursor:pointer}
+.checkbox-row{display:grid;grid-template-columns:repeat(2,1fr);gap:0 30px;margin-top:10px;align-items:center}
+.checkbox-row label{display:flex;align-items:center;gap:1px;font-size:15px;line-height:1.4;cursor:pointer}
+.checkbox-row input[type="checkbox"]{transform:scale(1.2);accent-color:var(--primary-blue)}
+.form-check{display:inline-flex;align-items:center;gap:8px;color:var(--primary-blue);cursor:pointer}
+input[type="checkbox"]{accent-color:var(--primary-blue);width:16px;height:16px;cursor:pointer}.form-check input{margin-right:8px;vertical-align:middle}
+.status-container{margin-top:20px}.status-row{display:flex;align-items:center;margin-bottom:6px}.status-label{color:var(--primary-blue);font-weight:bold;width:75px}
+#status-text,#last-run-text{color:var(--status-green)}
+.tooltip{position:relative;display:inline-block}
+.tooltip:hover::after{content:attr(data-tooltip);position:absolute;bottom:125%;left:0;background:#333;color:#fff;padding:6px 10px;border-radius:4px;white-space:nowrap;font-size:12px;opacity:.9;z-index:10;text-transform:none}
+.form-pair{display:flex;align-items:flex-start;gap:10px;margin-bottom:15px}
+.input-wrapper{display:flex;flex-direction:column}
+.form-pair label{color:var(--primary-blue);font-weight:bold;width:100px;margin-right:10px}
+.form-pair input,.form-pair select{background:#111;color:#fff}
+.short-input{width:60px;min-width:60px;max-width:60px;flex:0 0 auto}
+.short-input-filter{width:150px;min-width:150px;max-width:150px;flex:0 0 auto}
+#pool.short-input{min-width:60px;max-width:100%;flex:0 0 auto}
+input.invalid{border-color:red;color:red}.field-warning{display:none;color:red;font-size:12px;margin-top:4px}
+input.invalid + .field-warning{display:block}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-5px)}}
+#automover-settings.shake{animation:shake .3s}
+#save-confirmation,#start-confirmation,#stop-confirmation{display:block;clear:both;background:var(--primary-blue);color:#fff;font-weight:bold;padding:6px 12px;border-radius:6px;margin-top:12px;opacity:0;transition:opacity .4s ease;animation:flash .4s ease}
+@keyframes flash{0%{opacity:0;transform:scale(1)}50%{opacity:1;transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+#automover-wrapper{display:flex;align-items:flex-start;gap:30px;flex-wrap:wrap}
+#automover-settings{flex:1;height:69vh;max-width:450px}
+#moved-log-container{flex:1;max-width:870px;height:69vh;max-height:90vh;overflow-y:auto;background:#111;border-radius:12px;box-shadow:0 0 12px rgba(0,128,128,.3);padding:20px;font-family:sans-serif;color:#f0f8ff;display:flex;flex-direction:column;align-items:flex-start}
+#moved-log-container h3{color:var(--primary-blue);font-size:18px;margin-bottom:12px}
+#automover-log{width:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-word;background:#111;padding:10px;border-radius:8px;font-family:monospace;font-size:13px;color:#00ffaa;border:1px solid var(--primary-blue)}
+#log-counts{margin-bottom:12px;color:var(--primary-blue);font-size:14px;text-align:left;width:100%}
+.skipped-line{color:#ffd700}.log-header{display:flex;flex-direction:column;align-items:flex-start;margin-bottom:12px}.log-header h3{color:var(--primary-blue);font-size:18px;margin:0}
+.log-stats{text-align:right;font-size:14px;color:#00ffaa;white-space:nowrap}
+#last-run-container{flex:1;max-width:420px;height:71vh;max-height:90vh;overflow-y:auto;background:#111;border-radius:12px;box-shadow:0 0 12px rgba(0,128,128,.3);padding:10px;font-family:sans-serif;color:#f0f8ff}
+#last-run-container h3{color:var(--primary-blue);font-size:18px;margin-bottom:12px}
+#last-run-log{white-space:pre-wrap;word-break:break-word;background:#111;padding:10px;border-radius:8px;font-family:monospace;font-size:13px;color:#00ffaa;border:1px solid var(--primary-blue);max-height:61vh;overflow-y:auto}
+#log-filter{background:#111;border:1px solid var(--primary-blue);color:#00ffaa;padding:8px 12px;border-radius:6px;font-size:13px;font-family:monospace;width:100px;box-shadow:0 0 6px rgba(0,128,128,.3);transition:border-color .2s,box-shadow .2s}
+#log-filter:focus{border-color:#00bfff;box-shadow:0 0 10px rgba(0,191,255,.5);outline:none}
+#log-filter::placeholder{color:#008080}
+input[type="number"].short-input{appearance:auto;-webkit-appearance:auto;-moz-appearance:auto}
+.select-pool{appearance:none;width:auto;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:width .2s}
+.select-pool.expanded{width:auto!important}
+#save-messages div{opacity:1;transition:opacity .6s}
+/* Modal picker */
+#exclusion-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center}
+#exclusion-modal .box {
   position: relative;
+  background: #111;
+  color: #fff;
+  padding: 18px;
+  border-radius: 10px;
+  width: 800px;
+  height: 600px; /* fixed height */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#exclusion-modal .header{display:flex;align-items:center;gap:10px;margin-bottom:0px}
+#exclusion-modal .crumbs{flex:1;white-space:nowrap;overflow:auto}
+#exclusion-modal .crumbs a{color:#00bfff;text-decoration:none;margin-right:8px}
+#exclusion-modal .grid {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #333;
+  padding: 6px;
+}
+#exclusion-modal .row{display:flex;align-items:center;gap:0px;padding:0px;border-bottom:1px solid #00aaff22;cursor:default}
+#exclusion-modal .row .name{flex:1;color: #fff;display: flex;align-items: center;gap: 0px;font-weight: 500}
+#exclusion-modal .row.folder .name {
+  color: var(--primary-blue);
+}
+#exclusion-modal .row .name .icon {
+  margin-right: 2px;
+}
+
+#exclusion-modal .row .name .label {
   display: inline-block;
 }
-
-.tooltip:hover::after {
-  content: attr(data-tooltip);
+#exclusion-modal .row input[type="checkbox"] {
+  margin-right: 2px; /* minimal space between checkbox and icon */
+  transform: scale(1.1); /* optional: slightly larger checkbox */
+}
+#exclusion-modal .row .type{width:70px;text-align:right;opacity:.7}
+#exclusion-modal .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:0px}
+#exclusion-modal .toast{position:absolute;left:16px;bottom:0px;color:red;padding:8px 10px;border-radius:6px;display:none}
+#exclusion-modal .btn{background:#0b5fff;border:none;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer}
+#exclusion-modal .btn.secondary{background:#444}
+#exclusion-modal .btn.warn{background:#b54708}
+/* Exclusions field line */
+#exclusions-field{width:250px;cursor:pointer;user-select:none}
+#exclusion-modal .crumb {
+  color: var(--primary-blue);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+  font-weight: 500;
+}
+#exclusion-view-modal .modal-body {
+  position: relative; /* important: toast anchors to this */
+}
+#exclusion-view-modal .toast {
   position: absolute;
-  bottom: 125%;
-  left: 0;
-  background-color: #333;
-  color: #fff;
-  padding: 6px 10px;
-  border-radius: 4px;
-  white-space: nowrap;
-  font-size: 12px;
-  opacity: 0.9;
-  z-index: 10;
-  text-transform: none;
-}
-
-.form-pair {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.input-wrapper {
-  display: flex;
-  flex-direction: column;
-}
-
-.form-pair label {
-  color: var(--primary-blue);
-  font-weight: bold;
-  width: 100px;
-  margin-right: 10px;
-}
-
-.form-pair input,
-.form-pair select {
-  background: #111111;
-  color: #fff;
-}
-
-.short-input {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
-  flex: 0 0 auto;
-}
-
-.short-input-filter {
-  width: 150px;
-  min-width: 150px;
-  max-width: 150px;
-  flex: 0 0 auto;
-}
-
-#pool.short-input {
-  min-width: 60px;
-  max-width: 100%;
-  flex: 0 0 auto;
-}
-
-input.invalid {
-  border-color: red;
-  color: red;
-}
-
-.field-warning {
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9);
+  color: #00ff99;        /* success green */
+  padding: 8px 14px;
+  border: 1px solid #00aaff55;
+  border-radius: 6px;
+  font-weight: 600;
   display: none;
-  color: red;
-  font-size: 12px;
-  margin-top: 4px;
+  z-index: 10;
+}
+#exclusion-view-modal .toast.error { color: #ff5555; } /* error red */
+#exclusion-modal .crumb:hover {
+  color: #ff3333; /* red on hover */
+  text-decoration: underline;
 }
 
-input.invalid + .field-warning {
-  display: block;
+#exclusion-modal .sep {
+  color: #999;
+}
+#exclusions-field {
+  opacity: 0.6;             /* make it less bright */
+  color: #ccc;               /* soft gray text */
+  font-style: italic;        /* optional – looks more like a placeholder */
+}
+.footer > div {
+  gap: 6px !important;
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  50% { transform: translateX(5px); }
-  75% { transform: translateX(-5px); }
+.footer button {
+  margin: 0 !important;
 }
 
-#automover-settings.shake {
-  animation: shake 0.3s;
-}
-
-#save-confirmation {
-  display: block;
-  clear: both;
-  background: var(--primary-blue);
-  color: white;
-  font-weight: bold;
-  padding: 6px 12px;
-  border-radius: 6px;
-  margin-top: 12px;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  animation: flash 0.4s ease;
-}
-
-#start-confirmation {
-  display: block;
-  clear: both;
-  background: var(--primary-blue);
-  color: white;
-  font-weight: bold;
-  padding: 6px 12px;
-  border-radius: 6px;
-  margin-top: 12px;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  animation: flash 0.4s ease;
-}
-
-#stop-confirmation {
-  display: block;
-  clear: both;
-  background: var(--primary-blue);
-  color: white;
-  font-weight: bold;
-  padding: 6px 12px;
-  border-radius: 6px;
-  margin-top: 12px;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  animation: flash 0.4s ease;
-}
-
-@keyframes flash {
-  0% { opacity: 0; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.1); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* Wrap both boxes side by side */
-#automover-wrapper {
-  display: flex;
-  align-items: flex-start;
-  gap: 30px; /* spacing between the boxes */
-  flex-wrap: wrap;
-}
-
-/* Existing settings box */
-#automover-settings {
-  flex: 1;
-  height: 69vh;
-  max-width: 450px;
-}
-
-#moved-log-container {
-  flex: 1;
-  max-width: 870px;
-  height: 69vh;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: #111111;
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 128, 128, 0.3);
-  padding: 20px;
-  font-family: sans-serif;
-  color: #f0f8ff;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start; /* Align content to top-left */
-}
-
-#moved-log-container h3 {
-  color: var(--primary-blue);
-  font-size: 18px;
-  margin-bottom: 12px;
-}
-
-#automover-log {
-  width: 100%;               /* Take full width of parent */
-  box-sizing: border-box;    /* Include padding/border in width */
-  white-space: pre-wrap;
-  word-break: break-word;
-  background-color: #111111;
-  padding: 10px;
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 13px;
-  color: #00ffaa;
-  border: 1px solid var(--primary-blue);
-  height: auto;
-  max-height: none;
-  overflow-y: visible;
-}
-
-#log-counts {
-  margin-bottom: 12px;
-  color: var(--primary-blue);
-  font-size: 14px;
-  text-align: left;
-  width: 100%;
-}
-
-.skipped-line {
-  color: #ffd700; /* bright yellow */
-}
-
-.log-header {
-  display: flex;
-  flex-direction: column; /* stack children vertically */
-  align-items: flex-start; /* align left */
-  margin-bottom: 12px;
-}
-
-.log-header h3 {
-  color: var(--primary-blue);
-  font-size: 18px;
-  margin: 0;
-}
-
-.log-stats {
-  text-align: right;
-  font-size: 14px;
-  color: #00ffaa;
-  white-space: nowrap;
-}
-
-#last-run-container {
-  flex: 1;
-  max-width: 420px;
-  height: 71vh;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: #111111;
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 128, 128, 0.3);
-  padding: 10px;
-  font-family: sans-serif;
-  color: #f0f8ff;
-}
-
-#last-run-container h3 {
-  color: var(--primary-blue);
-  font-size: 18px;
-  margin-bottom: 12px;
-}
-
-#last-run-log {
-  white-space: pre-wrap;
-  word-break: break-word;
-  background-color: #111111;
-  padding: 10px;
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 13px;
-  color: #00ffaa;
-  border: 1px solid var(--primary-blue);
-  max-height: 61vh;
-  overflow-y: auto;
-}
-
-#log-filter {
-  background-color: #111111; /* dark background to match log panel */
-  border: 1px solid var(--primary-blue); /* your glowing blue theme */
-  color: #00ffaa; /* same green as mover log text */
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-family: monospace;
-  width: 100px;
-  box-shadow: 0 0 6px rgba(0, 128, 128, 0.3); /* soft glow */
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s;
-}
-
-#log-filter:focus {
-  border-color: #00bfff; /* blue glow on focus */
-  box-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
-  outline: none;
-}
-
-#log-filter::placeholder {
-  color: #008080; /* subtle placeholder tone */
-}
-
-input[type="number"].short-input {
-  appearance: auto;
-  -webkit-appearance: auto;
-  -moz-appearance: auto;
-}
-
-.select-pool {
-  appearance: none;
-  width: auto;
-  max-width: 100%;     /* Prevent overflow */
-  white-space: nowrap; /* Prevent wrapping */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: width 0.2s ease-in-out;
-}
-
-.select-pool.expanded {
-  width: auto !important;
-}
-
-#save-messages div {
-  opacity: 1;
-  transition: opacity 0.6s ease;
-}
 </style>
 
 <div id="automover-wrapper">
-  <!-- Settings Form -->
   <form id="automover-settings">
     <!-- Pool -->
     <div class="form-pair">
@@ -478,7 +203,7 @@ input[type="number"].short-input {
     </div>
 
     <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has it being used in mover direction in either direction. You might want to use a different pool.</div>
-<br>
+    <br>
 
     <!-- Threshold -->
     <div class="form-pair">
@@ -500,112 +225,159 @@ input[type="number"].short-input {
       </div>
     </div>
 
-    <div class="form-pair" id="age-days-container" style="display: none;">
-  <label for="age_days" class="tooltip" data-tooltip="Only move files older than this many days.">Age (days):</label>
-  <div class="input-wrapper">
-    <input type="number" id="age_days" class="short-input" min="1" step="1"
-      value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
-    <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
+    <!-- Age -->
+    <div class="form-pair" id="age-days-container" style="display:none;">
+      <label for="age_days" class="tooltip" data-tooltip="Only move files older than this many days.">Age (days):</label>
+      <div class="input-wrapper">
+        <input type="number" id="age_days" class="short-input" min="1" step="1"
+          value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
+        <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
+      </div>
+    </div>
+
+    <!-- Size -->
+    <div class="form-pair" id="size-mb-container" style="display:none;">
+      <label for="size_mb" class="tooltip" data-tooltip="Only move files larger than this size (in MB).">Min Size (MB):</label>
+      <div class="input-wrapper">
+        <input type="number" id="size_mb" class="short-input" min="1" step="1"
+          value="<?php echo htmlspecialchars($settings['SIZE_MB'] ?? '') ?>">
+        <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
+      </div>
+    </div>
+
+    <!-- Exclusions row (appears below Interval when enabled) -->
+    <div class="form-pair" id="exclusions-row" style="display:none;">
+      <label for="exclusions-field" class="tooltip" data-tooltip="Open the file picker to add or remove excluded paths.">Exclusions:</label>
+      <div class="input-wrapper">
+        <input id="exclusions-field" type="text" readonly value="Click to open file picker to add or remove" title="Click to open file picker to add or remove">
+        <button id="viewExclusionsBtn" type="button">View/Edit Exclusions</button>
+      </div>
+    </div>
+
+<div id="exclusion-view-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
+<div class="modal-body" style="background:#111; color:white; padding:20px; border-radius:10px;
+  width:800px; height:600px; overflow:hidden; display:flex; flex-direction:column;">
+    <h3 style="margin-top:0;">View/Edit Exclusions</h3>
+<textarea id="exclusionsEditor" style="
+  background:#000; color:#fff; font-family:monospace;
+  border:1px solid #333; border-radius:6px; padding:10px; resize:none;
+  width:97%; height:480px; overflow-y:auto;"></textarea>
+    <div style="display:flex; justify-content:space-between; margin-top:auto; padding-top:0px;">
+      <div>
+        <button id="copyExclusionsBtn" type="button" style="background:#222; color:#fff; border:1px solid #00aaff; padding:6px 12px; border-radius:6px; cursor:pointer;">Copy</button>
+        <button id="saveExclusionsBtn" type="button" style="background:#00aaff; color:#000; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">Save</button>
+      </div>
+      <button id="closeExclusionsView" type="button" style="background:#333; color:#fff; border:1px solid #555; padding:6px 12px; border-radius:5px;">Close</button>
+    </div>
   </div>
 </div>
 
-<div class="form-pair" id="size-mb-container" style="display: none;">
-  <label for="size_mb" class="tooltip" data-tooltip="Only move files larger than this size (in MB).">Min Size (MB):</label>
-  <div class="input-wrapper">
-    <input type="number" id="size_mb" class="short-input" min="1" step="1"
-      value="<?php echo htmlspecialchars($settings['SIZE_MB'] ?? '') ?>">
-    <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
-  </div>
-</div>
-
-    <!-- Checkboxes -->
+    <!-- Checkboxes row -->
     <div class="checkbox-row">
       <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
-        <input type="checkbox" id="autostart"
-          <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+        <input type="checkbox" id="autostart" <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
-        <input type="checkbox" id="dry_run"
-          <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
+      <label class="form-check tooltip" data-tooltip="Enable an exclusions list of files and folders that won't be moved.">
+        <input type="checkbox" id="enable_exclusions" <?php echo ($settings['EXCLUSIONS_ENABLED'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Exclusions
       </label>
 
       <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check.">
-        <input type="checkbox" id="allow_during_parity"
-          <?php echo ($settings['ALLOW_DURING_PARITY_CHECK'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
+        <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY_CHECK'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
       </label>
 
       <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old.">
-        <input type="checkbox" id="age_based_filter"
-          <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable age Based Filter
+        <input type="checkbox" id="age_based_filter" <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Age Based Filter
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Disables Unraid's built-in mover schedule.">
-        <input type="checkbox" id="disable_unraid_mover_schedule"
-          <?php echo ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '') === 'yes' ? 'checked' : '' ?>> Disable Unraid Mover Schedule
+      <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
+        <input type="checkbox" id="dry_run" <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
       </label>
 
       <label class="form-check tooltip" data-tooltip="Enable to move only files larger than the specified size in MB.">
-        <input type="checkbox" id="size_based_filter"
-          <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
+        <input type="checkbox" id="size_based_filter" <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
+      </label>
+
+      <label class="form-check tooltip" data-tooltip="Disables Unraid's built-in mover schedule.">
+        <input type="checkbox" id="disable_unraid_mover_schedule" <?php echo ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '') === 'yes' ? 'checked' : '' ?>> Disable Unraid Mover
       </label>
     </div>
 
-    <!-- Buttons -->
     <div class="form-group">
       <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
       <button type="button" id="stop-button" class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
     </div>
 
-    <!-- Confirmations -->
-    <div id="save-confirmation" style="display: none; margin-top: 10px;">✅ Saved Settings</div>
-    <div id="start-confirmation" style="display: none; margin-top: 10px;">✅ Started Automover</div>
-    <div id="stop-confirmation" style="display: none; margin-top: 10px;">✅ Stopping Automover</div>
+    <div id="save-confirmation" style="display:none;margin-top:10px;">✅ Saved Settings</div>
+    <div id="start-confirmation" style="display:none;margin-top:10px;">✅ Started Automover</div>
+    <div id="stop-confirmation" style="display:none;margin-top:10px;">✅ Stopping Automover</div>
 
-    <!-- Start cron messages -->
-<div id="save-messages" style="
-  display: none;
-  margin-top: 10px;
-  margin-bottom: 20px;
-  background: #111;
-  border-radius: 6px;
-  font-family: monospace;
-  color: red;
-"></div>
+    <div id="save-messages" style="display:none;margin-top:10px;margin-bottom:20px;background:#111;border-radius:6px;font-family:monospace;color:red;"></div>
 
-    <!-- Status -->
     <div class="status-container">
-      <div class="status-row">
-        <span class="status-label">Status:</span>
-        <span id="status-text">Stopped</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Last Run:</span>
-        <span id="last-run-text">No last run available</span>
-      </div>
+      <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
+      <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run available</span></div>
     </div>
   </form>
 
-  <!-- Mover Log Panel -->
   <div id="moved-log-container">
     <div class="log-header">
       <h3>Mover Log For Last Run</h3>
       <div id="log-counts" class="log-stats"></div>
     </div>
-    <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom: 12px;">
+    <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom:12px;">
     <pre id="automover-log">Loading...</pre>
   </div>
 
-  <!-- Last Run Panel -->
   <div id="last-run-container">
     <h3>Last Run Details</h3>
     <pre id="last-run-log">Loading last run log...</pre>
   </div>
 </div>
 
+<!-- Modal -->
+<div id="exclusion-modal">
+  <div class="box">
+    <div class="header">
+      <button class="btn secondary" id="btn-up" title="Go up directory">↑ Up</button>
+      <div class="crumbs" id="crumbs"></div>
+      <button class="btn warn" id="btn-close">Close</button>
+    </div>
+    <div class="grid" id="picker-grid"></div>
+<div class="footer" style="display:flex; justify-content:space-between; margin-top:10px;">
+  <div style="display:flex; flex-direction:column; gap:2px; line-height:1;">
+    <!-- Row 1: Normal buttons -->
+    <div style="display:flex; align-items:center; gap:6px; margin:0; padding:0;">
+      <button id="btn-add" class="btn primary">Add Selected</button>
+      <button id="btn-remove" class="btn secondary">Remove Selected</button>
+    </div>
+
+    <!-- Row 2: Wildcard buttons -->
+    <div style="display:flex; align-items:center; gap:6px; margin:0; padding:0;">
+      <button id="addExtBtn" type="button" class="btn primary" style="display:none; padding:6px 12px;">
+        Add extensions as wildcards
+      </button>
+      <button id="removeExtBtn" type="button" class="btn secondary" style="display:none; padding:6px 12px;">
+        Remove extensions as wildcards
+      </button>
+    </div>
+  </div>
+</div>
+
+
+      <div id="toast-container"
+     style="position:static; bottom:5px; right:15px;
+            display:flex; flex-direction:column; align-items:flex-end;
+            gap:6px; z-index:99999;">
+</div>
+    </div>
+  </div>
+</div>
+
 <script>
 const startBadge = document.getElementById('start-confirmation');
-const stopBadge = document.getElementById('stop-confirmation');
+const stopBadge  = document.getElementById('stop-confirmation');
 
 function updateStatus() {
   fetch('/plugins/automover/helpers/status_check.php')
@@ -614,12 +386,8 @@ function updateStatus() {
       document.getElementById('status-text').textContent = data.status;
       document.getElementById('last-run-text').textContent = data.last_run;
     })
-    .catch(err => {
-      console.error('Failed to fetch Automover status:', err);
-      document.getElementById('status-text').textContent = 'No details available';
-    });
+    .catch(() => { document.getElementById('status-text').textContent = 'No details available'; });
 }
-// Initial load + refresh loop
 updateStatus();
 setInterval(updateStatus, 5000);
 
@@ -632,24 +400,157 @@ document.addEventListener('DOMContentLoaded', function () {
   const confirmBadge = document.getElementById('save-confirmation');
   let currentPoolSelection = poolSelect.dataset.selected || '';
   const ageFilterCheckbox = document.getElementById('age_based_filter');
-  const ageDaysContainer = document.getElementById('age-days-container');
+  const ageDaysContainer  = document.getElementById('age-days-container');
+  const sizeFilterCheckbox= document.getElementById('size_based_filter');
+  const sizeMbContainer   = document.getElementById('size-mb-container');
 
-function toggleAgeInput() {
-  ageDaysContainer.style.display = ageFilterCheckbox.checked ? 'flex' : 'none';
+  // NEW: exclusions UI
+  const enableExcl = document.getElementById('enable_exclusions');
+  const exclRow    = document.getElementById('exclusions-row');
+  const exclField  = document.getElementById('exclusions-field');
+  const exclCount  = document.getElementById('exclusions-count');
+
+  function toggleAgeInput(){ ageDaysContainer.style.display = ageFilterCheckbox.checked ? 'flex':'none'; }
+  ageFilterCheckbox.addEventListener('change', toggleAgeInput); toggleAgeInput();
+
+  function toggleSizeInput(){ sizeMbContainer.style.display = sizeFilterCheckbox.checked ? 'flex':'none'; }
+  sizeFilterCheckbox.addEventListener('change', toggleSizeInput); toggleSizeInput();
+
+  function refreshExclusionsVisibility(){
+    exclRow.style.display = enableExcl.checked ? 'flex' : 'none';
+    if (enableExcl.checked) refreshExclusionCount();
+  }
+  enableExcl.addEventListener('change', refreshExclusionsVisibility);
+  refreshExclusionsVisibility();
+
+// --- element refs
+const viewBtn   = document.getElementById('viewExclusionsBtn');
+const viewModal = document.getElementById('exclusion-view-modal');
+const viewClose = document.getElementById('closeExclusionsView');
+const editor    = document.getElementById('exclusionsEditor');
+const copyBtn   = document.getElementById('copyExclusionsBtn');
+const exclusionssaveBtn   = document.getElementById('saveExclusionsBtn');
+
+// --- toast inside modal
+const exclusionstoast = document.createElement('div');
+exclusionstoast.id = 'exclToast';
+exclusionstoast.style.position = 'absolute';
+exclusionstoast.style.bottom = '28px';
+exclusionstoast.style.left = '50%';
+exclusionstoast.style.transform = 'translateX(-50%)';
+exclusionstoast.style.background = 'rgba(0,0,0,0.9)';
+exclusionstoast.style.color = '#00ff99';
+exclusionstoast.style.padding = '8px 14px';
+exclusionstoast.style.border = '1px solid #00aaff55';
+exclusionstoast.style.borderRadius = '6px';
+exclusionstoast.style.fontWeight = '600';
+exclusionstoast.style.display = 'none';
+exclusionstoast.style.zIndex = '10';
+if (viewModal) viewModal.querySelector('div').appendChild(exclusionstoast);
+
+function showexclusionstoast(msg, type = 'ok') {
+  exclusionstoast.textContent = msg;
+  exclusionstoast.style.color = (type === 'ok') ? '#00ff99' : '#ff5555';
+  exclusionstoast.style.display = 'block';
+  clearTimeout(showexclusionstoast._t);
+  showexclusionstoast._t = setTimeout(() => { exclusionstoast.style.display = 'none'; }, 1800);
 }
-ageFilterCheckbox.addEventListener('change', toggleAgeInput);
-toggleAgeInput(); // Initial state
 
-const sizeFilterCheckbox = document.getElementById('size_based_filter');
-const sizeMbContainer = document.getElementById('size-mb-container');
+// prevent form submits if buttons live in a <form>
+[viewBtn, copyBtn, exclusionssaveBtn, viewClose].forEach(b => {
+  if (b) b.setAttribute('type', 'button');
+});
 
-function toggleSizeInput() {
-  sizeMbContainer.style.display = sizeFilterCheckbox.checked ? 'flex' : 'none';
-}
-sizeFilterCheckbox.addEventListener('change', toggleSizeInput);
-toggleSizeInput(); // Initial state
+// --- open modal and load file
+viewBtn.addEventListener('click', e => {
+  e.preventDefault();
+  viewModal.style.display = 'flex';
 
-  // --- Pool Usage ---
+  fetch('/plugins/automover/helpers/manage_exclusions.php?action=get' +
+        (typeof csrfToken !== 'undefined'
+          ? '&csrf_token=' + encodeURIComponent(csrfToken)
+          : ''), { cache: 'no-store' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        editor.value = (data.content || '').trim();
+      } else {
+        editor.value = data.error || '(Error loading exclusions.txt)';
+        showexclusionstoast('Error loading file', 'err');
+      }
+    })
+    .catch(err => {
+      console.error('GET error:', err);
+      editor.value = '(Error loading exclusions.txt)';
+      showexclusionstoast('Fetch error', 'err');
+    });
+});
+
+// --- copy (with fallback)
+copyBtn.addEventListener('click', e => {
+  e.preventDefault();
+  const txt = editor.value || '';
+
+  function fallbackCopy() {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showexclusionstoast('Copied!');
+    } catch {
+      showexclusionstoast('Copy failed', 'err');
+    }
+    document.body.removeChild(ta);
+  }
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(txt)
+      .then(() => showexclusionstoast('Copied!'))
+      .catch(() => fallbackCopy());
+  } else {
+    fallbackCopy();
+  }
+});
+
+// --- save
+exclusionssaveBtn.addEventListener('click', e => {
+  e.preventDefault();
+  const content = editor.value || '';
+
+fetch('/plugins/automover/helpers/manage_exclusions.php?action=save', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'X-CSRF-TOKEN': csrfToken        // header Unraid validates
+  },
+  body: 'csrf_token=' + encodeURIComponent(csrfToken) +
+        '&content='   + encodeURIComponent(content)
+})
+  .then(r => r.text())
+  .then(text => {
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(text || 'No response'); }
+    if (data.ok) showexclusionstoast('✅ Save successful');
+    else showexclusionstoast(data.error || 'Save failed', 'err');
+  })
+  .catch(err => {
+    console.error('Save fetch error:', err);
+    showexclusionstoast('Save failed', 'err');
+  });
+
+});
+
+// --- close modal
+viewClose.addEventListener('click', e => {
+  e.preventDefault();
+  viewModal.style.display = 'none';
+});
+  
+  // Pool list
   function updatePoolUsage() {
     fetch('/plugins/automover/helpers/pool_usage.php')
       .then(res => res.json())
@@ -668,19 +569,14 @@ toggleSizeInput(); // Initial state
           });
         }
       })
-      .catch(err => {
-        console.error('Pool usage fetch failed:', err);
-        poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>';
-      });
+      .catch(() => { poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>'; });
 
-    poolSelect.addEventListener('change', () => {
-      currentPoolSelection = poolSelect.value;
-    });
+    poolSelect.addEventListener('change', () => { currentPoolSelection = poolSelect.value; });
   }
   updatePoolUsage();
   setInterval(updatePoolUsage, 5000);
 
-  // --- Log filtering ---
+  // Logs
   const filterInput = document.getElementById('log-filter');
   let filterTimer;
   filterInput.addEventListener('input', () => {
@@ -691,20 +587,15 @@ toggleSizeInput(); // Initial state
   function loadLastRunLog() {
     fetch('/plugins/automover/helpers/fetch_last_run_log.php')
       .then(res => res.text())
-      .then(data => {
-        document.getElementById('last-run-log').textContent = data || 'No last run data available.';
-      })
-      .catch(err => {
-        console.error('Failed to fetch last run log:', err);
-        document.getElementById('last-run-log').textContent = 'Error loading last run log.';
-      });
+      .then(data => { document.getElementById('last-run-log').textContent = data || 'No last run data available.'; })
+      .catch(() => { document.getElementById('last-run-log').textContent = 'Error loading last run log.'; });
   }
   loadLastRunLog();
   setInterval(loadLastRunLog, 5000);
 
   function loadMoverLog() {
     const keyword = filterInput.value.trim();
-    const query = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
+    const query   = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
     fetch(`/plugins/automover/helpers/fetch_files_moved_log.php${query}`)
       .then(res => res.json())
       .then(data => {
@@ -716,52 +607,39 @@ toggleSizeInput(); // Initial state
           if (line.toLowerCase().includes('skipped')) div.classList.add('skipped-line');
           logContainer.appendChild(div);
         });
-
-        document.getElementById('log-counts').innerHTML = `
-          <h3>Total Files Moved: ${data.moved}</h3>
-        `;
+        document.getElementById('log-counts').innerHTML = `<h3>Total Files Moved: ${data.moved}</h3>`;
       })
-      .catch(err => {
-        console.error('Failed to fetch mover log:', err);
+      .catch(() => {
         document.getElementById('automover-log').textContent = 'Error loading log.';
         document.getElementById('log-counts').textContent = '';
-        document.getElementById('log-duration').textContent = '';
       });
   }
   loadMoverLog();
   setInterval(loadMoverLog, 5000);
 
-  // --- Stop button ---
-document.getElementById('stop-button').addEventListener('click', function () {
-  const messageBox = document.getElementById('save-messages');
-  messageBox.innerHTML = ''; // Clear previous messages
-  messageBox.style.display = 'none'; // Optionally hide it
+  // Stop
+  document.getElementById('stop-button').addEventListener('click', function () {
+    const messageBox = document.getElementById('save-messages');
+    messageBox.innerHTML = '';
+    messageBox.style.display = 'none';
 
-  fetch('/plugins/automover/helpers/stop_cron.php')
-    .then(res => res.json())
-    .then(data => {
-      console.log('Stop response:', data);
-      updateStatus();
-      updatePoolUsage();
-
-      stopBadge.style.display = 'inline-block';
-      stopBadge.style.opacity = '0';
-      stopBadge.style.animation = 'none';
-      void stopBadge.offsetWidth;
-      stopBadge.style.animation = 'flash 0.4s ease';
-      stopBadge.style.opacity = '1';
-      setTimeout(() => {
+    fetch('/plugins/automover/helpers/stop_cron.php')
+      .then(res => res.json())
+      .then(() => {
+        updateStatus();
+        updatePoolUsage();
+        stopBadge.style.display = 'inline-block';
         stopBadge.style.opacity = '0';
-        stopBadge.style.display = 'none';
-      }, 3000);
-    })
-    .catch(err => {
-      console.error('Failed to stop Automover:', err);
-      document.getElementById('status-text').textContent = 'Error stopping cron';
-    });
-});
+        stopBadge.style.animation = 'none';
+        void stopBadge.offsetWidth;
+        stopBadge.style.animation = 'flash .4s ease';
+        stopBadge.style.opacity = '1';
+        setTimeout(() => { stopBadge.style.opacity = '0'; stopBadge.style.display = 'none'; }, 3000);
+      })
+      .catch(() => { document.getElementById('status-text').textContent = 'Error stopping cron'; });
+  });
 
-  // --- Validation ---
+  // Validation
   function validateField(input, rules, warningId) {
     const value = input.value.trim();
     const number = parseFloat(value);
@@ -770,156 +648,429 @@ document.getElementById('stop-button').addEventListener('click', function () {
     document.getElementById(warningId).style.display = invalid ? 'block' : 'none';
     return !invalid;
   }
-
   intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 5 }, 'interval-warning'));
   thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
-
   const ageDaysInput = document.getElementById('age_days');
   ageDaysInput.addEventListener('input', () => validateField(ageDaysInput, { min: 1 }, 'age-days-warning'));
-
   const sizeMbInput = document.getElementById('size_mb');
   sizeMbInput.addEventListener('input', () => validateField(sizeMbInput, { min: 1 }, 'size-mb-warning'));
 
-  // --- Save & Start ---
-saveBtn.addEventListener('click', function () {
-  // Run validations for all numeric fields
-  const intervalValid = validateField(intervalInput, { min: 5 }, 'interval-warning');
-  const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+  // ===== Exclusions picker (helper + csrf_token) =====
+  const modal = document.getElementById('exclusion-modal');
+  const grid  = document.getElementById('picker-grid');
+  const crumbs= document.getElementById('crumbs');
+  const btnUp = document.getElementById('btn-up');
+  const btnClose = document.getElementById('btn-close');
+  const btnAdd = document.getElementById('btn-add');
+  const btnRemove = document.getElementById('btn-remove');
+  const toast = document.getElementById('picker-toast');
+  let currentPath = '/mnt';
 
-  const ageDaysInput = document.getElementById('age_days');
-  const sizeMbInput = document.getElementById('size_mb');
+let toastQueueDelay = 0; // keeps a running delay so toasts stagger
 
-  const ageDaysValid = !document.getElementById('age_based_filter').checked ||
-                       validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
+function showToast(msg, type = 'ok') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
 
-  const sizeMbValid = !document.getElementById('size_based_filter').checked ||
-                      validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
+  const t = document.createElement('div');
+  t.textContent = msg;
 
-  // Combine all validations
-  const allValid = intervalValid && thresholdValid && ageDaysValid && sizeMbValid;
+  t.style.color = type === 'err' ? '#ffaaaa' : '#00ff99';
+  t.style.padding = '0px 0px';
+  t.style.borderRadius = '0px';
+  t.style.fontWeight = '600';
+  t.style.boxShadow = '0 0 6px rgba(0,0,0,0.3)';
+  t.style.opacity = '0';
+  t.style.transform = 'translateX(30px)'; // slide from right
+  t.style.transition = 'opacity .3s ease, transform .3s ease';
+  t.style.minWidth = '160px';
+  t.style.textAlign = 'right';
 
-  if (!allValid) {
-    form.classList.add('shake');
-    setTimeout(() => form.classList.remove('shake'), 300);
+  container.appendChild(t);
 
-    const messageBox = document.getElementById('save-messages');
-    messageBox.innerHTML = `<div style="color: red;">❌ Please correct the highlighted warnings.</div>`;
-    messageBox.style.display = 'block';
-    return; // Stop here — prevent Save & Start
+  // apply a small delay so multiple toasts don't appear at the exact same time
+  const delay = toastQueueDelay;
+  toastQueueDelay += 1000; // 1s between toasts
+
+  setTimeout(() => {
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(0)';
+  }, delay + 50);
+
+  // fade out after it’s been visible for ~2 s
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(30px)';
+    setTimeout(() => t.remove(), 300);
+  }, delay + 2350);
+
+  // reset queue after a few seconds (so future toasts don't keep offsetting forever)
+  setTimeout(() => { toastQueueDelay = 0; }, delay + 3000);
+}
+
+  function openPicker(){ modal.style.display='flex'; loadDir('/mnt'); }
+  function closePicker(){ modal.style.display='none'; }
+
+  exclField.addEventListener('click', openPicker);
+  btnClose.addEventListener('click', closePicker);
+
+function buildCrumbs(path) {
+  crumbs.innerHTML = '';
+
+  // Normalize and split
+  const cleanPath = path.replace(/\/+$/, '');
+  if (!cleanPath.startsWith('/mnt')) {
+    loadDir('/mnt');
+    return;
   }
 
-  // ✅ Only continue to save when all fields are valid
-  const settings = {
-    POOL_NAME: poolSelect.value,
-    THRESHOLD: thresholdInput.value,
-    INTERVAL: intervalInput.value,
-    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-    ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-    DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no',
-    AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
-    AGE_DAYS: ageDaysInput.value,
-    SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
-    SIZE_MB: sizeMbInput.value
-  };
+  const parts = cleanPath.split('/').filter(Boolean);
+  let accum = '';
 
-  const query = new URLSearchParams(settings).toString();
-  const confirmBadge = document.getElementById('save-confirmation');
-  const messageBox = document.getElementById('save-messages');
-  messageBox.innerHTML = '';
-  messageBox.style.display = 'block';
+  // Add root first
+  const root = document.createElement('span');
+  root.textContent = '/mnt';
+  root.className = 'crumb';
+  root.dataset.path = '/mnt';
+  crumbs.appendChild(root);
 
-  fetch('/plugins/automover/helpers/save_settings.php?' + query)
-    .then(res => res.text())
-    .then(text => {
-      try {
-        const data = JSON.parse(text);
+  // Build deeper segments
+  for (let i = 1; i < parts.length; i++) {
+    const seg = parts[i];
+    const sep = document.createElement('span');
+    sep.textContent = ' / ';
+    sep.className = 'sep';
+    crumbs.appendChild(sep);
 
-        if (data.status === 'ok') {
-          // Show confirmation badge
-          confirmBadge.style.display = 'inline-block';
-          confirmBadge.style.opacity = '0';
-          confirmBadge.style.animation = 'none';
-          void confirmBadge.offsetWidth;
-          confirmBadge.style.animation = 'flash 0.4s ease';
-          confirmBadge.style.opacity = '1';
-          setTimeout(() => {
-            confirmBadge.style.opacity = '0';
-            confirmBadge.style.display = 'none';
-          }, 3000);
+    accum = accum ? accum + '/' + seg : '/mnt/' + seg;
 
-          // Show save_settings.php messages
-          if (Array.isArray(data.messages) && data.messages.length > 0) {
-            data.messages.forEach(msg => {
-              const line = document.createElement('div');
-              line.textContent = msg;
-              messageBox.appendChild(line);
-            });
-          }
+    const a = document.createElement('span');
+    a.textContent = seg;
+    a.className = 'crumb';
+    a.dataset.path = accum;
+    crumbs.appendChild(a);
+  }
+}
 
-          // Start Automover and show its messages too
-          fetch(`/plugins/automover/helpers/start_cron.php?${new URLSearchParams(settings)}`)
-            .then(res => res.json())
-            .then(startData => {
-              console.log('Start response:', startData);
-              updateStatus();
+// ✅ Delegated click handler (only one global listener needed)
+crumbs.addEventListener('click', e => {
+  const crumb = e.target.closest('.crumb');
+  if (!crumb) return;
+  const path = crumb.dataset.path;
+  if (!path) return;
 
-              if (Array.isArray(startData.messages) && startData.messages.length > 0) {
-                startData.messages.forEach(msg => {
-                  const line = document.createElement('div');
-                  line.textContent = msg;
-                  messageBox.appendChild(line);
-                });
-              }
-            })
-            .catch(err => {
-              console.error('Failed to start Automover:', err);
-              document.getElementById('status-text').textContent = 'Error starting cron';
-              messageBox.innerHTML += `<div style="color: red;">❌ Error starting Automover</div>`;
-            });
-        } else {
-          console.error('Save failed:', data.message);
-          messageBox.innerHTML = `<div style="color: red;">❌ ${data.message || 'Save failed'}</div>`;
+  e.preventDefault();
+  e.stopPropagation();
+  loadDir(path);
+});
+
+  function loadDir(path){
+    const url = `/plugins/automover/helpers/update_exclusions.php?action=list_dir&path=${encodeURIComponent(path)}&csrf_token=${encodeURIComponent(csrf_token)}`;
+    fetch(url)
+      .then(r=>r.json())
+      .then(data=>{
+        if (!data.ok) throw new Error('list_dir failed');
+        currentPath = data.path || path;
+        buildCrumbs(currentPath);
+        grid.innerHTML = '';
+        data.items.forEach(it=>{
+const row = document.createElement('div');
+row.className = 'row';
+
+// --- Checkbox ---
+const cb = document.createElement('input');
+cb.type = 'checkbox';
+cb.dataset.path = it.path;
+
+// Disable if it's a root-level /mnt entry (like /mnt/disk1, /mnt/cache, etc.)
+if (/^\/mnt\/[^/]+$/.test(it.path)) {
+  cb.disabled = true;
+  cb.title = "Can't exclude entire disks or root pools";
+  cb.style.cursor = 'not-allowed';
+}
+
+// --- Name / Icon / Color ---
+const name = document.createElement('div');
+name.className = 'name';
+name.title = it.path;
+
+// Folder
+if (it.isDir) {
+  name.innerHTML = `<span class="icon">📁</span><span class="label">${it.name}</span>`;
+  name.style.color = 'var(--primary-blue)';
+  name.style.cursor = 'pointer';
+  name.addEventListener('click', () => loadDir(it.path));
+} else {
+  // File
+  name.innerHTML = `<span class="icon">📄</span><span class="label">${it.name}</span>`;
+  name.style.color = '#fff';
+}
+
+// --- Assemble Row ---
+row.appendChild(cb);
+row.appendChild(name);
+grid.appendChild(row);
+        });
+      })
+      .catch(()=>showToast('Error loading directory'));
+  }
+
+  btnUp.addEventListener('click', ()=>{
+    if (!currentPath || currentPath === '/mnt') return;
+    const up = currentPath.replace(/\/+$/,'').split('/').slice(0,-1).join('/') || '/mnt';
+    loadDir(up.startsWith('/mnt') ? up : '/mnt');
+  });
+
+  function selectedPaths(){ return Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map(cb=>cb.dataset.path); }
+
+  function refreshExclusionCount(){
+    fetch(`/plugins/automover/helpers/update_exclusions.php?action=get_exclusion_count&csrf_token=${encodeURIComponent(csrf_token)}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if (d.ok){
+          exclCount.textContent = `${d.count} item${d.count===1?'':'s'}`;
+          exclField.value = d.count>0 ? `Click to open file picker to add or remove` : 'Click to open file picker to add or remove';
         }
-      } catch (err) {
-        console.error('Response parse failed:', err, 'Raw:', text);
-        messageBox.innerHTML = `<div style="color: red;">❌ Invalid response from server</div>`;
-      }
+      }).catch(()=>{});
+  }
+
+  btnAdd.addEventListener('click', ()=>{
+    const paths = selectedPaths();
+    if (paths.length===0){ showToast('No selection'); return; }
+    const body = new URLSearchParams(); body.append('csrf_token', csrf_token); paths.forEach(p=>body.append('paths[]', p));
+    fetch('/plugins/automover/helpers/update_exclusions.php?action=add_exclusions', { method:'POST', body })
+      .then(r=>r.json()).then(d=>{
+        if (d.ok){ showToast('✅ Added'); refreshExclusionCount(); }
+        else showToast('Add failed');
+      }).catch(()=>showToast('Add failed'));
+  });
+
+  btnRemove.addEventListener('click', ()=>{
+    const paths = selectedPaths();
+    if (paths.length===0){ showToast('No selection'); return; }
+    const body = new URLSearchParams(); body.append('csrf_token', csrf_token); paths.forEach(p=>body.append('paths[]', p));
+    fetch('/plugins/automover/helpers/update_exclusions.php?action=remove_exclusions', { method:'POST', body })
+      .then(r=>r.json()).then(d=>{
+        if (d.ok){ showToast('✅ Removed'); refreshExclusionCount(); }
+        else showToast('Remove failed');
+      }).catch(()=>showToast('Remove failed'));
+  });
+
+  btnClose.addEventListener('click', () => {
+  addExtBtn.style.display = 'none';
+  selectedExts.clear();
+  modal.style.display = 'none';
+});
+
+// WILDCARD
+const addExtBtn = document.getElementById('addExtBtn');
+const removeExtBtn = document.getElementById('removeExtBtn');
+let selectedExts = new Set();
+
+document.addEventListener('change', (e) => {
+  if (!e.target.matches('#picker-grid input[type="checkbox"]')) return;
+
+  // collect all checked file extensions
+  selectedExts.clear();
+  const checked = Array.from(document.querySelectorAll('#picker-grid input[type="checkbox"]:checked'));
+  checked.forEach(cb => {
+    if (cb.dataset.isdir === 'true') return; // skip folders
+    const name = cb.dataset.path.split('/').pop();
+    const parts = name.split('.');
+    if (parts.length > 1) selectedExts.add(parts.pop());
+  });
+
+  if (selectedExts.size > 0) {
+    const label = Array.from(selectedExts).map(e => `*.${e}`).join(', ');
+    addExtBtn.textContent = `Add ext's as wildcards`;
+    removeExtBtn.textContent = `Remove ext's as wildcards`;
+    addExtBtn.style.display = 'inline-block';
+    removeExtBtn.style.display = 'inline-block';
+  } else {
+    addExtBtn.style.display = 'none';
+    removeExtBtn.style.display = 'none';
+  }
+});
+
+// ✅ Add extensions as wildcards
+addExtBtn.addEventListener('click', () => {
+  if (selectedExts.size === 0) return;
+
+  const body = new URLSearchParams();
+  body.append('csrf_token', csrf_token);
+  Array.from(selectedExts).forEach(ext => body.append('paths[]', `*.${ext}`));
+
+  fetch('/plugins/automover/helpers/update_exclusions.php?action=add_exclusions', {
+    method: 'POST',
+    body
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        let delay = 0;
+        Array.from(selectedExts).forEach(ext => {
+          setTimeout(() => showToast(`✅ Added *.${ext}`), delay);
+          delay += 350;
+        });
+      } else showToast('Failed to add wildcard(s)', 'err');
     })
     .catch(err => {
-      console.error('Save failed:', err);
-      messageBox.innerHTML = `<div style="color: red;">❌ Save request failed</div>`;
+      console.error('Add wildcard error:', err);
+      showToast('Error adding wildcard(s)', 'err');
     });
 });
 
+// ✅ Remove extensions as wildcards
+removeExtBtn.addEventListener('click', () => {
+  if (selectedExts.size === 0) return;
+
+  const body = new URLSearchParams();
+  body.append('csrf_token', csrf_token);
+  Array.from(selectedExts).forEach(ext => body.append('paths[]', `*.${ext}`));
+
+  fetch('/plugins/automover/helpers/update_exclusions.php?action=remove_exclusions', {
+    method: 'POST',
+    body
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        let delay = 0;
+        Array.from(selectedExts).forEach(ext => {
+          setTimeout(() => showToast(`✅ Removed *.${ext}`), delay);
+          delay += 350;
+        });
+      } else showToast('Failed to remove wildcard(s)', 'err');
+    })
+    .catch(err => {
+      console.error('Remove wildcard error:', err);
+      showToast('Error removing wildcard(s)', 'err');
+    });
 });
-</script>
-<script>
+
+  // Save & Start
+  saveBtn.addEventListener('click', function () {
+    const intervalValid  = validateField(intervalInput, { min: 5 }, 'interval-warning');
+    const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+    const ageDaysInput = document.getElementById('age_days');
+    const sizeMbInput  = document.getElementById('size_mb');
+    const ageDaysValid = !document.getElementById('age_based_filter').checked || validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
+    const sizeMbValid  = !document.getElementById('size_based_filter').checked || validateField(sizeMbInput,  { min: 1 }, 'size-mb-warning');
+    const allValid = intervalValid && thresholdValid && ageDaysValid && sizeMbValid;
+
+    const messageBox = document.getElementById('save-messages');
+    if (!allValid) {
+      form.classList.add('shake'); setTimeout(()=>form.classList.remove('shake'), 300);
+      messageBox.innerHTML = `<div style="color:red;">⚠️ Please correct the highlighted warnings.</div>`;
+      messageBox.style.display = 'block';
+      return;
+    }
+
+    // Ensure exclusions file exists if enabled
+    const ensurePromise = enableExcl.checked
+      ? fetch(`/plugins/automover/helpers/update_exclusions.php?action=ensure_exclusions&csrf_token=${encodeURIComponent(csrf_token)}`)
+          .then(r=>r.json()).then(d=>!!d.ok).catch(()=>false)
+      : Promise.resolve(true);
+
+    ensurePromise.then(ok=>{
+      if (!ok) {
+        messageBox.innerHTML = `<div style="color:red;">❌ Could not create exclusions.txt</div>`;
+        messageBox.style.display = 'block';
+        return;
+      }
+
+      const settings = {
+        POOL_NAME: poolSelect.value,
+        THRESHOLD: thresholdInput.value,
+        INTERVAL: intervalInput.value,
+        DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+        ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+        AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+        DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no',
+        AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
+        AGE_DAYS: ageDaysInput.value,
+        SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
+        SIZE_MB: sizeMbInput.value,
+        EXCLUSIONS_ENABLED: enableExcl.checked ? 'yes' : 'no',
+      };
+
+const ordered = [
+  ['POOL_NAME', settings.POOL_NAME],
+  ['THRESHOLD', settings.THRESHOLD],
+  ['INTERVAL', settings.INTERVAL],
+  ['DRY_RUN', settings.DRY_RUN],
+  ['ALLOW_DURING_PARITY_CHECK', settings.ALLOW_DURING_PARITY_CHECK],
+  ['AUTOSTART', settings.AUTOSTART],
+  ['DISABLE_UNRAID_MOVER_SCHEDULE', settings.DISABLE_UNRAID_MOVER_SCHEDULE],
+  ['AGE_BASED_FILTER', settings.AGE_BASED_FILTER],
+  ['AGE_DAYS', settings.AGE_DAYS],
+  ['SIZE_BASED_FILTER', settings.SIZE_BASED_FILTER],
+  ['SIZE_MB', settings.SIZE_MB],
+  ['EXCLUSIONS_ENABLED', settings.EXCLUSIONS_ENABLED],
+];
+const query = new URLSearchParams(ordered).toString();
+      const confirmBadge = document.getElementById('save-confirmation');
+      messageBox.innerHTML = '';
+      messageBox.style.display = 'block';
+
+      fetch('/plugins/automover/helpers/save_settings.php?' + query + '&csrf_token=' + encodeURIComponent(csrf_token))
+        .then(res => res.text())
+        .then(text => {
+          let data;
+          try { data = JSON.parse(text); } catch(e) { throw new Error('Invalid JSON'); }
+          if (data.status === 'ok') {
+            confirmBadge.style.display='inline-block'; confirmBadge.style.opacity='0'; confirmBadge.style.animation='none'; void confirmBadge.offsetWidth; confirmBadge.style.animation='flash .4s ease'; confirmBadge.style.opacity='1';
+            setTimeout(()=>{ confirmBadge.style.opacity='0'; confirmBadge.style.display='none'; }, 3000);
+
+            if (Array.isArray(data.messages)) data.messages.forEach(msg=>{ const line=document.createElement('div'); line.textContent=msg; messageBox.appendChild(line); });
+
+            fetch('/plugins/automover/helpers/start_cron.php?' + new URLSearchParams(settings) + '&csrf_token=' + encodeURIComponent(csrf_token))
+              .then(res => res.json())
+              .then(startData => {
+                updateStatus();
+                if (Array.isArray(startData.messages)) startData.messages.forEach(msg=>{ const line=document.createElement('div'); line.textContent=msg; messageBox.appendChild(line); });
+              })
+              .catch(() => {
+                document.getElementById('status-text').textContent = 'Error starting cron';
+                messageBox.innerHTML += `<div style="color:red;">❌ Error starting Automover</div>`;
+              });
+          } else {
+            messageBox.innerHTML = `<div style="color:red;">❌ ${data.message || 'Save failed'}</div>`;
+          }
+        })
+        .catch(() => { messageBox.innerHTML = `<div style="color:red;">❌ Save request failed</div>`; });
+    });
+  });
+
+  // Initial counts
+  function refreshExclusionCount(){
+    fetch(`/plugins/automover/helpers/update_exclusions.php?action=get_exclusion_count&csrf_token=${encodeURIComponent(csrf_token)}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if (d.ok){
+          exclCount.textContent = `${d.count} item${d.count===1?'':'s'}`;
+          exclField.value = d.count>0 ? `Click to open file picker to add or remove` : 'Click to open file picker to add or remove';
+        }
+      }).catch(()=>{});
+  }
+  refreshExclusionCount();
+});
+
+// Keep pool-usage warning + CA update check
 document.addEventListener("DOMContentLoaded", () => {
   const poolSelect = document.getElementById('pool');
   const poolWarning = document.getElementById('pool-warning');
-
-  function checkPoolUsage(poolName) {
-    if (!poolName) {
-      poolWarning.style.display = 'none';
-      return;
-    }
+  function checkPoolUsage(poolName){
+    if (!poolName) { poolWarning.style.display='none'; return; }
     fetch(`/plugins/automover/helpers/check_pool_usage.php?pool=${encodeURIComponent(poolName)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.in_use) poolWarning.style.display = 'block';
-        else poolWarning.style.display = 'none';
-      })
-      .catch(err => {
-        console.error("Failed to check pool usage:", err);
-        poolWarning.style.display = 'none';
-      });
+      .then(res=>res.json())
+      .then(data=>{ poolWarning.style.display = data.in_use ? 'none' : 'block'; })
+      .catch(()=>{ poolWarning.style.display = 'none'; });
   }
-
   poolSelect.addEventListener('change', () => checkPoolUsage(poolSelect.value));
   setTimeout(() => { checkPoolUsage(poolSelect.value); }, 250);
 });
 if ( typeof caPluginUpdateCheck === "function" ) {
-        caPluginUpdateCheck("automover.plg",{name:"Automover"});
-    }
+  caPluginUpdateCheck("automover.plg",{name:"Automover"});
+}
 </script>

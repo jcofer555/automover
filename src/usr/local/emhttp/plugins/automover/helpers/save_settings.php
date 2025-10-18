@@ -17,6 +17,7 @@ $args = [
     $_GET['AGE_DAYS'] ?? '',
     $_GET['SIZE_BASED_FILTER'] ?? '',
     $_GET['SIZE_MB'] ?? '',
+    $_GET['EXCLUSIONS_ENABLED'] ?? '',
 ];
 
 // Escape each argument for safety

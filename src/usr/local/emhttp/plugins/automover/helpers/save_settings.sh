@@ -15,6 +15,7 @@ AGE_BASED_FILTER="${8:-no}"
 AGE_DAYS="${9:-1}"
 SIZE_BASED_FILTER="${10:-no}"
 SIZE_MB="${11:-1}"
+EXCLUSIONS_ENABLED="${12:-no}"
 
 # Write all settings cleanly and atomically
 {
@@ -29,6 +30,7 @@ SIZE_MB="${11:-1}"
   echo "AGE_DAYS=\"$AGE_DAYS\""
   echo "SIZE_BASED_FILTER=\"$SIZE_BASED_FILTER\""
   echo "SIZE_MB=\"$SIZE_MB\""
+  echo "EXCLUSIONS_ENABLED=\"$EXCLUSIONS_ENABLED\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

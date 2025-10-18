@@ -4,7 +4,15 @@ LAST_RUN_FILE="/var/log/automover_last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
 AUTOMOVER_LOG="/var/log/automover_files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
-IN_USE_FILE="/boot/config/plugins/automover/in_use_files.txt"
+IN_USE_FILE="/tmp/in_use_files.txt"
+
+# Load settings
+if [[ -f "$CFG_PATH" ]]; then
+  source "$CFG_PATH"
+else
+  echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
+  exit 1
+fi
 
 # Generate in-use file exclusion list with disk path translation
 > "$IN_USE_FILE"
@@ -28,14 +36,6 @@ for dir in /mnt/*; do
 done
 
 sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
-
-# Load settings
-if [[ -f "$CFG_PATH" ]]; then
-  source "$CFG_PATH"
-else
-  echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
-  exit 1
-fi
 
 # Normalize quoted values
 for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY_CHECK AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB; do
@@ -269,6 +269,10 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
         echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
         echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
         moved_anything=true
+      fi
+
+      if [[ "$file_count" -gt 0 ]]; then
+        echo "Finished move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
       fi
     fi
 
