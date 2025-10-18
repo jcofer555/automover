@@ -38,7 +38,7 @@ else
 fi
 
 # Normalize quoted values
-for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY_CHECK AGE_BASED_FILTER; do
+for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY_CHECK AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -50,6 +50,13 @@ if [[ "$AGE_BASED_FILTER" == "yes" && "$AGE_DAYS" =~ ^[0-9]+$ && "$AGE_DAYS" -gt
   MTIME_ARG="+$((AGE_DAYS_CLEAN - 1))"
 else
   AGE_FILTER_ENABLED=false
+fi
+
+# Size-based configuration
+if [[ "$SIZE_BASED_FILTER" == "yes" && "$SIZE_MB" =~ ^[0-9]+$ && "$SIZE_MB" -gt 0 ]]; then
+  SIZE_FILTER_ENABLED=true
+else
+  SIZE_FILTER_ENABLED=false
 fi
 
 MOUNT_POINT="/mnt/${POOL_NAME}"
@@ -190,17 +197,24 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   # DRY RUN
   if [[ "$DRY_RUN" == "yes" ]]; then
     if [[ -d "$src" ]]; then
-      if [[ "$AGE_FILTER_ENABLED" == true ]]; then
-        mapfile -t aged_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
-        mapfile -t aged_dirs  < <(cd "$src" && find . -type d -empty -mtime "$MTIME_ARG" -printf '%P/\n' 2>/dev/null)
-        all_aged_items=("${aged_files[@]}" "${aged_dirs[@]}")
+      if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
+        if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
+          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
+        elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
+          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
+        elif [[ "$SIZE_FILTER_ENABLED" == true ]]; then
+          mapfile -t filtered_files < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
+        fi
 
-        if (( ${#all_aged_items[@]} == 0 )); then
+        mapfile -t filtered_dirs < <(cd "$src" && find . -type d -empty -printf '%P/\n' 2>/dev/null)
+        all_filtered_items=("${filtered_files[@]}" "${filtered_dirs[@]}")
+
+        if (( ${#all_filtered_items[@]} == 0 )); then
           continue
         fi
 
         rsync_filter=("--files-from=-")
-        dry_output=$(printf '%s\n' "${all_aged_items[@]}" | rsync -ainH --checksum "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
+        dry_output=$(printf '%s\n' "${all_filtered_items[@]}" | rsync -ainH --checksum "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
       else
         dry_output=$(rsync -ainH --checksum "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
       fi
@@ -226,15 +240,24 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     fi
 
     if [[ -d "$src" ]]; then
-      if [[ "$AGE_FILTER_ENABLED" == true ]]; then
-        mapfile -t aged_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
-        mapfile -t aged_dirs  < <(cd "$src" && find . -type d -empty -mtime "$MTIME_ARG" -printf '%P/\n' 2>/dev/null)
-        all_aged_items=("${aged_files[@]}" "${aged_dirs[@]}")
-        if (( ${#all_aged_items[@]} == 0 )); then
+      if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
+        if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
+          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
+        elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
+          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
+        elif [[ "$SIZE_FILTER_ENABLED" == true ]]; then
+          mapfile -t filtered_files < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
+        fi
+
+        mapfile -t filtered_dirs < <(cd "$src" && find . -type d -empty -printf '%P/\n' 2>/dev/null)
+        all_filtered_items=("${filtered_files[@]}" "${filtered_dirs[@]}")
+
+        if (( ${#all_filtered_items[@]} == 0 )); then
           continue
         fi
+
         rsync_filter=("--files-from=-")
-        output=$(printf '%s\n' "${all_aged_items[@]}" | rsync -aiH --checksum --remove-source-files "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
+        output=$(printf '%s\n' "${all_filtered_items[@]}" | rsync -aiH --checksum --remove-source-files "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
       else
         output=$(rsync -aiH --checksum --remove-source-files "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
       fi
@@ -249,7 +272,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       fi
     fi
 
-    # Always perform empty directory cleanup (even if AGE filter off)
+    # Always perform empty directory cleanup
     if [[ -d "$src" ]]; then
       while IFS= read -r dir; do
         skip=false

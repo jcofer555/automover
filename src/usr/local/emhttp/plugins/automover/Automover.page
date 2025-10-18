@@ -18,7 +18,9 @@ $defaults = [
     'AUTOSTART' => 'no',
     'DISABLE_UNRAID_MOVER_SCHEDULE' => 'no',
     'AGE_BASED_FILTER' => 'no',
-    'AGE_DAYS' => 1
+    'AGE_DAYS' => 1,
+    'SIZE_BASED_FILTER' => 'no',
+    'SIZE_MB' => 1
 ];
 
 // Load existing config if present
@@ -92,10 +94,25 @@ button {
 }
 
 .checkbox-row {
-  justify-content: space-evenly;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 columns */
+  gap: 0px 30px; /* vertical and horizontal spacing */
+  margin-top: 10px;
   align-items: center;
-  margin-top: 25px;
-  margin-bottom: 15px;
+}
+
+.checkbox-row label {
+  display: flex;
+  align-items: center; /* vertically center checkbox + text */
+  gap: 1px; /* spacing between box and label text */
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.checkbox-row input[type="checkbox"] {
+  transform: scale(1.2); /* make checkbox slightly larger */
+  accent-color: var(--primary-blue); /* match your Unraid plugin color theme */
 }
 
 .form-check {
@@ -477,23 +494,37 @@ input[type="number"].short-input {
     <div class="form-pair">
       <label for="interval" class="tooltip" data-tooltip="Interval between usage checks in minutes.">Interval (minutes):</label>
       <div class="input-wrapper">
-        <input type="number" id="interval" class="short-input" min="1" step="1"
+        <input type="number" id="interval" class="short-input" min="5" step="1"
           value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? '') ?>">
-        <div id="interval-warning" class="field-warning">Interval must be at least 5</div>
+        <div id="interval-warning" class="field-warning">Interval must be at least 5 minutes</div>
       </div>
     </div>
 
     <div class="form-pair" id="age-days-container" style="display: none;">
   <label for="age_days" class="tooltip" data-tooltip="Only move files older than this many days.">Age (days):</label>
   <div class="input-wrapper">
-    <input type="number" id="age_days" class="short-input" min="0" step="1"
+    <input type="number" id="age_days" class="short-input" min="1" step="1"
       value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
-    <div id="age-days-warning" class="field-warning">Age must be 0 or greater</div>
+    <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
+  </div>
+</div>
+
+<div class="form-pair" id="size-mb-container" style="display: none;">
+  <label for="size_mb" class="tooltip" data-tooltip="Only move files larger than this size (in MB).">Min Size (MB):</label>
+  <div class="input-wrapper">
+    <input type="number" id="size_mb" class="short-input" min="1" step="1"
+      value="<?php echo htmlspecialchars($settings['SIZE_MB'] ?? '') ?>">
+    <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
   </div>
 </div>
 
     <!-- Checkboxes -->
     <div class="checkbox-row">
+      <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
+        <input type="checkbox" id="autostart"
+          <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+      </label>
+
       <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
         <input type="checkbox" id="dry_run"
           <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
@@ -504,9 +535,9 @@ input[type="number"].short-input {
           <?php echo ($settings['ALLOW_DURING_PARITY_CHECK'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
-        <input type="checkbox" id="autostart"
-          <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+      <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old.">
+        <input type="checkbox" id="age_based_filter"
+          <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable age Based Filter
       </label>
 
       <label class="form-check tooltip" data-tooltip="Disables Unraid's built-in mover schedule.">
@@ -514,9 +545,9 @@ input[type="number"].short-input {
           <?php echo ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '') === 'yes' ? 'checked' : '' ?>> Disable Unraid Mover Schedule
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old.">
-        <input type="checkbox" id="age_based_filter"
-          <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable age Based Filter
+      <label class="form-check tooltip" data-tooltip="Enable to move only files larger than the specified size in MB.">
+        <input type="checkbox" id="size_based_filter"
+          <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
       </label>
     </div>
 
@@ -608,6 +639,15 @@ function toggleAgeInput() {
 }
 ageFilterCheckbox.addEventListener('change', toggleAgeInput);
 toggleAgeInput(); // Initial state
+
+const sizeFilterCheckbox = document.getElementById('size_based_filter');
+const sizeMbContainer = document.getElementById('size-mb-container');
+
+function toggleSizeInput() {
+  sizeMbContainer.style.display = sizeFilterCheckbox.checked ? 'flex' : 'none';
+}
+sizeFilterCheckbox.addEventListener('change', toggleSizeInput);
+toggleSizeInput(); // Initial state
 
   // --- Pool Usage ---
   function updatePoolUsage() {
@@ -737,30 +777,53 @@ document.getElementById('stop-button').addEventListener('click', function () {
   const ageDaysInput = document.getElementById('age_days');
   ageDaysInput.addEventListener('input', () => validateField(ageDaysInput, { min: 1 }, 'age-days-warning'));
 
+  const sizeMbInput = document.getElementById('size_mb');
+  sizeMbInput.addEventListener('input', () => validateField(sizeMbInput, { min: 1 }, 'size-mb-warning'));
 
   // --- Save & Start ---
 saveBtn.addEventListener('click', function () {
-  const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+  // Run validations for all numeric fields
+  const intervalValid = validateField(intervalInput, { min: 5 }, 'interval-warning');
   const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
-  if (!intervalValid || !thresholdValid) {
+
+  const ageDaysInput = document.getElementById('age_days');
+  const sizeMbInput = document.getElementById('size_mb');
+
+  const ageDaysValid = !document.getElementById('age_based_filter').checked ||
+                       validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
+
+  const sizeMbValid = !document.getElementById('size_based_filter').checked ||
+                      validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
+
+  // Combine all validations
+  const allValid = intervalValid && thresholdValid && ageDaysValid && sizeMbValid;
+
+  if (!allValid) {
     form.classList.add('shake');
     setTimeout(() => form.classList.remove('shake'), 300);
-    return;
+
+    const messageBox = document.getElementById('save-messages');
+    messageBox.innerHTML = `<div style="color: red;">❌ Please correct the highlighted warnings.</div>`;
+    messageBox.style.display = 'block';
+    return; // Stop here — prevent Save & Start
   }
 
-const settings = {
-  POOL_NAME: poolSelect.value,
-  THRESHOLD: thresholdInput.value,
-  INTERVAL: intervalInput.value,
-  DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-  ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-  AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-  DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no',
-  AGE_BASED_FILTER: ageFilterCheckbox.checked ? 'yes' : 'no',
-  AGE_DAYS: ageDaysInput.value
-};
-  const query = new URLSearchParams(settings).toString();
+  // ✅ Only continue to save when all fields are valid
+  const settings = {
+    POOL_NAME: poolSelect.value,
+    THRESHOLD: thresholdInput.value,
+    INTERVAL: intervalInput.value,
+    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+    ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+    DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no',
+    AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
+    AGE_DAYS: ageDaysInput.value,
+    SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
+    SIZE_MB: sizeMbInput.value
+  };
 
+  const query = new URLSearchParams(settings).toString();
   const confirmBadge = document.getElementById('save-confirmation');
   const messageBox = document.getElementById('save-messages');
   messageBox.innerHTML = '';

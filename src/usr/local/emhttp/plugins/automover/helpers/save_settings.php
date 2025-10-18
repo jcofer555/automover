@@ -15,6 +15,8 @@ $args = [
     $_GET['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '',
     $_GET['AGE_BASED_FILTER'] ?? '',
     $_GET['AGE_DAYS'] ?? '',
+    $_GET['SIZE_BASED_FILTER'] ?? '',
+    $_GET['SIZE_MB'] ?? '',
 ];
 
 // Escape each argument for safety
