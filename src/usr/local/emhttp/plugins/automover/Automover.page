@@ -469,10 +469,8 @@ exclusionstoast.style.position = 'absolute';
 exclusionstoast.style.bottom = '28px';
 exclusionstoast.style.left = '50%';
 exclusionstoast.style.transform = 'translateX(-50%)';
-exclusionstoast.style.background = 'rgba(0,0,0,0.9)';
 exclusionstoast.style.color = '#00ff99';
 exclusionstoast.style.padding = '8px 14px';
-exclusionstoast.style.border = '1px solid #00aaff55';
 exclusionstoast.style.borderRadius = '6px';
 exclusionstoast.style.fontWeight = '600';
 exclusionstoast.style.display = 'none';
@@ -531,7 +529,7 @@ copyBtn.addEventListener('click', e => {
     ta.select();
     try {
       document.execCommand('copy');
-      showexclusionstoast('Copied!');
+      showexclusionstoast('✅ Copied!');
     } catch {
       showexclusionstoast('Copy failed', 'err');
     }
