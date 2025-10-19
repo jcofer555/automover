@@ -280,7 +280,7 @@ input[type="number"].short-input{appearance:auto;-webkit-appearance:auto;-moz-ap
     <div class="form-pair" id="exclusions-row" style="display:none;">
       <label for="exclusions-field" class="tooltip" data-tooltip="Open the file picker to add or remove excluded paths.">Exclusions:</label>
       <div class="input-wrapper">
-        <input id="exclusions-field" type="text" readonly value="Click to open file picker to add or remove" title="Click to open file picker to add or remove">
+        <input id="exclusions-field" type="text" readonly value="Click to open file picker" title="Click to open file picker">
         <button id="viewExclusionsBtn" type="button">View/Edit Exclusions</button>
       </div>
     </div>
@@ -901,7 +901,7 @@ grid.appendChild(row);
       .then(d=>{
         if (d.ok){
           exclCount.textContent = `${d.count} item${d.count===1?'':'s'}`;
-          exclField.value = d.count>0 ? `Click to open file picker to add or remove` : 'Click to open file picker to add or remove';
+          exclField.value = d.count>0 ? `Click to open file picker` : 'Click to open file picker';
         }
       }).catch(()=>{});
   }
@@ -1101,6 +1101,16 @@ const query = new URLSearchParams(ordered).toString();
               .then(startData => {
                 updateStatus();
                 if (Array.isArray(startData.messages)) startData.messages.forEach(msg=>{ const line=document.createElement('div'); line.textContent=msg; messageBox.appendChild(line); });
+                          if (startData.flag_changed) {
+            const moverCheckbox = document.getElementById('disable_unraid_mover_schedule');
+            if (moverCheckbox) {
+              moverCheckbox.checked = false;
+              const notice = document.createElement('div');
+              notice.style.color = 'orange';
+              notice.textContent = '';
+              messageBox.appendChild(notice);
+            }
+          }
               })
               .catch(() => {
                 document.getElementById('status-text').textContent = 'Error starting cron';
@@ -1121,7 +1131,7 @@ const query = new URLSearchParams(ordered).toString();
       .then(d=>{
         if (d.ok){
           exclCount.textContent = `${d.count} item${d.count===1?'':'s'}`;
-          exclField.value = d.count>0 ? `Click to open file picker to add or remove` : 'Click to open file picker to add or remove';
+          exclField.value = d.count>0 ? `Click to open file picker` : 'Click to open file picker';
         }
       }).catch(()=>{});
   }
