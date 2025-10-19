@@ -1,12 +1,29 @@
 #!/bin/bash
-
+SCRIPT_NAME="automover"
 LAST_RUN_FILE="/var/log/automover_last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
 AUTOMOVER_LOG="/var/log/automover_files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
-IN_USE_FILE="/tmp/in_use_files.txt"
+IN_USE_FILE="/tmp/automover/in_use_files.txt"
 
-# Load settings
+# ==========================================================
+#  Optional MOVE NOW Mode (bypass all filters)
+# ==========================================================
+MOVE_NOW=false
+if [[ "$1" == "--force-now" ]]; then
+  MOVE_NOW=true
+  shift
+fi
+
+# Optional: specify pool manually (used by Move Now button)
+if [[ "$1" == "--pool" && -n "$2" ]]; then
+  POOL_NAME="$2"
+  shift 2
+fi
+
+# ==========================================================
+#  Load Settings
+# ==========================================================
 if [[ -f "$CFG_PATH" ]]; then
   source "$CFG_PATH"
 else
@@ -14,7 +31,30 @@ else
   exit 1
 fi
 
-# Generate in-use file exclusion list with disk path translation
+# Normalize quoted values
+for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY_CHECK AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED; do
+  eval "$var=\$(echo \${$var} | tr -d '\"')"
+done
+
+# ==========================================================
+#  FORCE NOW mode disables all filters and restrictions
+# ==========================================================
+if [[ "$MOVE_NOW" == true ]]; then
+  echo "FORCE NOW mode active — disabling all filters and checks" >> "$LAST_RUN_FILE"
+  AGE_FILTER_ENABLED=false
+  SIZE_FILTER_ENABLED=false
+  AGE_BASED_FILTER="no"
+  SIZE_BASED_FILTER="no"
+  DRY_RUN="no"
+  ALLOW_DURING_PARITY_CHECK="yes"
+  EXCLUSIONS_FILE="/dev/null"
+  THRESHOLD=0
+fi
+
+# ==========================================================
+#  Generate In-Use File Exclusion List
+# ==========================================================
+mkdir -p /tmp/automover
 > "$IN_USE_FILE"
 
 EXCLUDES=("user" "user0" "addons" "disks" "remotes" "rootshare")
@@ -34,37 +74,17 @@ for dir in /mnt/*; do
     }
   ' >> "$IN_USE_FILE"
 done
-
 sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
 
-# Normalize quoted values
-for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY_CHECK AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB; do
-  eval "$var=\$(echo \${$var} | tr -d '\"')"
-done
-
-# Age-based configuration
-if [[ "$AGE_BASED_FILTER" == "yes" && "$AGE_DAYS" =~ ^[0-9]+$ && "$AGE_DAYS" -gt 0 ]]; then
-  AGE_FILTER_ENABLED=true
-  AGE_DAYS_CLEAN=$AGE_DAYS
-  ((AGE_DAYS_CLEAN > 0)) || AGE_DAYS_CLEAN=1
-  MTIME_ARG="+$((AGE_DAYS_CLEAN - 1))"
-else
-  AGE_FILTER_ENABLED=false
-fi
-
-# Size-based configuration
-if [[ "$SIZE_BASED_FILTER" == "yes" && "$SIZE_MB" =~ ^[0-9]+$ && "$SIZE_MB" -gt 0 ]]; then
-  SIZE_FILTER_ENABLED=true
-else
-  SIZE_FILTER_ENABLED=false
-fi
-
-MOUNT_POINT="/mnt/${POOL_NAME}"
-
-# Log header
+# ==========================================================
+#  Log Header
+# ==========================================================
 start_time=$(date +%s)
-echo "------------------------------------------------" >> "$LAST_RUN_FILE"
-echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
+{
+  echo "------------------------------------------------"
+  echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
+  [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — all filters and exclusions disabled"
+} >> "$LAST_RUN_FILE"
 
 log_session_end() {
   end_time=$(date +%s)
@@ -77,11 +97,13 @@ log_session_end() {
     echo "Duration: ${secs}s" >> "$LAST_RUN_FILE"
   fi
   echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
-  printf "\n" >> "$LAST_RUN_FILE"
+  echo "" >> "$LAST_RUN_FILE"
 }
 
-# Parity check
-if [[ "$ALLOW_DURING_PARITY_CHECK" == "no" ]]; then
+# ==========================================================
+#  Parity Check Guard (unless MOVE_NOW)
+# ==========================================================
+if [[ "$ALLOW_DURING_PARITY_CHECK" == "no" && "$MOVE_NOW" == false ]]; then
   if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; then
     echo "Parity check in progress. Skipping this run." >> "$LAST_RUN_FILE"
     log_session_end
@@ -89,40 +111,63 @@ if [[ "$ALLOW_DURING_PARITY_CHECK" == "no" ]]; then
   fi
 fi
 
-# Usage check
-POOL_NAME=$(basename "$MOUNT_POINT")
-ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
-
-if [[ -n "$ZFS_CAP" ]]; then
-  USED="$ZFS_CAP"
+# ==========================================================
+#  Age & Size Filter Config
+# ==========================================================
+if [[ "$MOVE_NOW" == false ]]; then
+  AGE_FILTER_ENABLED=false
+  SIZE_FILTER_ENABLED=false
+  if [[ "$AGE_BASED_FILTER" == "yes" && "$AGE_DAYS" =~ ^[0-9]+$ && "$AGE_DAYS" -gt 0 ]]; then
+    AGE_FILTER_ENABLED=true
+    MTIME_ARG="+$((AGE_DAYS - 1))"
+  fi
+  if [[ "$SIZE_BASED_FILTER" == "yes" && "$SIZE_MB" =~ ^[0-9]+$ && "$SIZE_MB" -gt 0 ]]; then
+    SIZE_FILTER_ENABLED=true
+  fi
 else
-  USED=$(df -h --output=pcent "$MOUNT_POINT" 2>/dev/null | awk 'NR==2 {gsub("%",""); print}')
+  AGE_FILTER_ENABLED=false
+  SIZE_FILTER_ENABLED=false
 fi
 
-if [[ -z "$USED" ]]; then
-  echo "$MOUNT_POINT usage not detected — nothing to do" >> "$LAST_RUN_FILE"
-  log_session_end
-  exit 1
+MOUNT_POINT="/mnt/${POOL_NAME}"
+
+# ==========================================================
+#  Pool Usage Check (skip if MOVE_NOW)
+# ==========================================================
+if [[ "$MOVE_NOW" == false ]]; then
+  POOL_NAME=$(basename "$MOUNT_POINT")
+  ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
+
+  if [[ -n "$ZFS_CAP" ]]; then
+    USED="$ZFS_CAP"
+  else
+    USED=$(df -h --output=pcent "$MOUNT_POINT" 2>/dev/null | awk 'NR==2 {gsub("%",""); print}')
+  fi
+
+  if [[ -z "$USED" ]]; then
+    echo "$MOUNT_POINT usage not detected — nothing to do" >> "$LAST_RUN_FILE"
+    log_session_end
+    exit 1
+  fi
+
+  echo "$POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)" >> "$LAST_RUN_FILE"
+
+  if [[ "$USED" -le "$THRESHOLD" ]]; then
+    echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"
+    log_session_end
+    exit 0
+  fi
 fi
 
-echo "$POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)" >> "$LAST_RUN_FILE"
-
-if [[ "$USED" -le "$THRESHOLD" ]]; then
-  echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"
-  log_session_end
-  exit 0
-fi
-
-echo "Usage exceeds threshold - starting move" >> "$LAST_RUN_FILE"
-
+# ==========================================================
+#  Movement Logic
+# ==========================================================
 dry_run_nothing=true
 moved_anything=false
-
 SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
 
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
-  goto_case=false
   [[ -f "$cfg" ]] || continue
   share_name="${cfg##*/}"
   share_name="${share_name%.cfg}"
@@ -133,201 +178,91 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
   [[ -z "$use_cache" || -z "$pool1" ]] && continue
 
+  # Skip unrelated pools unless forced by argument
+  if [[ "$pool1" != "$POOL_NAME" && "$pool2" != "$POOL_NAME" ]]; then
+    continue
+  fi
+
+  # Define source/destination
   if [[ -z "$pool2" ]]; then
     if [[ "$use_cache" == "yes" ]]; then
       src="/mnt/$pool1/$share_name"
       dst="/mnt/user0/$share_name"
-      cleanup_path="$src"
-      goto_case=true
     elif [[ "$use_cache" == "prefer" ]]; then
       src="/mnt/user0/$share_name"
       dst="/mnt/$pool1/$share_name"
-      cleanup_path="$src"
-      goto_case=true
+    else
+      continue
     fi
-  fi
-
-  if [[ -z "$goto_case" ]]; then
+  else
     case "$use_cache" in
       yes)
         src="/mnt/$pool1/$share_name"
         dst="/mnt/$pool2/$share_name"
-        cleanup_path="$src"
         ;;
       prefer)
         src="/mnt/$pool2/$share_name"
         dst="/mnt/$pool1/$share_name"
-        cleanup_path="$src"
         ;;
       *) continue ;;
     esac
-
-    if [[ -n "$pool1" && -n "$pool2" && "$use_cache" =~ ^(yes|prefer)$ ]]; then
-      if ! mountpoint -q "$src"; then
-        echo "Source not mounted: $src — skipping share: $share_name" >> "$LAST_RUN_FILE"
-        continue
-      fi
-      if ! mountpoint -q "$dst"; then
-        echo "Destination not mounted: $dst — skipping share: $share_name" >> "$LAST_RUN_FILE"
-        continue
-      fi
-    fi
   fi
 
-  dst=$(readlink -f "$dst")
-  dst_pool=$(basename "$(dirname "$dst")")
-  dst_share=$(basename "$dst")
+  [[ ! -d "$src" ]] && continue
 
-  # Load exclusions per share
+  # Exclusions disabled in MOVE_NOW
   excludes=()
-  src_clean="${src%/}"
-
-  for file in "$EXCLUSIONS_FILE" "$IN_USE_FILE"; do
-    [[ -f "$file" ]] || continue
+  if [[ "$MOVE_NOW" == false && -f "$EXCLUSIONS_FILE" ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
       [[ -z "$line" || "$line" =~ ^# ]] && continue
-      line_clean="${line%/}"
-      if [[ "$line_clean" == "$src_clean"* ]]; then
-        rel="${line_clean#$src_clean/}"
-        excludes+=("--exclude=$rel")
-      fi
-    done < "$file"
-  done
+      excludes+=("--exclude=$line")
+    done < "$EXCLUSIONS_FILE"
+  fi
 
-  # DRY RUN
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    if [[ -d "$src" ]]; then
-      if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
-        if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
-          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
-        elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
-          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
-        elif [[ "$SIZE_FILTER_ENABLED" == true ]]; then
-          mapfile -t filtered_files < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
-        fi
+  # Always exclude in-use files
+  if [[ -f "$IN_USE_FILE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ -z "$line" || "$line" =~ ^# ]] && continue
+      excludes+=("--exclude=$line")
+    done < "$IN_USE_FILE"
+  fi
 
-        mapfile -t filtered_dirs < <(cd "$src" && find . -type d -empty -printf '%P/\n' 2>/dev/null)
-        all_filtered_items=("${filtered_files[@]}" "${filtered_dirs[@]}")
-
-        if (( ${#all_filtered_items[@]} == 0 )); then
-          continue
-        fi
-
-        rsync_filter=("--files-from=-")
-        dry_output=$(printf '%s\n' "${all_filtered_items[@]}" | rsync -ainH --checksum "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
-      else
-        dry_output=$(rsync -ainH --checksum "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
-      fi
-
-      file_lines=$(echo "$dry_output" | awk '$1 ~ /^>f/' | cut -c13-)
-      file_count=$(echo "$file_lines" | grep -c .)
-
-      if [[ "$file_count" -gt 0 ]]; then
-        echo "Dry run detected $file_count files to move for share: $share_name" >> "$AUTOMOVER_LOG"
-        echo "Dry run detected $file_count files to move for share: $share_name" >> "$LAST_RUN_FILE"
-        echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
-        moved_anything=true
-        dry_run_nothing=false
-      fi
+  # ==========================================================
+  #  ACTUAL MOVE
+  # ==========================================================
+  if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
+    if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
+      mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
+    elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
+      mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
+    elif [[ "$SIZE_FILTER_ENABLED" == true ]]; then
+      mapfile -t filtered_files < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
     fi
-
-  # ACTUAL MOVE
+    mapfile -t filtered_dirs < <(cd "$src" && find . -type d -empty -printf '%P/\n' 2>/dev/null)
+    all_filtered_items=("${filtered_files[@]}" "${filtered_dirs[@]}")
+    (( ${#all_filtered_items[@]} == 0 )) && continue
+    output=$(printf '%s\n' "${all_filtered_items[@]}" | rsync -aiH --checksum --remove-source-files "${excludes[@]}" --files-from=- "$src/" "$dst/" 2>/dev/null)
   else
-    if zpool list -H -o name | grep -qx "$dst_pool"; then
-      if ! zfs list -H -o name | grep -qx "$dst_pool/$dst_share"; then
-        zfs create "$dst_pool/$dst_share" 2>/dev/null
-      fi
-    fi
+    output=$(rsync -aiH --checksum --remove-source-files "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
+  fi
 
-    if [[ -d "$src" ]]; then
-      if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
-        if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
-          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
-        elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
-          mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
-        elif [[ "$SIZE_FILTER_ENABLED" == true ]]; then
-          mapfile -t filtered_files < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
-        fi
+  file_lines=$(echo "$output" | awk '$1 ~ /^>f/' | cut -c13-)
+  file_count=$(echo "$file_lines" | grep -c .)
 
-        mapfile -t filtered_dirs < <(cd "$src" && find . -type d -empty -printf '%P/\n' 2>/dev/null)
-        all_filtered_items=("${filtered_files[@]}" "${filtered_dirs[@]}")
-
-        if (( ${#all_filtered_items[@]} == 0 )); then
-          continue
-        fi
-
-        rsync_filter=("--files-from=-")
-        output=$(printf '%s\n' "${all_filtered_items[@]}" | rsync -aiH --checksum --remove-source-files "${excludes[@]}" "${rsync_filter[@]}" "$src/" "$dst/" 2>/dev/null)
-      else
-        output=$(rsync -aiH --checksum --remove-source-files "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
-      fi
-
-      file_lines=$(echo "$output" | awk '$1 ~ /^>f/' | cut -c13-)
-      file_count=$(echo "$file_lines" | grep -c .)
-
-      if [[ "$file_count" -gt 0 ]]; then
-        echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
-        echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
-        moved_anything=true
-      fi
-
-      if [[ "$file_count" -gt 0 ]]; then
-        echo "Finished move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
-      fi
-    fi
-
-    # Always perform empty directory cleanup
-    if [[ -d "$src" ]]; then
-      while IFS= read -r dir; do
-        skip=false
-        for ex in "${excludes[@]}"; do
-          ex_path="${ex#--exclude=}"
-          [[ "$dir" == "$src/$ex_path"* ]] && skip=true && break
-        done
-        [[ "$skip" == true ]] && continue
-
-        if [[ -d "$dir" && -z "$(ls -A "$dir")" ]]; then
-          if [[ "$AGE_FILTER_ENABLED" == true ]]; then
-            if find "$dir" -maxdepth 0 -type d -mtime "$MTIME_ARG" | grep -q .; then
-              rmdir "$dir" 2>/dev/null
-            fi
-          else
-            rmdir "$dir" 2>/dev/null
-          fi
-        fi
-      done < <(find "$src" -type d | sort -r)
-    fi
-
-    # ZFS dataset cleanup
-    cleanup_path=$(readlink -f "$cleanup_path")
-    zfs_dataset=$(zfs list -H -o name,mountpoint | awk -v path="$cleanup_path" '$2 == path {print $1}')
-
-    if [[ -n "$zfs_dataset" ]]; then
-      if [[ -z "$(ls -A "$cleanup_path")" ]]; then
-        zfs unmount "$zfs_dataset" 2>/dev/null
-        zfs destroy "$zfs_dataset" 2>/dev/null
-      else
-        echo "ZFS dataset not empty: $zfs_dataset" >> "$LAST_RUN_FILE"
-      fi
-    else
-      if [[ -d "$cleanup_path" && -z "$(ls -A "$cleanup_path")" ]]; then
-        rmdir "$cleanup_path" 2>/dev/null
-      fi
-    fi
+  if [[ "$file_count" -gt 0 ]]; then
+    echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
+    echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
+    echo "Finished move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
+    moved_anything=true
   fi
 done
 
-# Final summary
-if [[ "$DRY_RUN" == "yes" ]]; then
-  if [[ "$dry_run_nothing" == "true" ]]; then
-    echo "Dry run: No files would have been moved" >> "$AUTOMOVER_LOG"
-    echo "Dry run: No files would have been moved" >> "$LAST_RUN_FILE"
-  fi
-else
-  if [[ "$moved_anything" == false ]]; then
-    echo "No files moved for this run" >> "$AUTOMOVER_LOG"
-    echo "No files moved for this run" >> "$LAST_RUN_FILE"
-  fi
+# ==========================================================
+#  Summary
+# ==========================================================
+if [[ "$moved_anything" == false ]]; then
+  echo "No files moved for this run" >> "$AUTOMOVER_LOG"
+  echo "No files moved for this run" >> "$LAST_RUN_FILE"
 fi
 
 log_session_end

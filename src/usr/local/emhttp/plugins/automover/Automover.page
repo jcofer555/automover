@@ -110,7 +110,7 @@ input.invalid{border-color:red;color:red}.field-warning{display:none;color:red;f
 input.invalid + .field-warning{display:block}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-5px)}}
 #automover-settings.shake{animation:shake .3s}
-#save-confirmation,#start-confirmation,#stop-confirmation{display:block;clear:both;background:var(--primary-blue);color:#fff;font-weight:bold;padding:6px 12px;border-radius:6px;margin-top:12px;opacity:0;transition:opacity .4s ease;animation:flash .4s ease}
+#move-now-confirmation,#save-confirmation,#start-confirmation,#stop-confirmation{display:block;clear:both;background:var(--primary-blue);color:#fff;width: fit-content;font-weight:bold;padding:6px 12px;border-radius:6px;margin-top:12px;opacity:0;transition:opacity .4s ease;animation:flash .4s ease}
 @keyframes flash{0%{opacity:0;transform:scale(1)}50%{opacity:1;transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
 #automover-wrapper{display:flex;align-items:flex-start;gap:30px;flex-wrap:wrap}
 #automover-settings{flex:1;height:69vh;max-width:450px}
@@ -287,13 +287,19 @@ input[type="number"].short-input{appearance:auto;-webkit-appearance:auto;-moz-ap
 
 <div id="exclusion-view-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0;
   background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
-<div class="modal-body" style="background:#111; color:white; padding:20px; border-radius:10px;
+  <div class="modal-body" style="background:#111; color:white; padding:20px; border-radius:10px;
   width:800px; height:600px; overflow:hidden; display:flex; flex-direction:column;">
     <h3 style="margin-top:0;">View/Edit Exclusions</h3>
-<textarea id="exclusionsEditor" style="
-  background:#000; color:#fff; font-family:monospace;
-  border:1px solid #333; border-radius:6px; padding:10px; resize:none;
-  width:97%; height:480px; overflow-y:auto;"></textarea>
+    <p style="margin-top:4px; margin-bottom:10px; color:#aaa; font-style:italic; font-size:13px;">
+      * Any array paths changed or added need to be entered as <code>user0</code> instead of <code>disk#</code>.
+      For example: <code>/mnt/disk3/data/test/file.txt</code> should be entered as <code>/mnt/user0/data/test/file.txt</code>. This does not apply to pool paths.
+    </p>
+
+    <textarea id="exclusionsEditor" style="
+      background:#000; color:#fff; font-family:monospace;
+      border:1px solid #333; border-radius:6px; padding:10px; resize:none;
+      width:97%; height:480px; overflow-y:auto;"></textarea>
+
     <div style="display:flex; justify-content:space-between; margin-top:auto; padding-top:0px;">
       <div>
         <button id="copyExclusionsBtn" type="button" style="background:#222; color:#fff; border:1px solid #00aaff; padding:6px 12px; border-radius:6px; cursor:pointer;">Copy</button>
@@ -335,13 +341,14 @@ input[type="number"].short-input{appearance:auto;-webkit-appearance:auto;-moz-ap
       </label>
     </div>
 
-    <div class="form-group">
-      <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
-      <button type="button" id="stop-button" class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
-    </div>
+<div class="form-group">
+  <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
+  <button type="button" id="stop-button" class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
+  <button type="button" id="moveNowBtn" class="btn tooltip" data-tooltip="Run Automover immediately, ignoring filters.">Move Now</button>
+</div>
 
-    <div id="save-confirmation" style="display:none;margin-top:10px;">✅ Saved Settings</div>
-    <div id="start-confirmation" style="display:none;margin-top:10px;">✅ Started Automover</div>
+    <div id="move-now-confirmation" style="display:none;margin-top:10px;">✅ Moving Now</div>
+    <div id="save-confirmation" style="display:none;margin-top:10px;">✅ Saved & Started Automover</div>
     <div id="stop-confirmation" style="display:none;margin-top:10px;">✅ Stopping Automover</div>
 
     <div id="save-messages" style="display:none;margin-top:10px;margin-bottom:20px;background:#111;border-radius:6px;font-family:monospace;color:red;"></div>
@@ -429,11 +436,47 @@ document.addEventListener('DOMContentLoaded', function () {
   const thresholdInput = document.getElementById('threshold');
   const saveBtn = document.getElementById('save-settings');
   const confirmBadge = document.getElementById('save-confirmation');
+  const moveNowBtn = document.getElementById('moveNowBtn');
+  const moveNowBadge = document.getElementById('move-now-confirmation');
   let currentPoolSelection = poolSelect.dataset.selected || '';
   const ageFilterCheckbox = document.getElementById('age_based_filter');
   const ageDaysContainer  = document.getElementById('age-days-container');
   const sizeFilterCheckbox= document.getElementById('size_based_filter');
   const sizeMbContainer   = document.getElementById('size-mb-container');
+
+  moveNowBtn.addEventListener('click', () => {
+  // Trigger the move action (you may already have this logic elsewhere)
+  fetch('/plugins/automover/helpers/run_manual_move.php', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRF-TOKEN': csrfToken
+    },
+    body: 'csrf_token=' + encodeURIComponent(csrfToken)
+  })
+  .then(res => res.json())
+  .then(data => {
+if (data.ok) {
+  moveNowBadge.style.display = 'block';
+  moveNowBadge.style.opacity = '1';
+  moveNowBadge.style.animation = 'flash 0.4s ease';
+
+  setTimeout(() => {
+    moveNowBadge.style.opacity = '0';
+    moveNowBadge.style.animation = '';
+    setTimeout(() => {
+      moveNowBadge.style.display = 'none'; // ✅ Collapse space after fade
+    }, 400); // match transition duration
+  }, 2000);
+} else {
+      alert('Move Now failed: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(err => {
+    console.error('Move Now error:', err);
+    alert('Move Now failed');
+  });
+});
 
   // NEW: exclusions UI
   const enableExcl = document.getElementById('enable_exclusions');
