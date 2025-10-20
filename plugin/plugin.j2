@@ -99,18 +99,23 @@ MOVER_BACKUP="/usr/local/sbin/mover.automover"
 MIN_SIZE=4096
 
 if [ "$DISABLE_UNRAID_MOVER_SCHEDULE" == "yes" ]; then
-    if [ -f "$MOVER" ]; then
-        mover_size=$(stat -c%s "$MOVER")
-        if (( mover_size >= MIN_SIZE )); then
-            cp "$MOVER" "$MOVER_BACKUP"
-            : > "$MOVER"
-            chmod 755 "$MOVER_BACKUP"
-            echo "✅ Unraid mover schedule disabled."
-        else
-            echo "⚠️ Mover tuning is likely installed so schedule was not disabled."
-        fi
+    # Skip if backup already exists (stay silent)
+    if [ -f "$MOVER_BACKUP" ]; then
+        :
     else
-        echo "⚠️ Mover file not found — unable to disable schedule."
+        if [ -f "$MOVER" ]; then
+            mover_size=$(stat -c%s "$MOVER")
+            if (( mover_size >= MIN_SIZE )); then
+                cp "$MOVER" "$MOVER_BACKUP"
+                : > "$MOVER"
+                chmod 755 "$MOVER_BACKUP"
+                echo "✅ Unraid mover schedule disabled."
+            else
+                echo "⚠️ Mover tuning is likely installed so schedule was not disabled."
+            fi
+        else
+            echo "⚠️ Mover file not found — unable to disable schedule."
+        fi
     fi
 fi
 
