@@ -131,7 +131,7 @@ button {
 .checkbox-row {
   align-items: center;
   display: grid;
-  gap: 0 30px;
+  gap: 0 0px;
   grid-template-columns: repeat(2, 1fr);
   margin-top: 10px;
 }
@@ -141,7 +141,7 @@ button {
   cursor: pointer;
   display: flex;
   font-size: 15px;
-  gap: 1px;
+  gap: 0px;
   line-height: 1.4;
 }
 
@@ -333,7 +333,7 @@ input.invalid + .field-warning {
 
 #automover-settings {
   flex: 1;
-  height: 69vh;
+  height: 74vh;
   max-width: 450px;
 }
 
@@ -347,7 +347,7 @@ input.invalid + .field-warning {
   flex: 1;
   flex-direction: column;
   font-family: sans-serif;
-  height: 69vh;
+  height: 74vh;
   max-height: 90vh;
   max-width: 870px;
   overflow-y: auto;
@@ -413,7 +413,7 @@ input.invalid + .field-warning {
   color: #f0f8ff;
   flex: 1;
   font-family: sans-serif;
-  height: 71vh;
+  height: 74vh;
   max-height: 90vh;
   max-width: 420px;
   overflow-y: auto;
@@ -901,6 +901,17 @@ a:focus-visible {
   </div>
 </div>
 
+<?php
+// === Check for Mover Tuning plugin ===
+$moverTuningInstalled = false;
+$moverTuningPlg = '/boot/config/plugins/ca.mover.tuning.plg';
+$moverTuningDir = '/usr/local/emhttp/plugins/ca.mover.tuning';
+
+if ((is_file($moverTuningPlg) && realpath($moverTuningPlg)) || is_dir($moverTuningDir)) {
+    $moverTuningInstalled = true;
+}
+?>
+
 <script>
 const stopBadge  = document.getElementById('stop-confirmation');
 
@@ -983,6 +994,41 @@ if (data.ok) {
   }
   enableExcl.addEventListener('change', refreshExclusionsVisibility);
   refreshExclusionsVisibility();
+
+  // Detect if Mover Tuning is installed (set by PHP)
+  const moverTuningInstalled = "<?= $moverTuningInstalled ? 'true' : 'false' ?>" === "true";
+
+  if (moverTuningInstalled) {
+    const disableMoverCheckbox = document.getElementById('disable_unraid_mover_schedule');
+    const checkboxRow = document.querySelector('.checkbox-row');
+
+    // Create a warning element (hidden by default)
+    const moverWarning = document.createElement('div');
+    moverWarning.id = 'mover-tuning-warning';
+    moverWarning.style.display = 'none';
+    moverWarning.style.color = 'red';
+    moverWarning.style.fontWeight = 'bold';
+    moverWarning.style.padding = '6px 2px';
+    moverWarning.style.marginTop = '8px';
+    moverWarning.style.fontSize = '14px';
+    moverWarning.style.lineHeight = '1.4';
+    moverWarning.style.textAlign = 'left';
+    moverWarning.innerHTML = `
+      ⚠️ Mover Tuning is installed. Having both can result in conflicts between Mover Tuning and Automover.<br>
+      Consider uninstalling one or the other to avoid incompatibility issues before saving.
+    `;
+
+    // Insert warning element right below the checkbox row
+    checkboxRow.insertAdjacentElement('afterend', moverWarning);
+
+    // Toggle visibility based on checkbox state
+    disableMoverCheckbox.addEventListener('change', function () {
+      moverWarning.style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Initialize on page load
+    if (disableMoverCheckbox.checked) moverWarning.style.display = 'block';
+  }
 
 // --- element refs
 const viewBtn   = document.getElementById('viewExclusionsBtn');
