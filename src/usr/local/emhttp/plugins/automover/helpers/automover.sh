@@ -32,7 +32,7 @@ else
 fi
 
 # Normalize quoted values
-for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY_CHECK AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED; do
+for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -46,7 +46,7 @@ if [[ "$MOVE_NOW" == true ]]; then
   AGE_BASED_FILTER="no"
   SIZE_BASED_FILTER="no"
   DRY_RUN="no"
-  ALLOW_DURING_PARITY_CHECK="yes"
+  ALLOW_DURING_PARITY="yes"
   EXCLUSIONS_FILE="/dev/null"
   THRESHOLD=0
 fi
@@ -103,7 +103,7 @@ log_session_end() {
 # ==========================================================
 #  Parity Check Guard (unless MOVE_NOW)
 # ==========================================================
-if [[ "$ALLOW_DURING_PARITY_CHECK" == "no" && "$MOVE_NOW" == false ]]; then
+if [[ "$ALLOW_DURING_PARITY" == "no" && "$MOVE_NOW" == false ]]; then
   if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; then
     echo "Parity check in progress. Skipping this run." >> "$LAST_RUN_FILE"
     log_session_end

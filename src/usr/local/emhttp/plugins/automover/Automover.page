@@ -52,9 +52,8 @@ $defaults = [
     'THRESHOLD' => 0,
     'INTERVAL' => 60,
     'DRY_RUN' => 'no',
-    'ALLOW_DURING_PARITY_CHECK' => 'no',
+    'ALLOW_DURING_PARITY' => 'no',
     'AUTOSTART' => 'no',
-    'DISABLE_UNRAID_MOVER_SCHEDULE' => 'no',
     'AGE_BASED_FILTER' => 'no',
     'AGE_DAYS' => 1,
     'SIZE_BASED_FILTER' => 'no',
@@ -809,7 +808,7 @@ a:focus-visible {
       </label>
 
       <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check.">
-        <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY_CHECK'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity Check
+        <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity
       </label>
 
       <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old.">
@@ -822,10 +821,6 @@ a:focus-visible {
 
       <label class="form-check tooltip" data-tooltip="Enable to move only files larger than the specified size in MB.">
         <input type="checkbox" id="size_based_filter" <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
-      </label>
-
-      <label class="form-check tooltip" data-tooltip="Disables Unraid's built-in mover schedule.">
-        <input type="checkbox" id="disable_unraid_mover_schedule" <?php echo ($settings['DISABLE_UNRAID_MOVER_SCHEDULE'] ?? '') === 'yes' ? 'checked' : '' ?>> Disable Unraid Mover
       </label>
     </div>
 
@@ -999,7 +994,6 @@ if (data.ok) {
   const moverTuningInstalled = "<?= $moverTuningInstalled ? 'true' : 'false' ?>" === "true";
 
   if (moverTuningInstalled) {
-    const disableMoverCheckbox = document.getElementById('disable_unraid_mover_schedule');
     const checkboxRow = document.querySelector('.checkbox-row');
 
     // Create a warning element (hidden by default)
@@ -1589,9 +1583,8 @@ removeExtBtn.addEventListener('click', () => {
         THRESHOLD: thresholdInput.value,
         INTERVAL: intervalInput.value,
         DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-        ALLOW_DURING_PARITY_CHECK: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+        ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
         AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-        DISABLE_UNRAID_MOVER_SCHEDULE: document.getElementById('disable_unraid_mover_schedule').checked ? 'yes' : 'no',
         AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
         AGE_DAYS: ageDaysInput.value,
         SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
@@ -1604,9 +1597,8 @@ const ordered = [
   ['THRESHOLD', settings.THRESHOLD],
   ['INTERVAL', settings.INTERVAL],
   ['DRY_RUN', settings.DRY_RUN],
-  ['ALLOW_DURING_PARITY_CHECK', settings.ALLOW_DURING_PARITY_CHECK],
+  ['ALLOW_DURING_PARITY', settings.ALLOW_DURING_PARITY],
   ['AUTOSTART', settings.AUTOSTART],
-  ['DISABLE_UNRAID_MOVER_SCHEDULE', settings.DISABLE_UNRAID_MOVER_SCHEDULE],
   ['AGE_BASED_FILTER', settings.AGE_BASED_FILTER],
   ['AGE_DAYS', settings.AGE_DAYS],
   ['SIZE_BASED_FILTER', settings.SIZE_BASED_FILTER],
@@ -1635,7 +1627,6 @@ const query = new URLSearchParams(ordered).toString();
                 updateStatus();
                 if (Array.isArray(startData.messages)) startData.messages.forEach(msg=>{ const line=document.createElement('div'); line.textContent=msg; messageBox.appendChild(line); });
                           if (startData.flag_changed) {
-            const moverCheckbox = document.getElementById('disable_unraid_mover_schedule');
             if (moverCheckbox) {
               moverCheckbox.checked = false;
               const notice = document.createElement('div');
