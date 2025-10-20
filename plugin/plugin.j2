@@ -69,16 +69,11 @@ fi
 
 # Sort config: priority keys first, then the rest
 {
-    # Print ordered keys in order if they exist
     for key in "${ordered_keys[@]}"; do
         grep -E "^[[:space:]]*${key}[[:space:]]*=" "$USER_CFG"
     done
-
-    # Print remaining keys not in the ordered list
     grep -v -E "^($(IFS='|'; echo "${ordered_keys[*]}"))=" "$USER_CFG"
 } > "$TMP_CFG"
-
-# Replace original config with sorted version
 mv "$TMP_CFG" "$USER_CFG"
 
 SETTINGS="/boot/config/plugins/automover/settings.cfg"
@@ -88,41 +83,53 @@ if [ -e "$SETTINGS" ]; then
     source "$SETTINGS"
 fi
 
+# === Check for Mover Tuning plugin ===
+MOVER_TUNING="/boot/config/plugins/ca.mover.tuning.plg"
+if [ -f "$MOVER_TUNING" ]; then
+    echo "⚠️ Mover tuning is installed. Having both can result in conflicts between mover tuning and automover. Consider uninstalling one or the other to avoid incompatibility issues."
+fi
+
+# === Disable Unraid mover schedule if requested ===
+MOVER="/usr/local/sbin/mover"
+MOVER_BACKUP="/usr/local/sbin/mover.automover"
+MIN_SIZE=4096
+
+if [ "$DISABLE_UNRAID_MOVER_SCHEDULE" == "yes" ]; then
+    if [ -f "$MOVER" ]; then
+        mover_size=$(stat -c%s "$MOVER")
+        if (( mover_size >= MIN_SIZE )); then
+            cp "$MOVER" "$MOVER_BACKUP"
+            : > "$MOVER"
+            chmod 755 "$MOVER_BACKUP"
+            echo "✅ Unraid mover schedule disabled."
+        else
+            echo "⚠️ Mover tuning is likely installed so schedule was not disabled."
+        fi
+    else
+        echo "⚠️ Mover file not found — unable to disable schedule."
+    fi
+fi
+
 if [ "$AUTOSTART" == "no" ]; then
-
-  # Clean up old versions
   rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
-
-  # Removing cron
   rm -f "$CRON_FILE"
-
   echo ""
   echo "----------------------------------------------------"
   echo " {{ name }} has been installed."
   echo " Version: {{ env['PLUGIN_VERSION'] }}"
   echo "----------------------------------------------------"
   echo ""
-  
 else
-
-# Extract interval
-INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
-
-# Write cron schedule
-echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
-
-# Reload Unraid cron
-update_cron
-
-# cleanup old versions
-rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
-
-echo ""
-echo "----------------------------------------------------"
-echo " {{ name }} has been installed."
-echo " Version: {{ env['PLUGIN_VERSION'] }}"
-echo "----------------------------------------------------"
-echo ""
+  INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
+  echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
+  update_cron
+  rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
+  echo ""
+  echo "----------------------------------------------------"
+  echo " {{ name }} has been installed."
+  echo " Version: {{ env['PLUGIN_VERSION'] }}"
+  echo "----------------------------------------------------"
+  echo ""
 fi
 ]]>
 </INLINE>
