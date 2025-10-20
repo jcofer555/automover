@@ -89,7 +89,7 @@ MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
 # Verify using realpath and test existence explicitly
 if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
   if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
-    echo "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover. Consider uninstalling one to avoid incompatibility issues."
+    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues."
   fi
 fi
 
@@ -160,7 +160,7 @@ if [[ -f /usr/local/sbin/mover.automover ]]; then
     cp /usr/local/sbin/mover.automover /usr/local/sbin/mover
   else
     rm -f /usr/local/sbin/mover.automover
-    echo "⚠️ The mover.automover file is not the right size so schedule was not restored. Please reboot Unraid to fully re-enable Unraid's mover schedule."
+    echo -e "⚠️ The mover.automover file is not the right size so schedule was not restored. \nPlease reboot Unraid to fully re-enable Unraid's mover schedule."
   fi
 fi
 rm -rf /usr/local/emhttp/plugins/{{ name }}
