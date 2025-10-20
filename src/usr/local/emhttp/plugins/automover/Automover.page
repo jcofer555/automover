@@ -334,6 +334,7 @@ input.invalid + .field-warning {
   flex: 1;
   height: 74vh;
   max-width: 450px;
+  max-height: 85vh;
 }
 
 #moved-log-container {
@@ -347,7 +348,7 @@ input.invalid + .field-warning {
   flex-direction: column;
   font-family: sans-serif;
   height: 74vh;
-  max-height: 90vh;
+  max-height: 85vh;
   max-width: 870px;
   overflow-y: auto;
   padding: 20px;
@@ -413,7 +414,7 @@ input.invalid + .field-warning {
   flex: 1;
   font-family: sans-serif;
   height: 74vh;
-  max-height: 90vh;
+  max-height: 85vh;
   max-width: 420px;
   overflow-y: auto;
   padding: 10px;
