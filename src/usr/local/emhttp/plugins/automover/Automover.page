@@ -887,7 +887,6 @@ a:focus-visible {
   </div>
 </div>
 
-
       <div id="toast-container"
      style="position:static; bottom:5px; right:15px;
             display:flex; flex-direction:column; align-items:flex-end;
@@ -896,17 +895,6 @@ a:focus-visible {
     </div>
   </div>
 </div>
-
-<?php
-// === Check for Mover Tuning plugin ===
-$moverTuningInstalled = false;
-$moverTuningPlg = '/boot/config/plugins/ca.mover.tuning.plg';
-$moverTuningDir = '/usr/local/emhttp/plugins/ca.mover.tuning';
-
-if ((is_file($moverTuningPlg) && realpath($moverTuningPlg)) || is_dir($moverTuningDir)) {
-    $moverTuningInstalled = true;
-}
-?>
 
 <script>
 const stopBadge  = document.getElementById('stop-confirmation');
@@ -990,40 +978,6 @@ if (data.ok) {
   }
   enableExcl.addEventListener('change', refreshExclusionsVisibility);
   refreshExclusionsVisibility();
-
-  // Detect if Mover Tuning is installed (set by PHP)
-  const moverTuningInstalled = "<?= $moverTuningInstalled ? 'true' : 'false' ?>" === "true";
-
-  if (moverTuningInstalled) {
-    const checkboxRow = document.querySelector('.checkbox-row');
-
-    // Create a warning element (hidden by default)
-    const moverWarning = document.createElement('div');
-    moverWarning.id = 'mover-tuning-warning';
-    moverWarning.style.display = 'none';
-    moverWarning.style.color = 'red';
-    moverWarning.style.fontWeight = 'bold';
-    moverWarning.style.padding = '6px 2px';
-    moverWarning.style.marginTop = '8px';
-    moverWarning.style.fontSize = '14px';
-    moverWarning.style.lineHeight = '1.4';
-    moverWarning.style.textAlign = 'left';
-    moverWarning.innerHTML = `
-      ⚠️ Mover Tuning is installed. Having both can result in conflicts between Mover Tuning and Automover.<br>
-      Consider uninstalling one or the other to avoid incompatibility issues before saving.
-    `;
-
-    // Insert warning element right below the checkbox row
-    checkboxRow.insertAdjacentElement('afterend', moverWarning);
-
-    // Toggle visibility based on checkbox state
-    disableMoverCheckbox.addEventListener('change', function () {
-      moverWarning.style.display = this.checked ? 'block' : 'none';
-    });
-
-    // Initialize on page load
-    if (disableMoverCheckbox.checked) moverWarning.style.display = 'block';
-  }
 
 // --- element refs
 const viewBtn   = document.getElementById('viewExclusionsBtn');
