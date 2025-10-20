@@ -67,12 +67,11 @@ else
     done < "$DEFAULT_CFG"
 fi
 
-# Sort config: priority keys first, then the rest
+# Rebuild config: keep only ordered known keys (remove everything else)
 {
     for key in "${ordered_keys[@]}"; do
         grep -E "^[[:space:]]*${key}[[:space:]]*=" "$USER_CFG"
     done
-    grep -v -E "^($(IFS='|'; echo "${ordered_keys[*]}"))=" "$USER_CFG"
 } > "$TMP_CFG"
 mv "$TMP_CFG" "$USER_CFG"
 
@@ -115,6 +114,7 @@ if [ "$DISABLE_UNRAID_MOVER_SCHEDULE" == "yes" ]; then
     fi
 fi
 
+# === Cron setup ===
 if [ "$AUTOSTART" == "no" ]; then
   rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
   rm -f "$CRON_FILE"
