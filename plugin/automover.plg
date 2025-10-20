@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.10.75.7"
+  version="2025.10.76"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.10.76
+
+- Removal of DISABLE_UNRAID_MOVER as to many mover tuning and other options rely on those specifics
+
 ### 2025.10.75.7
 
 - More logic if mover tuning is installed
@@ -25,18 +29,14 @@
 - Minor css changes
 - Check if mover tuning is installed during installing/updating and displays warning message if installed
 
-### 2025.10.75.2
-
-- Fix for disabling unraids mover at reboot if setting is enabled
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.75.7-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.10.75.7/unraid-automover-2025.10.75.7-noarch-1.txz</URL>
-<SHA256>4c809a31da42a2ee8ddd4d816dbe9a7be3ec73def20517bb3a1f4888a19aa700</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.76-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.10.76/unraid-automover-2025.10.76-noarch-1.txz</URL>
+<SHA256>a10075ab7c8aa4782dbca70e14b138a3d1b3c2caa6016e104a25f16f1400ada8</SHA256>
 </FILE>
 
 <!--
@@ -45,7 +45,7 @@ The 'install' script.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.75.7-noarch-1.txz
+upgradepkg --install-new /boot/config/plugins/automover/unraid-automover-2025.10.76-noarch-1.txz
 
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
@@ -57,9 +57,8 @@ ordered_keys=(
     "THRESHOLD"
     "INTERVAL"
     "DRY_RUN"
-    "ALLOW_DURING_PARITY_CHECK"
+    "ALLOW_DURING_PARITY"
     "AUTOSTART"
-    "DISABLE_UNRAID_MOVER_SCHEDULE"
     "AGE_BASED_FILTER"
     "AGE_DAYS"
     "SIZE_BASED_FILTER"
@@ -95,62 +94,25 @@ if [ -e "$SETTINGS" ]; then
     source "$SETTINGS"
 fi
 
-# === Check for Mover Tuning plugin ===
-MOVER_TUNING="/boot/config/plugins/ca.mover.tuning.plg"
-MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
-
-# Verify using realpath and test existence explicitly
-if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
-  if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
-    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues."
-  fi
-fi
-
-# === Disable Unraid mover schedule if requested ===
-MOVER="/usr/local/sbin/mover"
-MOVER_BACKUP="/usr/local/sbin/mover.automover"
-MIN_SIZE=4096
-
-if [ "$DISABLE_UNRAID_MOVER_SCHEDULE" == "yes" ]; then
-    # Skip if backup already exists (stay silent)
-    if [ -f "$MOVER_BACKUP" ]; then
-        :
-    else
-        if [ -f "$MOVER" ]; then
-            mover_size=$(stat -c%s "$MOVER")
-            if (( mover_size >= MIN_SIZE )); then
-                cp "$MOVER" "$MOVER_BACKUP"
-                : > "$MOVER"
-                chmod 755 "$MOVER_BACKUP"
-                echo "✅ Unraid mover schedule disabled."
-            else
-                echo "⚠️ Mover tuning is likely installed so schedule was not disabled."
-            fi
-        else
-            echo "⚠️ Mover file not found — unable to disable schedule."
-        fi
-    fi
-fi
-
 # === Cron setup ===
 if [ "$AUTOSTART" == "no" ]; then
-  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.75.7')
+  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.76')
   rm -f "$CRON_FILE"
   echo ""
   echo "----------------------------------------------------"
   echo " automover has been installed."
-  echo " Version: 2025.10.75.7"
+  echo " Version: 2025.10.76"
   echo "----------------------------------------------------"
   echo ""
 else
   INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
   echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
   update_cron
-  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.75.7')
+  rm -f $(ls /boot/config/plugins/automover/unraid-automover-*.txz 2>/dev/null | grep -v '2025.10.76')
   echo ""
   echo "----------------------------------------------------"
   echo " automover has been installed."
-  echo " Version: 2025.10.75.7"
+  echo " Version: 2025.10.76"
   echo "----------------------------------------------------"
   echo ""
 fi
@@ -165,17 +127,6 @@ The 'remove' script.
 <INLINE>
 <![CDATA[
 removepkg unraid-automover
-
-if [[ -f /usr/local/sbin/mover.automover ]]; then
-  size=$(stat -c%s /usr/local/sbin/mover.automover)
-  if (( size >= 4096 )); then
-    rm -f /usr/local/sbin/mover
-    cp /usr/local/sbin/mover.automover /usr/local/sbin/mover
-  else
-    rm -f /usr/local/sbin/mover.automover
-    echo -e "⚠️ The mover.automover file is not the right size so schedule was not restored. \nPlease reboot Unraid to fully re-enable Unraid's mover schedule."
-  fi
-fi
 rm -rf /usr/local/emhttp/plugins/automover
 rm -rf /boot/config/plugins/automover
 ]]>
