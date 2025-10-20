@@ -92,6 +92,17 @@ if [ -f "$SETTINGS" ]; then
     source "$SETTINGS"
 fi
 
+# === Check for Mover Tuning plugin ===
+MOVER_TUNING="/boot/config/plugins/ca.mover.tuning.plg"
+MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
+
+# Verify using realpath and test existence explicitly
+if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
+  if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
+    echo "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover. Consider uninstalling one to avoid incompatibility issues."
+  fi
+fi
+
 # Remove older txz packages (keep only the current one)
 find /boot/config/plugins/{{ name }}/ -maxdepth 1 -type f -name "{{ package_name }}-*.txz" ! -name "{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz" -delete
 
