@@ -83,6 +83,12 @@ if [ -e "$SETTINGS" ]; then
     source "$SETTINGS"
 fi
 
+# === Check for Mover Tuning plugin ===
+MOVER_TUNING="/boot/config/plugins/ca.mover.tuning.plg"
+if [ -f "$MOVER_TUNING" ]; then
+    echo "⚠️ Mover tuning is installed. Having both can create conflicts between mover tuning and automover. Consider uninstalling one or the other to avoid incompatibility issues."
+fi
+
 # === Disable Unraid mover schedule if requested ===
 MOVER="/usr/local/sbin/mover"
 MOVER_BACKUP="/usr/local/sbin/mover.automover"
@@ -95,7 +101,7 @@ if [ "$DISABLE_UNRAID_MOVER_SCHEDULE" == "yes" ]; then
             cp "$MOVER" "$MOVER_BACKUP"
             : > "$MOVER"
             chmod 755 "$MOVER_BACKUP"
-            echo "✅ Unraid mover schedule disabled (mover backed up and cleared)."
+            echo "✅ Unraid mover schedule disabled."
         else
             echo "⚠️ Mover tuning is likely installed so schedule was not disabled."
         fi
