@@ -26,19 +26,26 @@ For older releases, see https://github.com/{{ env['GITHUB_REPOSITORY'] }}/releas
 <SHA256>{{ env['PLUGIN_CHECKSUM'] }}</SHA256>
 </FILE>
 
-<!--
-The 'install' script.
--->
+<!-- ==========================================================
+     INSTALL SCRIPT
+========================================================== -->
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-upgradepkg --install-new /boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz
+# ==========================================================
+#  INSTALL / UPGRADE LOGIC
+# ==========================================================
 
+PACKAGE_TXZ="/boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
+CRON_FILE="/boot/config/plugins/automover/automover.cron"
 
-# Define the desired key order
+# Install the package
+upgradepkg --install-new "$PACKAGE_TXZ"
+
+# Ordered config keys
 ordered_keys=(
     "POOL_NAME"
     "THRESHOLD"
@@ -53,11 +60,13 @@ ordered_keys=(
     "EXCLUSIONS_ENABLED"
 )
 
-# If user config doesn't exist, copy the default
+# ==========================================================
+#  CONFIG MANAGEMENT
+# ==========================================================
 if [ ! -f "$USER_CFG" ]; then
     cp "$DEFAULT_CFG" "$USER_CFG"
 else
-    # Add missing keys from default config
+    # Add missing keys from default
     while IFS='=' read -r key val; do
         [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
         if ! grep -q -E "^[[:space:]]*${key}[[:space:]]*=" "$USER_CFG"; then
@@ -66,50 +75,56 @@ else
     done < "$DEFAULT_CFG"
 fi
 
-# Rebuild config: keep only ordered known keys (remove everything else)
+# Rebuild ordered version (only known keys, drop extra lines)
 {
     for key in "${ordered_keys[@]}"; do
         grep -E "^[[:space:]]*${key}[[:space:]]*=" "$USER_CFG"
     done
 } > "$TMP_CFG"
+
 mv "$TMP_CFG" "$USER_CFG"
 
+# ==========================================================
+#  LOAD SETTINGS & SETUP CRON
+# ==========================================================
 SETTINGS="/boot/config/plugins/automover/settings.cfg"
-CRON_FILE="/boot/config/plugins/automover/automover.cron"
-
-if [ -e "$SETTINGS" ]; then
+if [ -f "$SETTINGS" ]; then
     source "$SETTINGS"
 fi
 
-# === Cron setup ===
+# Remove older txz packages (keep only the current one)
+find /boot/config/plugins/{{ name }}/ -maxdepth 1 -type f -name "{{ package_name }}-*.txz" ! -name "{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz" -delete
+
+# Handle autostart
 if [ "$AUTOSTART" == "no" ]; then
-  rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
-  rm -f "$CRON_FILE"
-  echo ""
-  echo "----------------------------------------------------"
-  echo " {{ name }} has been installed."
-  echo " Version: {{ env['PLUGIN_VERSION'] }}"
-  echo "----------------------------------------------------"
-  echo ""
+    rm -f "$CRON_FILE"
+    echo ""
+    echo "----------------------------------------------------"
+    echo " {{ name }} has been installed."
+    echo " Version: {{ env['PLUGIN_VERSION'] }}"
+    echo " Autostart: Disabled"
+    echo "----------------------------------------------------"
+    echo ""
 else
-  INTERVAL=$(grep INTERVAL "$SETTINGS" | cut -d '"' -f2)
-  echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
-  update_cron
-  rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
-  echo ""
-  echo "----------------------------------------------------"
-  echo " {{ name }} has been installed."
-  echo " Version: {{ env['PLUGIN_VERSION'] }}"
-  echo "----------------------------------------------------"
-  echo ""
+    INTERVAL=$(grep -oP '(?<=INTERVAL=")[^"]*' "$SETTINGS" 2>/dev/null)
+    [ -z "$INTERVAL" ] && INTERVAL=60
+    echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
+    update_cron
+    echo ""
+    echo "----------------------------------------------------"
+    echo " {{ name }} has been installed."
+    echo " Version: {{ env['PLUGIN_VERSION'] }}"
+    echo " Autostart: Enabled (every $INTERVAL minutes)"
+    echo "----------------------------------------------------"
+    echo ""
 fi
 ]]>
 </INLINE>
 </FILE>
 
-<!--
-The 'remove' script.
--->
+<!-- ==========================================================
+     REMOVE SCRIPT
+========================================================== -->
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 <![CDATA[
