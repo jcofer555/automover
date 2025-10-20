@@ -67,12 +67,11 @@ else
     done < "$DEFAULT_CFG"
 fi
 
-# Sort config: priority keys first, then the rest
+# Rebuild config: keep only ordered known keys (remove everything else)
 {
     for key in "${ordered_keys[@]}"; do
         grep -E "^[[:space:]]*${key}[[:space:]]*=" "$USER_CFG"
     done
-    grep -v -E "^($(IFS='|'; echo "${ordered_keys[*]}"))=" "$USER_CFG"
 } > "$TMP_CFG"
 mv "$TMP_CFG" "$USER_CFG"
 
@@ -85,8 +84,13 @@ fi
 
 # === Check for Mover Tuning plugin ===
 MOVER_TUNING="/boot/config/plugins/ca.mover.tuning.plg"
-if [ -f "$MOVER_TUNING" ]; then
-    echo "⚠️ Mover tuning is installed. Having both can result in conflicts between mover tuning and automover. Consider uninstalling one or the other to avoid incompatibility issues."
+MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
+
+# Verify using realpath and test existence explicitly
+if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
+  if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
+    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues."
+  fi
 fi
 
 # === Disable Unraid mover schedule if requested ===
@@ -95,21 +99,27 @@ MOVER_BACKUP="/usr/local/sbin/mover.automover"
 MIN_SIZE=4096
 
 if [ "$DISABLE_UNRAID_MOVER_SCHEDULE" == "yes" ]; then
-    if [ -f "$MOVER" ]; then
-        mover_size=$(stat -c%s "$MOVER")
-        if (( mover_size >= MIN_SIZE )); then
-            cp "$MOVER" "$MOVER_BACKUP"
-            : > "$MOVER"
-            chmod 755 "$MOVER_BACKUP"
-            echo "✅ Unraid mover schedule disabled."
-        else
-            echo "⚠️ Mover tuning is likely installed so schedule was not disabled."
-        fi
+    # Skip if backup already exists (stay silent)
+    if [ -f "$MOVER_BACKUP" ]; then
+        :
     else
-        echo "⚠️ Mover file not found — unable to disable schedule."
+        if [ -f "$MOVER" ]; then
+            mover_size=$(stat -c%s "$MOVER")
+            if (( mover_size >= MIN_SIZE )); then
+                cp "$MOVER" "$MOVER_BACKUP"
+                : > "$MOVER"
+                chmod 755 "$MOVER_BACKUP"
+                echo "✅ Unraid mover schedule disabled."
+            else
+                echo "⚠️ Mover tuning is likely installed so schedule was not disabled."
+            fi
+        else
+            echo "⚠️ Mover file not found — unable to disable schedule."
+        fi
     fi
 fi
 
+# === Cron setup ===
 if [ "$AUTOSTART" == "no" ]; then
   rm -f $(ls /boot/config/plugins/{{ name }}/{{ package_name }}-*.txz 2>/dev/null | grep -v '{{ env['PLUGIN_VERSION'] }}')
   rm -f "$CRON_FILE"
@@ -150,7 +160,7 @@ if [[ -f /usr/local/sbin/mover.automover ]]; then
     cp /usr/local/sbin/mover.automover /usr/local/sbin/mover
   else
     rm -f /usr/local/sbin/mover.automover
-    echo "⚠️ The mover.automover file is not the right size so schedule was not restored. Please reboot Unraid to fully re-enable Unraid's mover schedule."
+    echo -e "⚠️ The mover.automover file is not the right size so schedule was not restored. \nPlease reboot Unraid to fully re-enable Unraid's mover schedule."
   fi
 fi
 rm -rf /usr/local/emhttp/plugins/{{ name }}
