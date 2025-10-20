@@ -1635,3 +1635,60 @@ if ( typeof caPluginUpdateCheck === "function" ) {
   caPluginUpdateCheck("automover.plg",{name:"Automover"});
 }
 </script>
+<?php
+// === Detect Mover Tuning plugin ===
+$moverTuningInstalled = file_exists('/boot/config/plugins/ca.mover.tuning.plg');
+?>
+
+<?php if ($moverTuningInstalled): ?>
+  <div id="mover-tuning-warning" style="
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #222;
+    color: #ffcc00;
+    padding: 14px 45px 14px 20px; /* right padding added for button space */
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 0 10px rgba(255,255,0,0.4);
+    z-index: 999999;
+    max-width: 80%;
+    text-align: center;
+    position: fixed;
+  ">
+    ⚠️ Mover Tuning plugin appears to be installed.<br>
+    Having both can result in conflicts between <b>Mover Tuning</b> and <b>Automover</b>.<br>
+    Consider uninstalling one to avoid incompatibility issues.
+
+    <!-- Close Button -->
+    <button id="close-tuning-warning" style="
+      position: absolute;
+      right: -40px;
+      top: -10px;
+      background: none;
+      border: none;
+      color: #ffcc00;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      line-height: 1;
+    " title="Dismiss this warning">×</button>
+  </div>
+
+  <script>
+  // Allow user to close popup smoothly
+  document.addEventListener("DOMContentLoaded", () => {
+    const closeBtn = document.getElementById("close-tuning-warning");
+    const warnBox = document.getElementById("mover-tuning-warning");
+    if (closeBtn && warnBox) {
+      closeBtn.addEventListener("click", () => {
+        warnBox.style.transition = "opacity 0.4s ease";
+        warnBox.style.opacity = "0";
+        setTimeout(() => warnBox.remove(), 400);
+      });
+    }
+  });
+  </script>
+<?php endif; ?>
