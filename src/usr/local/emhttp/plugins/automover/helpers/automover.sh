@@ -141,9 +141,9 @@ log_session_end() {
 }
 
 # ==========================================================
-#  Pause qBittorrent torrents if enabled
+#  Pause qBittorrent torrents if enabled (skip in dry run)
 # ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
   run_qbit_script pause
 fi
 
@@ -348,9 +348,9 @@ if [[ "$moved_anything" == false ]]; then
 fi
 
 # ==========================================================
-#  Resume qBittorrent torrents if enabled
+#  Resume qBittorrent torrents if enabled (skip in dry run)
 # ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
   run_qbit_script resume
 fi
 
