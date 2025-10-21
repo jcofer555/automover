@@ -869,13 +869,43 @@ a:focus-visible {
       border:1px solid #333; border-radius:6px; padding:10px; resize:none;
       width:97%; height:480px; overflow-y:auto;"></textarea>
 
-    <div style="display:flex; justify-content:space-between; margin-top:auto; padding-top:0px;">
-      <div>
-        <button id="copyExclusionsBtn" type="button" style="background:#222; color:#fff; border:1px solid #00aaff; padding:6px 12px; border-radius:6px; cursor:pointer;">Copy</button>
-        <button id="saveExclusionsBtn" type="button" style="background:#00aaff; color:#000; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">Save</button>
-      </div>
-      <button id="closeExclusionsView" type="button" style="background:#333; color:#fff; border:1px solid #555; padding:6px 12px; border-radius:5px;">Close</button>
-    </div>
+<div style="display:flex; justify-content:space-between; margin-top:auto; padding-top:0px;">
+  <div>
+    <!-- Copy button now matches 'Remove Selected' style -->
+    <button id="copyExclusionsBtn" type="button" style="
+      background:#444;
+      color:#fff;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      padding:8px 12px;
+      font-weight:500;
+    ">Copy</button>
+
+    <!-- Save button now matches 'Add Selected' style -->
+    <button id="saveExclusionsBtn" type="button" style="
+      background:#0b5fff;
+      color:#fff;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      padding:8px 12px;
+      font-weight:600;
+    ">Save</button>
+  </div>
+
+  <!-- Close button unchanged -->
+<button id="closeExclusionsView" type="button" style="
+  background:#b54708;
+  color:#fff;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  padding:8px 12px;
+  font-weight:600;
+  box-shadow:0 0 6px rgba(0,0,0,0.4);
+">Close</button>
+</div>
   </div>
 </div>
 
@@ -956,36 +986,46 @@ a:focus-visible {
     <div class="header">
       <button class="btn secondary" id="btn-up" title="Go up directory">↑ Up</button>
       <div class="crumbs" id="crumbs"></div>
-      <button class="btn warn" id="btn-close">Close</button>
+      <!-- ❌ Removed the Close button from here -->
     </div>
+
     <div class="grid" id="picker-grid"></div>
-<div class="footer" style="display:flex; justify-content:space-between; margin-top:10px;">
-  <div style="display:flex; flex-direction:column; gap:2px; line-height:1;">
-    <!-- Row 1: Normal buttons -->
-    <div style="display:flex; align-items:center; gap:6px; margin:0; padding:0;">
-      <button id="btn-add" class="btn primary">Add Selected</button>
-      <button id="btn-remove" class="btn secondary">Remove Selected</button>
+
+    <!-- ✅ Footer updated with Close button on bottom-right -->
+    <div class="footer" style="display:flex; justify-content:space-between; margin-top:10px; align-items:flex-end;">
+      <!-- Left side: Add/Remove buttons -->
+      <div style="display:flex; flex-direction:column; gap:2px; line-height:1;">
+        <!-- Row 1: Normal buttons -->
+        <div style="display:flex; align-items:center; gap:6px; margin:0; padding:0;">
+          <button id="btn-add" class="btn primary">Add Selected</button>
+          <button id="btn-remove" class="btn secondary">Remove Selected</button>
+        </div>
+
+        <!-- Row 2: Wildcard buttons -->
+        <div style="display:flex; align-items:center; gap:6px; margin:0; padding:0;">
+          <button id="addExtBtn" type="button" class="btn primary" style="display:none; padding:6px 12px;">
+            Add extensions as wildcards
+          </button>
+          <button id="removeExtBtn" type="button" class="btn secondary" style="display:none; padding:6px 12px;">
+            Remove extensions as wildcards
+          </button>
+        </div>
+      </div>
+
+      <!-- Right side: Close button -->
+      <div style="display:flex; justify-content:flex-end; align-items:flex-end;">
+        <button class="btn warn" id="btn-close" style="padding:8px 12px; font-weight:600;">Close</button>
+      </div>
     </div>
 
-    <!-- Row 2: Wildcard buttons -->
-    <div style="display:flex; align-items:center; gap:6px; margin:0; padding:0;">
-      <button id="addExtBtn" type="button" class="btn primary" style="display:none; padding:6px 12px;">
-        Add extensions as wildcards
-      </button>
-      <button id="removeExtBtn" type="button" class="btn secondary" style="display:none; padding:6px 12px;">
-        Remove extensions as wildcards
-      </button>
+    <!-- Toast container (unchanged) -->
+    <div id="toast-container"
+         style="position:static; bottom:5px; right:15px;
+                display:flex; flex-direction:column; align-items:flex-end;
+                gap:6px; z-index:99999;">
     </div>
   </div>
 </div>
-
-      <div id="toast-container"
-     style="position:static; bottom:5px; right:15px;
-            display:flex; flex-direction:column; align-items:flex-end;
-            gap:6px; z-index:99999;">
-</div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -1598,6 +1638,7 @@ grid.appendChild(row);
 
   btnClose.addEventListener('click', () => {
   addExtBtn.style.display = 'none';
+  removeExtBtn.style.display = 'none';
   selectedExts.clear();
   modal.style.display = 'none';
 });
@@ -1856,12 +1897,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 </script>
-<?php
-// === Detect Mover Tuning plugin ===
-$moverTuningInstalled = file_exists('/boot/config/plugins/ca.mover.tuning.plg');
-?>
-
-<?php if ($moverTuningInstalled): ?>
+<?php if (file_exists('/boot/config/plugins/ca.mover.tuning.plg')): ?>
   <div id="mover-tuning-warning" style="
     position: fixed;
     bottom: 35px;
@@ -1869,7 +1905,7 @@ $moverTuningInstalled = file_exists('/boot/config/plugins/ca.mover.tuning.plg');
     transform: translateX(-50%);
     background: #222;
     color: #ffcc00;
-    padding: 14px 45px 14px 20px; /* right padding added for button space */
+    padding: 14px 45px 14px 20px;
     border-radius: 8px;
     font-weight: 600;
     font-size: 14px;
@@ -1877,18 +1913,17 @@ $moverTuningInstalled = file_exists('/boot/config/plugins/ca.mover.tuning.plg');
     z-index: 999999;
     max-width: 80%;
     text-align: center;
-    position: fixed;
   ">
     ⚠️ Mover Tuning plugin appears to be installed.<br>
     Having both can result in conflicts between <b>Mover Tuning</b> and <b>Automover</b>.<br>
     Consider uninstalling one to avoid incompatibility issues.
 
-    <!-- Close Button -->
-    <button id="close-tuning-warning" style="
+    <!-- ✅ Close “X” -->
+    <button id="mover-tuning-close" style="
       position: absolute;
-      right: -40px;
-      top: -10px;
-      background: none;
+      top: -16px;
+      right: -45px;
+      background: transparent;
       border: none;
       color: #ffcc00;
       font-size: 18px;
@@ -1897,5 +1932,19 @@ $moverTuningInstalled = file_exists('/boot/config/plugins/ca.mover.tuning.plg');
       line-height: 1;
     " title="Dismiss this warning">×</button>
   </div>
-</script>
+
+  <script>
+    // Close handler
+    document.addEventListener('DOMContentLoaded', () => {
+      const closeBtn = document.getElementById('mover-tuning-close');
+      const popup = document.getElementById('mover-tuning-warning');
+      if (closeBtn && popup) {
+        closeBtn.addEventListener('click', () => {
+          popup.style.opacity = '0';
+          popup.style.transition = 'opacity 0.3s ease';
+          setTimeout(() => popup.remove(), 300);
+        });
+      }
+    });
+  </script>
 <?php endif; ?>
