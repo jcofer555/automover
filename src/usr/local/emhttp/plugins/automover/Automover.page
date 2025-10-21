@@ -348,9 +348,9 @@ input.invalid + .field-warning {
 
 #automover-settings {
   flex: 1;
-  height: 97vh;
+  height: 105vh;
   max-width: 450px;
-  max-height: 97vh;
+  max-height: 105vh;
 }
 
 #moved-log-container {
@@ -363,8 +363,8 @@ input.invalid + .field-warning {
   flex: 1;
   flex-direction: column;
   font-family: sans-serif;
-  height: 97vh;
-  max-height: 97vh;
+  height: 105vh;
+  max-height: 105vh;
   max-width: 970px;
   overflow-y: auto;
   padding: 20px;
@@ -429,8 +429,8 @@ input.invalid + .field-warning {
   color: #f0f8ff;
   flex: 1;
   font-family: sans-serif;
-  height: 97vh;
-  max-height: 97vh;
+  height: 105vh;
+  max-height: 105vh;
   max-width: 420px;
   overflow-y: auto;
   padding: 10px;
@@ -449,7 +449,7 @@ input.invalid + .field-warning {
   color: #00ffaa;
   font-family: monospace;
   font-size: 13px;
-  max-height: 87vh;
+  max-height: 95vh;
   overflow-y: auto;
   padding: 10px;
   white-space: pre-wrap;
@@ -1922,7 +1922,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button id="mover-tuning-close" style="
       position: absolute;
       top: -16px;
-      right: -45px;
+      right: -42px;
       background: transparent;
       border: none;
       color: #ffcc00;
