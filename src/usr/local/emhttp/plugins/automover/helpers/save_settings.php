@@ -17,6 +17,13 @@ $args = [
     $_GET['SIZE_BASED_FILTER'] ?? '',
     $_GET['SIZE_MB'] ?? '',
     $_GET['EXCLUSIONS_ENABLED'] ?? '',
+    $_GET['QBITTORRENT_SCRIPT'] ?? '',
+    $_GET['QBITTORRENT_HOST'] ?? '',
+    $_GET['QBITTORRENT_USERNAME'] ?? '',
+    $_GET['QBITTORRENT_PASSWORD'] ?? '',
+    $_GET['QBITTORRENT_DAYS_FROM'] ?? '',
+    $_GET['QBITTORRENT_DAYS_TO'] ?? '',
+    $_GET['QBITTORRENT_STATUS'] ?? '',
 ];
 
 // Escape each argument for safety
