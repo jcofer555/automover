@@ -60,7 +60,7 @@ $defaults = [
     'SIZE_MB' => 1,
     'EXCLUSIONS_ENABLED' => 'no',
     'QBITTORRENT_SCRIPT' => 'no',
-    'QBITTORRENT_HOST' => 'yourip:8080',
+    'QBITTORRENT_HOST' => 'yourip:port',
     'QBITTORRENT_USERNAME' => '',
     'QBITTORRENT_PASSWORD' => '',
     'QBITTORRENT_DAYS_FROM' => '0',
@@ -731,6 +731,11 @@ a:focus-visible {
 
 <div id="automover-wrapper">
   <form id="automover-settings">
+        <div class="status-container">
+      <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
+      <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run available</span></div>
+    </div>
+    <br>
     <!-- Pool -->
     <div class="form-pair">
       <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
@@ -810,18 +815,18 @@ a:focus-visible {
   <div class="form-pair">
     <label for="qbit_days_from" class="tooltip" data-tooltip="Torrents newer than this age (days) will be ignored.">Days From:</label>
     <div class="input-wrapper">
-      <input type="number" id="qbit_days_from" class="short-input" min="0" step="1"
+      <input type="number" id="qbit_days_from" class="short-input" min="0" max="999" step="1"
         value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_FROM'] ?? '') ?>">
-      <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 99999</div>
+      <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 999</div>
     </div>
   </div>
 
   <div class="form-pair">
     <label for="qbit_days_to" class="tooltip" data-tooltip="Oldest torrents (days).">Days To:</label>
     <div class="input-wrapper">
-      <input type="number" id="qbit_days_to" class="short-input" min="1" step="1"
+      <input type="number" id="qbit_days_to" class="short-input" min="1" max="999" step="1"
         value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
-      <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 99999</div>
+      <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 999</div>
       <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
     </div>
   </div>
@@ -958,11 +963,6 @@ a:focus-visible {
     <div id="stop-confirmation" style="display:none;margin-top:10px;">✅ Stopping Automover</div>
 
     <div id="save-messages" style="display:none;margin-top:10px;margin-bottom:20px;background:#111;border-radius:6px;font-family:monospace;color:red;"></div>
-
-    <div class="status-container">
-      <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
-      <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run available</span></div>
-    </div>
   </form>
 
   <div id="moved-log-container">
@@ -986,7 +986,6 @@ a:focus-visible {
     <div class="header">
       <button class="btn secondary" id="btn-up" title="Go up directory">↑ Up</button>
       <div class="crumbs" id="crumbs"></div>
-      <!-- ❌ Removed the Close button from here -->
     </div>
 
     <div class="grid" id="picker-grid"></div>
@@ -1018,7 +1017,7 @@ a:focus-visible {
       </div>
     </div>
 
-    <!-- Toast container (unchanged) -->
+    <!-- Toast container -->
     <div id="toast-container"
          style="position:static; bottom:5px; right:15px;
                 display:flex; flex-direction:column; align-items:flex-end;
@@ -1395,8 +1394,8 @@ function validateQbitFields() {
   const fromVal = parseInt(qbitDaysFromInput.value, 10);
   const toVal = parseInt(qbitDaysToInput.value, 10);
 
-  const validFrom = !isNaN(fromVal) && fromVal >= 0 && fromVal <= 99999;
-  const validTo = !isNaN(toVal) && toVal >= 1 && toVal <= 99999;
+  const validFrom = !isNaN(fromVal) && fromVal >= 0 && fromVal <= 999;
+  const validTo = !isNaN(toVal) && toVal >= 1 && toVal <= 999;
   const validOrder = validFrom && validTo && fromVal < toVal;
 
   qbitDaysFromInput.classList.toggle("invalid", !validFrom);
