@@ -22,6 +22,7 @@ QBITTORRENT_PASSWORD="${15:-}"
 QBITTORRENT_DAYS_FROM="${16:-0}"
 QBITTORRENT_DAYS_TO="${17:-2}"
 QBITTORRENT_STATUS="${18:-completed}"
+HIDDEN_FILTER="${19:-no}"
 
 # Write all settings cleanly and atomically
 {
@@ -43,6 +44,7 @@ QBITTORRENT_STATUS="${18:-completed}"
   echo "QBITTORRENT_DAYS_FROM=\"$QBITTORRENT_DAYS_FROM\""
   echo "QBITTORRENT_DAYS_TO=\"$QBITTORRENT_DAYS_TO\""
   echo "QBITTORRENT_STATUS=\"$QBITTORRENT_STATUS\""
+  echo "HIDDEN_FILTER=\"$HIDDEN_FILTER\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

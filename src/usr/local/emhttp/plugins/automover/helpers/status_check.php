@@ -3,10 +3,17 @@ $cronFile   = '/boot/config/plugins/automover/automover.cron';
 $logFile    = '/var/log/automover_last_run.log';
 $bootFail   = '/var/tmp/automover_boot_failure';
 $arrayStateFile = '/var/local/emhttp/var.ini';
+$statusFile = '/tmp/automover/automover_status.txt';
 
 $status     = 'Stopped';
 $lastRun    = 'Cannot find last run';
 $lastRunTs  = '';
+
+// ✅ Ensure status directory exists
+$dir = dirname($statusFile);
+if (!is_dir($dir)) {
+    @mkdir($dir, 0755, true);
+}
 
 // ✅ Autostart failure override
 if (file_exists($bootFail)) {
@@ -43,7 +50,7 @@ if (file_exists($bootFail)) {
         }
     }
 
-    // ✅ Status logic with array override
+    // ✅ Base Status
     if ($arrayStopped) {
         $status = 'Array Is Not Started While Automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
     } elseif ($parityRunning) {
@@ -51,6 +58,14 @@ if (file_exists($bootFail)) {
     } else {
         $status = $automoverRunning ? 'Running' : 'Stopped';
     }
+
+    // ✅ Check live "Moving" indicator (overrides above if active)
+if (file_exists($statusFile)) {
+    $movingState = trim(file_get_contents($statusFile));
+    if (strcasecmp($movingState, 'moving') === 0 || strcasecmp($movingState, 'moving files') === 0) {
+        $status = 'Moving Files';   // 🚀 Will show live while rsync runs
+    }
+}
 
     // ✅ Compute readable time difference
     if ($lastRunTs) {
@@ -85,7 +100,9 @@ if (file_exists($bootFail)) {
     }
 }
 
-// ✅ Output JSON
+// ✅ Always write detected status to file (so automover.sh can restore it)
+file_put_contents($statusFile, $status);
+
 header('Content-Type: application/json');
 echo json_encode([
     'status'       => $status,

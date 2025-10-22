@@ -5,12 +5,19 @@ CFG_PATH="/boot/config/plugins/automover/settings.cfg"
 AUTOMOVER_LOG="/var/log/automover_files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
 IN_USE_FILE="/tmp/automover/in_use_files.txt"
+STATUS_FILE="/tmp/automover/automover_status.txt"
 
 # ==========================================================
-#  Prevent multiple concurrent runs
+#  Setup directories and lock
 # ==========================================================
 mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover.lock"
+
+# Preserve whatever status was set before starting
+PREV_STATUS="Stopped"
+if [[ -f "$STATUS_FILE" ]]; then
+  PREV_STATUS=$(cat "$STATUS_FILE" | tr -d '\r\n')
+fi
 
 if [ -f "$LOCK_FILE" ]; then
   if ps -p "$(cat "$LOCK_FILE")" > /dev/null 2>&1; then
@@ -25,6 +32,7 @@ echo $$ > "$LOCK_FILE"
 
 # --- Ensure cleanup on all exit conditions ---
 cleanup() {
+  echo "$PREV_STATUS" > "$STATUS_FILE"    # ✅ Restore prior status
   rm -f "$LOCK_FILE"
   exit
 }
@@ -37,7 +45,8 @@ if [[ -f "$CFG_PATH" ]]; then
   source "$CFG_PATH"
 else
   echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
-  exit 1
+  echo "$PREV_STATUS" > "$STATUS_FILE"
+  cleanup
 fi
 
 # ==========================================================
@@ -97,7 +106,7 @@ fi
 for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
-           QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS; do
+           QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -123,7 +132,7 @@ start_time=$(date +%s)
 {
   echo "------------------------------------------------"
   echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
-  [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — all filters and exclusions disabled"
+  [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — all filters and exclusions disabled for this run"
 } >> "$LAST_RUN_FILE"
 
 log_session_end() {
@@ -151,14 +160,11 @@ fi
 #  Generate In-Use File Exclusion List
 # ==========================================================
 > "$IN_USE_FILE"
-
 EXCLUDES=("user" "user0" "addons" "disks" "remotes" "rootshare")
-
 for dir in /mnt/*; do
   base="$(basename "$dir")"
   [[ " ${EXCLUDES[*]} " =~ " $base " ]] && continue
   [[ -d "$dir" ]] || continue
-
   lsof +D "$dir" 2>/dev/null | awk -v path="$dir" '
     $4 ~ /^[0-9]+[rwu]$/ && $9 ~ "^/mnt/" {
       file=$9
@@ -178,12 +184,12 @@ if [[ "$ALLOW_DURING_PARITY" == "no" && "$MOVE_NOW" == false ]]; then
   if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini 2>/dev/null; then
     echo "Parity check in progress. Skipping this run." >> "$LAST_RUN_FILE"
     log_session_end
-    exit 0
+    cleanup
   fi
 fi
 
 # ==========================================================
-#  Age & Size Filter Config
+#  Age & Size Filters
 # ==========================================================
 if [[ "$MOVE_NOW" == false ]]; then
   AGE_FILTER_ENABLED=false
@@ -229,7 +235,7 @@ if [[ "$MOVE_NOW" == false ]]; then
   if [[ -z "$USED" ]]; then
     echo "$MOUNT_POINT usage not detected — nothing to do" >> "$LAST_RUN_FILE"
     log_session_end
-    exit 1
+    cleanup
   fi
 
   echo "$POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)" >> "$LAST_RUN_FILE"
@@ -237,9 +243,15 @@ if [[ "$MOVE_NOW" == false ]]; then
   if [[ "$USED" -le "$THRESHOLD" ]]; then
     echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"
     log_session_end
-    exit 0
+    cleanup
   fi
 fi
+
+# ==========================================================
+#  Begin Movement (status update)
+# ==========================================================
+echo "Starting move process" >> "$LAST_RUN_FILE"
+echo "Moving Files" > "$STATUS_FILE"
 
 # ==========================================================
 #  Movement Logic
@@ -290,20 +302,45 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
   [[ ! -d "$src" ]] && continue
 
-  excludes=()
-  if [[ "$MOVE_NOW" == false && -f "$EXCLUSIONS_FILE" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      [[ -z "$line" || "$line" =~ ^# ]] && continue
-      excludes+=("--exclude=$line")
-    done < "$EXCLUSIONS_FILE"
-  fi
+excludes=()
+if [[ "$MOVE_NOW" == false && "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" =~ ^# ]] && continue
 
-  if [[ -f "$IN_USE_FILE" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      [[ -z "$line" || "$line" =~ ^# ]] && continue
+    # Wildcard or relative pattern — pass as-is
+    if [[ "$line" == *'*'* || "$line" != /* ]]; then
       excludes+=("--exclude=$line")
-    done < "$IN_USE_FILE"
-  fi
+      continue
+    fi
+
+    # Absolute path — convert to relative
+    abs_path=$(realpath -m "$line")
+    if [[ "$abs_path" == "$src"* ]]; then
+      rel_path="${abs_path#$src/}"
+      excludes+=("--exclude=$rel_path")
+    fi
+  done < "$EXCLUSIONS_FILE"
+fi
+
+# === Hidden file/folder filter (strict recursive for both files and directories) ===
+if [[ "$MOVE_NOW" == false && "$HIDDEN_FILTER" == "yes" ]]; then
+
+  cd "$src" || continue
+
+  # --- Exclude hidden directories (the folder itself and everything inside) ---
+  while IFS= read -r hidden_dir; do
+    rel="${hidden_dir#./}"
+    excludes+=("--exclude=$rel" "--exclude=$rel/*" "--exclude=$rel/**")
+  done < <(find . -type d -name '.*' 2>/dev/null)
+
+  # --- Exclude hidden files (not inside hidden dirs) ---
+  while IFS= read -r hidden_file; do
+    rel="${hidden_file#./}"
+    excludes+=("--exclude=$rel")
+  done < <(find . -type f -name '.*' 2>/dev/null)
+
+  cd - >/dev/null 2>&1 || true
+fi
 
   if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
     if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
@@ -354,4 +391,48 @@ if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
   run_qbit_script resume
 fi
 
+# ==========================================================
+#  Finish and restore previous status
+# ==========================================================
+echo "Finished move process" >> "$LAST_RUN_FILE"
+
+# ==========================================================
+#  Cleanup Empty Folders (including ZFS datasets)
+# ==========================================================
+if [[ "$DRY_RUN" != "yes" ]]; then
+
+  for cfg in "$SHARE_CFG_DIR"/*.cfg; do
+    [[ -f "$cfg" ]] || continue
+    share_name="${cfg##*/}"
+    share_name="${share_name%.cfg}"
+
+    pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
+    pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
+    [[ -z "$pool1" && -z "$pool2" ]] && continue
+
+    for pool in "$pool1" "$pool2"; do
+      [[ -z "$pool" ]] && continue
+      base_path="/mnt/$pool/$share_name"
+      [[ ! -d "$base_path" ]] && continue
+
+      # Remove truly empty directories
+      find "$base_path" -type d -empty -delete 2>/dev/null
+
+      # Detect and destroy empty ZFS datasets
+      if command -v zfs >/dev/null 2>&1; then
+        mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
+        for ds in "${datasets[@]}"; do
+          mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
+          if [[ -d "$mountpoint" ]]; then
+            if [[ -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+              zfs destroy -f "$ds" >/dev/null 2>&1
+            fi
+          fi
+        done
+      fi
+    done
+  done
+fi
+
 log_session_end
+echo "$PREV_STATUS" > "$STATUS_FILE"
