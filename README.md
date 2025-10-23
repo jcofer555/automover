@@ -13,6 +13,7 @@
 - Allow or deny moving when parity is checking
 - Interval setting to check threshold with a minimum of 1 minute
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
+- Ability to force turbo write on during move
 - Ability to disable unraids built in mover schedule
 - Ability to manually set file/folder excludes
 - Ability to skip hidden folders/files
@@ -21,7 +22,8 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="401" alt="image thumb png 25895fc68749e708f7ca7fe93c8f0f54" src="https://github.com/user-attachments/assets/00b44c1f-f4f1-486f-82a7-35444fddda58" />
+<img width="1000" height="454" alt="image thumb png 7400e14e87d560712419c1783bdb4796" src="https://github.com/user-attachments/assets/16d7b0ee-8e74-4f8c-af6c-d110abe30932" />
+
 
 
 
