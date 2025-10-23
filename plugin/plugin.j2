@@ -66,6 +66,7 @@ ordered_keys=(
 	"QBITTORRENT_DAYS_TO"
 	"QBITTORRENT_STATUS"
 	"HIDDEN_FILTER"
+	"FORCE_RECONSTRUCTIVE_WRITE"
 )
 
 # ==========================================================
@@ -121,7 +122,6 @@ if [ "$AUTOSTART" == "no" ]; then
     echo "----------------------------------------------------"
     echo " {{ name }} has been installed."
     echo " Version: {{ env['PLUGIN_VERSION'] }}"
-    echo " Autostart: Disabled"
     echo "----------------------------------------------------"
     echo ""
 else
@@ -133,7 +133,6 @@ else
     echo "----------------------------------------------------"
     echo " {{ name }} has been installed."
     echo " Version: {{ env['PLUGIN_VERSION'] }}"
-    echo " Autostart: Enabled (every $INTERVAL minutes)"
     echo "----------------------------------------------------"
     echo ""
 fi
