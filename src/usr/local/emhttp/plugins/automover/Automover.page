@@ -501,6 +501,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .select-pool {
+  min-width: fit-content;
   appearance: none;
   max-width: 100%;
   overflow: hidden;
@@ -741,6 +742,13 @@ a:focus-visible {
 ::-webkit-scrollbar-thumb {
   background: var(--primary-blue);
   border-radius: 4px;
+}
+
+#qbit_status {
+  width: auto;
+  min-width: fit-content;
+  max-width: 100%;
+  display: inline-block;
 }
 </style>
 
