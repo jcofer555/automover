@@ -1079,7 +1079,7 @@ function checkAutomoverDone() {
 // run every 5s like your status updates
 setInterval(checkAutomoverDone, 5000);
 
-// 🔒 Disable control buttons while Automover is running
+// Disable control buttons while Automover is running
 function checkAutomoverLock() {
   fetch('/plugins/automover/helpers/check_lock.php', { cache: 'no-store' })
     .then(res => res.json())
@@ -1092,7 +1092,6 @@ function checkAutomoverLock() {
           el.disabled = locked;
           el.style.opacity = locked ? '0.5' : '1';
           el.style.cursor = locked ? 'not-allowed' : 'pointer';
-          el.title = locked ? 'Automover is currently running' : '';
         }
       });
     })
