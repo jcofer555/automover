@@ -256,16 +256,16 @@ input[type="checkbox"] {
 
 .short-input {
   flex: 0 0 auto;
-  max-width: 60px;
-  min-width: 60px;
-  width: 60px;
+  max-width: 70px;
+  min-width: 70px;
+  width: 70px;
 }
 
 .short-input-filter {
   flex: 0 0 auto;
-  max-width: 150px;
-  min-width: 150px;
-  width: 150px;
+  max-width: 160px;
+  min-width: 160px;
+  width: 160px;
 }
 
 #pool.short-input {
@@ -485,6 +485,19 @@ input[type="number"].short-input {
   -moz-appearance: auto;
   -webkit-appearance: auto;
   appearance: auto;
+}
+
+/* Restore number input spinner alignment for Unraid 7.2 */
+input[type="number"] {
+  padding-right: 0; /* remove internal spacing */
+}
+
+/* Force Chrome/Webkit to place arrows at field edge */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  right: 0;
+  position: absolute;
 }
 
 .select-pool {
