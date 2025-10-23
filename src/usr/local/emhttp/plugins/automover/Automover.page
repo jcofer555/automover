@@ -825,7 +825,7 @@ a:focus-visible {
 <div id="qbit-fields" style="display:none;">
 
   <div class="form-pair">
-    <label for="qbit_host" class="tooltip" data-tooltip="Example: http://10.100.10.250:8080">Host:</label>
+    <label for="qbit_host" class="tooltip" data-tooltip="Example: 10.100.10.250:8080">Host:</label>
     <div class="input-wrapper">
       <input type="text" id="qbit_host" value="<?php echo htmlspecialchars($settings['QBITTORRENT_HOST'] ?? '') ?>">
       <div id="qbit-host-warning" class="field-warning">Host is required</div>
@@ -833,7 +833,7 @@ a:focus-visible {
   </div>
 
   <div class="form-pair">
-    <label for="qbit_user">Username:</label>
+    <label for="qbit_user" class="tooltip" data-tooltip="Qbittorrent webui username">Username:</label>
     <div class="input-wrapper">
       <input type="text" id="qbit_user" value="<?php echo htmlspecialchars($settings['QBITTORRENT_USERNAME'] ?? '') ?>">
       <div id="qbit-user-warning" class="field-warning">Username is required</div>
@@ -841,7 +841,7 @@ a:focus-visible {
   </div>
 
   <div class="form-pair">
-    <label for="qbit_pass">Password:</label>
+    <label for="qbit_pass" class="tooltip" data-tooltip="Qbittorrent webui password">Password:</label>
     <div class="input-wrapper">
       <input type="password" id="qbit_pass" value="<?php echo htmlspecialchars($settings['QBITTORRENT_PASSWORD'] ?? '') ?>">
       <div id="qbit-pass-warning" class="field-warning">Password is required</div>
@@ -849,7 +849,7 @@ a:focus-visible {
   </div>
 
   <div class="form-pair">
-    <label for="qbit_days_from" class="tooltip" data-tooltip="Torrents newer than this age (days) will be ignored.">Days From:</label>
+    <label for="qbit_days_from" class="tooltip" data-tooltip="Torrents newer than this age (days) will be ignored">Days From:</label>
     <div class="input-wrapper">
       <input type="number" id="qbit_days_from" class="short-input" min="0" max="999" step="1"
         value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_FROM'] ?? '') ?>">
@@ -858,7 +858,7 @@ a:focus-visible {
   </div>
 
   <div class="form-pair">
-    <label for="qbit_days_to" class="tooltip" data-tooltip="Oldest torrents (days).">Days To:</label>
+    <label for="qbit_days_to" class="tooltip" data-tooltip="Torrents Older than this age (days) to be ignored">Days To:</label>
     <div class="input-wrapper">
       <input type="number" id="qbit_days_to" class="short-input" min="1" max="999" step="1"
         value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
@@ -868,7 +868,7 @@ a:focus-visible {
   </div>
 
   <div class="form-pair">
-    <label for="qbit_status" class="tooltip" data-tooltip="Which torrents to act on.">Status:</label>
+    <label for="qbit_status" class="tooltip" data-tooltip="Which status of torrents to act on">Status:</label>
     <select id="qbit_status">
       <?php
       $statuses = [
@@ -888,7 +888,7 @@ a:focus-visible {
 
     <!-- Exclusions row (appears below Interval when enabled) -->
     <div class="form-pair" id="exclusions-row" style="display:none;">
-      <label for="exclusions-field" class="tooltip" data-tooltip="Open the file picker to add or remove excluded paths.">Exclusions:</label>
+      <label for="exclusions-field" class="tooltip" data-tooltip="Open the file picker to add or remove excluded paths">Exclusions:</label>
       <div class="input-wrapper">
         <input id="exclusions-field" type="text" readonly value="Click to open file picker" title="Click to open file picker">
         <button id="viewExclusionsBtn" type="button">View/Edit Exclusions</button>
@@ -952,39 +952,39 @@ a:focus-visible {
 
     <!-- Checkboxes row -->
     <div class="checkbox-row">
-      <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots.">
+      <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots">
         <input type="checkbox" id="autostart" <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Enable an exclusions list of files and folders that won't be moved.">
+      <label class="form-check tooltip" data-tooltip="Enable an exclusions list of files and folders that won't be moved">
         <input type="checkbox" id="enable_exclusions" <?php echo ($settings['EXCLUSIONS_ENABLED'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Exclusions
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check.">
+      <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check">
         <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old.">
+      <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old">
         <input type="checkbox" id="age_based_filter" <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Age Based Filter
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files.">
+      <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files">
         <input type="checkbox" id="dry_run" <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Enable to move only files larger than the specified size in MB.">
+      <label class="form-check tooltip" data-tooltip="Enable to move only files larger than the specified size in MB">
         <input type="checkbox" id="size_based_filter" <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Pause qbittorrent torrents before move and resume after.">
+      <label class="form-check tooltip" data-tooltip="Pause qbittorrent torrents before move and resume after">
         <input type="checkbox" id="qbit_script" <?php echo ($settings['QBITTORRENT_SCRIPT'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Qbit Script
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Skip hidden files and folders (those starting with a dot).">
+      <label class="form-check tooltip" data-tooltip="Skip hidden files and folders (those starting with a dot)">
         <input type="checkbox" id="hidden_filter" <?php echo ($settings['HIDDEN_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Hidden Filter
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Force Unraid to use reconstructive (turbo) write mode during file moves.">
+      <label class="form-check tooltip" data-tooltip="Force Unraid to use reconstructive (turbo) write mode during file moves">
         <input type="checkbox" id="force_reconstructive_write" <?php echo ($settings['FORCE_RECONSTRUCTIVE_WRITE'] ?? '') === 'yes' ? 'checked' : '' ?>> Force Turbo Write
       </label>
     </div>
@@ -1003,12 +1003,12 @@ a:focus-visible {
       <div id="log-counts" class="log-stats"></div>
     </div>
     <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom:12px;">
-    <pre id="automover-log">Loading...</pre>
+    <pre id="automover-log">Loading</pre>
   </div>
 
   <div id="last-run-container">
     <h3>Last Run Details</h3>
-    <pre id="last-run-log">Loading last run log...</pre>
+    <pre id="last-run-log">Loading last run log</pre>
   </div>
 </div>
 
