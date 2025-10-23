@@ -38,6 +38,8 @@ cleanup() {
 }
 trap cleanup EXIT SIGINT SIGTERM SIGHUP SIGQUIT
 
+rm -f /tmp/automover/automover.done
+
 # ==========================================================
 #  Load Settings
 # ==========================================================
@@ -254,6 +256,14 @@ echo "Starting move process" >> "$LAST_RUN_FILE"
 echo "Moving Files" > "$STATUS_FILE"
 
 # ==========================================================
+#  Enable reconstructive (turbo) write if requested
+# ==========================================================
+if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
+  echo "Enabling reconstructive (turbo) md_write_method" >> "$LAST_RUN_FILE"
+  /usr/local/sbin/mdcmd set md_write_method 1
+fi
+
+# ==========================================================
 #  Movement Logic
 # ==========================================================
 dry_run_nothing=true
@@ -434,5 +444,23 @@ if [[ "$DRY_RUN" != "yes" ]]; then
   done
 fi
 
+# ==========================================================
+#  Restore previous md_write_method if modified
+# ==========================================================
+if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
+  turbo_write_mode=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
+  if [[ -n "$turbo_write_mode" ]]; then
+    /usr/local/sbin/mdcmd set md_write_method "$turbo_write_mode"
+    echo "Restored md_write_method to previous value: $turbo_write_mode" >> "$LAST_RUN_FILE"
+  fi
+fi
+
 log_session_end
+
+# ==========================================================
+#  Signal completion to WebUI
+# ==========================================================
+mkdir -p /tmp/automover
+echo "done" > /tmp/automover/automover.done
+
 echo "$PREV_STATUS" > "$STATUS_FILE"

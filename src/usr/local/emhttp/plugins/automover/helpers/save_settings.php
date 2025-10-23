@@ -25,6 +25,7 @@ $args = [
     $_GET['QBITTORRENT_DAYS_TO'] ?? '',
     $_GET['QBITTORRENT_STATUS'] ?? '',
     $_GET['HIDDEN_FILTER'] ?? '',
+    $_GET['FORCE_RECONSTRUCTIVE_WRITE'] ?? '',
 ];
 
 // Escape each argument for safety

@@ -66,7 +66,8 @@ $defaults = [
     'QBITTORRENT_DAYS_FROM' => '0',
     'QBITTORRENT_DAYS_TO' => '2',
     'QBITTORRENT_STATUS' => 'completed',
-    'HIDDEN_FILTER' => 'no'
+    'HIDDEN_FILTER' => 'no',
+    'FORCE_RECONSTRUCTIVE_WRITE' => 'no'
 ];
 
 // Load existing config if present
@@ -961,6 +962,10 @@ a:focus-visible {
       <label class="form-check tooltip" data-tooltip="Skip hidden files and folders (those starting with a dot).">
         <input type="checkbox" id="hidden_filter" <?php echo ($settings['HIDDEN_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Hidden Filter
       </label>
+
+      <label class="form-check tooltip" data-tooltip="Force Unraid to use reconstructive (turbo) write mode during file moves.">
+        <input type="checkbox" id="force_reconstructive_write" <?php echo ($settings['FORCE_RECONSTRUCTIVE_WRITE'] ?? '') === 'yes' ? 'checked' : '' ?>> Force Turbo Write
+      </label>
     </div>
 
 <div id="python-warning"
@@ -1047,6 +1052,58 @@ function updateStatus() {
 }
 updateStatus();
 setInterval(updateStatus, 5000);
+
+// === 🧩 Poll for Automover completion (done flag) ===
+function checkAutomoverDone() {
+  fetch('/plugins/automover/helpers/check_done.php', { cache: 'no-store' })
+    .then(res => res.json())
+    .then(data => {
+      if (data.done) {
+        const buttons = [
+          document.getElementById('save-settings'),
+          document.getElementById('stop-button'),
+          document.getElementById('moveNowBtn'),
+        ];
+        buttons.forEach(btn => {
+          if (!btn) return;
+          btn.disabled = false;
+          btn.style.backgroundColor = '';
+          btn.style.opacity = '1';
+          btn.style.cursor = 'pointer';
+        });
+      }
+    })
+    .catch(() => {});
+}
+
+// run every 5s like your status updates
+setInterval(checkAutomoverDone, 5000);
+
+// 🔒 Disable control buttons while Automover is running
+function checkAutomoverLock() {
+  fetch('/plugins/automover/helpers/check_lock.php', { cache: 'no-store' })
+    .then(res => res.json())
+    .then(data => {
+      const locked = data.locked === true;
+      const btnIds = ['save-settings', 'stop-button', 'moveNowBtn'];
+      btnIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.disabled = locked;
+          el.style.opacity = locked ? '0.5' : '1';
+          el.style.cursor = locked ? 'not-allowed' : 'pointer';
+          el.title = locked ? 'Automover is currently running' : '';
+        }
+      });
+    })
+    .catch(() => {}); // ignore errors silently
+}
+
+// Run once immediately, then every 5s (same as status polling)
+document.addEventListener('DOMContentLoaded', () => {
+  checkAutomoverLock();
+  setInterval(checkAutomoverLock, 5000);
+});
 
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('automover-settings');
@@ -1798,6 +1855,7 @@ removeExtBtn.addEventListener('click', () => {
         QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value,
         QBITTORRENT_STATUS: document.getElementById('qbit_status').value,
         HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
+        FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
       };
 
 const ordered = [
@@ -1820,6 +1878,7 @@ const ordered = [
   ['QBITTORRENT_DAYS_TO', settings.QBITTORRENT_DAYS_TO],
   ['QBITTORRENT_STATUS', settings.QBITTORRENT_STATUS],
   ['HIDDEN_FILTER', settings.HIDDEN_FILTER],
+  ['FORCE_RECONSTRUCTIVE_WRITE', settings.FORCE_RECONSTRUCTIVE_WRITE],
 ];
 const query = new URLSearchParams(ordered).toString();
       const confirmBadge = document.getElementById('save-confirmation');
@@ -1914,7 +1973,50 @@ document.addEventListener('DOMContentLoaded', () => {
     updateWarningVisibility(); // Run on page load to reflect current state
   }
 });
+</script>
+<script>
+// === Disable buttons immediately after click ===
+document.addEventListener("DOMContentLoaded", () => {
+  const actionButtons = [
+    document.getElementById("save-settings"),
+    document.getElementById("stop-button"),
+    document.getElementById("moveNowBtn"),
+  ];
 
+  actionButtons.forEach(btn => {
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      // Immediately disable the clicked button
+      btn.disabled = true;
+      btn.style.backgroundColor = "#000";
+      btn.style.opacity = "0.6";
+      btn.style.cursor = "not-allowed";
+
+      // Optionally disable *all* other action buttons too
+      actionButtons.forEach(other => {
+        if (other && other !== btn) {
+          other.disabled = true;
+          other.style.backgroundColor = "#000";
+          other.style.opacity = "0.6";
+          other.style.cursor = "not-allowed";
+        }
+      });
+
+      // Optional: automatically re-enable after some time (e.g. 60s)
+      // setTimeout(() => {
+      //   actionButtons.forEach(b => {
+      //     if (b) {
+      //       b.disabled = false;
+      //       b.style.backgroundColor = "";
+      //       b.style.opacity = "1";
+      //       b.style.cursor = "pointer";
+      //     }
+      //   });
+      // }, 60000);
+    });
+  });
+});
 </script>
 <?php if (file_exists('/boot/config/plugins/ca.mover.tuning.plg')): ?>
   <div id="mover-tuning-warning" style="
