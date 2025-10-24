@@ -67,7 +67,8 @@ $defaults = [
     'QBITTORRENT_DAYS_TO' => '2',
     'QBITTORRENT_STATUS' => 'completed',
     'HIDDEN_FILTER' => 'no',
-    'FORCE_RECONSTRUCTIVE_WRITE' => 'no'
+    'FORCE_RECONSTRUCTIVE_WRITE' => 'no',
+    'QBIT_MANAGE_CONTAINERNAME' => ''
 ];
 
 // Load existing config if present
@@ -845,6 +846,14 @@ a:focus-visible {
     <div class="input-wrapper">
       <input type="password" id="qbit_pass" value="<?php echo htmlspecialchars($settings['QBITTORRENT_PASSWORD'] ?? '') ?>">
       <div id="qbit-pass-warning" class="field-warning">Password is required</div>
+    </div>
+  </div>
+
+    <div class="form-pair">
+    <label for="qbit_manage" class="tooltip" data-tooltip="Optional: Enter a Docker container name to stop during moves and start afterward. Leave blank to disable.">Qbit Manage:</label>
+    <div class="input-wrapper">
+      <input type="text" id="qbit_manage" value="<?php echo htmlspecialchars($settings['QBIT_MANAGE_CONTAINERNAME'] ?? '') ?>">
+      <div id="qbit-manage-warning" class="field-warning">Container name is optional</div>
     </div>
   </div>
 
@@ -1876,6 +1885,7 @@ removeExtBtn.addEventListener('click', () => {
         QBITTORRENT_STATUS: document.getElementById('qbit_status').value,
         HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
         FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
+        QBIT_MANAGE_CONTAINERNAME: document.getElementById('qbit_manage').value,
       };
 
 const ordered = [
@@ -1899,6 +1909,7 @@ const ordered = [
   ['QBITTORRENT_STATUS', settings.QBITTORRENT_STATUS],
   ['HIDDEN_FILTER', settings.HIDDEN_FILTER],
   ['FORCE_RECONSTRUCTIVE_WRITE', settings.FORCE_RECONSTRUCTIVE_WRITE],
+  ['QBIT_MANAGE_CONTAINERNAME', settings.QBIT_MANAGE_CONTAINERNAME],
 ];
 const query = new URLSearchParams(ordered).toString();
       const confirmBadge = document.getElementById('save-confirmation');

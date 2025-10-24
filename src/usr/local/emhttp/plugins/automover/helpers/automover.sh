@@ -74,7 +74,7 @@ run_qbit_script() {
     return
   fi
 
-  echo "Running qbittorrent $action..." >> "$LAST_RUN_FILE"
+  echo "Running qbittorrent $action" >> "$LAST_RUN_FILE"
 
   python3 "$python_script" \
     --host "$QBITTORRENT_HOST" \
@@ -150,13 +150,6 @@ log_session_end() {
   echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
   echo "" >> "$LAST_RUN_FILE"
 }
-
-# ==========================================================
-#  Pause qBittorrent torrents if enabled (skip in dry run)
-# ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
-  run_qbit_script pause
-fi
 
 # ==========================================================
 #  Generate In-Use File Exclusion List
@@ -247,6 +240,21 @@ if [[ "$MOVE_NOW" == false ]]; then
     log_session_end
     cleanup
   fi
+fi
+
+# ==========================================================
+#  Pause qBittorrent torrents if enabled (skip in dry run)
+# ==========================================================
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
+  run_qbit_script pause
+fi
+
+# ==========================================================
+#  Stop managed container (optional, skip in dry run)
+# ==========================================================
+if [[ "$DRY_RUN" != "yes" && -n "$QBIT_MANAGE_CONTAINERNAME" && "$QBIT_MANAGE_CONTAINERNAME" != "no" ]]; then
+  echo "Stopping Docker container: $QBIT_MANAGE_CONTAINERNAME" >> "$LAST_RUN_FILE"
+  docker stop "$QBIT_MANAGE_CONTAINERNAME"
 fi
 
 # ==========================================================
@@ -399,6 +407,14 @@ fi
 # ==========================================================
 if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
   run_qbit_script resume
+fi
+
+# ==========================================================
+#  Restart managed container (optional, skip in dry run)
+# ==========================================================
+if [[ "$DRY_RUN" != "yes" && -n "$QBIT_MANAGE_CONTAINERNAME" && "$QBIT_MANAGE_CONTAINERNAME" != "no" ]]; then
+  echo "Starting Docker container: $QBIT_MANAGE_CONTAINERNAME" >> "$LAST_RUN_FILE"
+  docker start "$QBIT_MANAGE_CONTAINERNAME"
 fi
 
 # ==========================================================
