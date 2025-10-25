@@ -5,5 +5,9 @@
     "icon": "icon.png",
     "support": "https://forums.unraid.net/topic/192216-automover-for-unraid/",
     "min": "7.0.0",
-    "launch": "Settings/Automover"
+    "launch": "Settings/Automover",
+    "jdupes_file": "jdupes-1.31.1.tar.xz",
+    "jdupes_checksum": "",
+    "libjodycode_file": "libjodycode-4.0.1.tar.gz",
+    "libjodycode_checksum": ""
 }
