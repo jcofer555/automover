@@ -21,6 +21,16 @@ For older releases, see https://github.com/{{ env['GITHUB_REPOSITORY'] }}/releas
 ]]>
 </CHANGES>
 
+<FILE Name="/boot/config/plugins/{{ name }}/{{ jdupes_file }}">
+<URL>https://github.com/{{ env['GITHUB_REPOSITORY'] }}/raw/refs/tags/{{ env['PLUGIN_TAG'] }}/packages/{{ jdupes_file }}</URL>
+<SHA256>{{ jdupes_checksum }}</SHA256>
+</FILE>
+
+<FILE Name="/boot/config/plugins/{{ name }}/{{ libjodycode_file }}">
+<URL>https://github.com/{{ env['GITHUB_REPOSITORY'] }}/raw/refs/tags/{{ env['PLUGIN_TAG'] }}/packages/{{ libjodycode_file }}</URL>
+<SHA256>{{ libjodycode_checksum }}</SHA256>
+</FILE>
+
 <FILE Name="/boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz">
 <URL>https://github.com/{{ env['GITHUB_REPOSITORY'] }}/releases/download/{{ env['PLUGIN_VERSION'] }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz</URL>
 <SHA256>{{ env['PLUGIN_CHECKSUM'] }}</SHA256>
@@ -44,6 +54,10 @@ CRON_FILE="/boot/config/plugins/automover/automover.cron"
 
 # Install the package
 upgradepkg --install-new "$PACKAGE_TXZ"
+killall jdupes >/dev/null 2>&1
+killall libjodycode >/dev/null 2>&1
+tar xvf /boot/config/plugins/{{ name }}/jdupes-1.31.1.tar.xz -C /usr/bin/ jdupes
+tar xvf /boot/config/plugins/{{ name }}/libjodycode-4.0.1.tar.gz -C /usr/bin/ libjodycode
 
 # Ordered config keys
 ordered_keys=(
@@ -67,7 +81,9 @@ ordered_keys=(
 	"QBITTORRENT_STATUS"
 	"HIDDEN_FILTER"
 	"FORCE_RECONSTRUCTIVE_WRITE"
-	"QBIT_MANAGE_CONTAINERNAME"
+	"CONTAINER_NAMES"
+	"ENABLE_JDUPES"
+	"HASH_PATH"
 )
 
 # ==========================================================
@@ -115,6 +131,8 @@ fi
 
 # Remove older txz packages (keep only the current one)
 find /boot/config/plugins/{{ name }}/ -maxdepth 1 -type f -name "{{ package_name }}-*.txz" ! -name "{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz" -delete
+rm -f $(ls /boot/config/plugins/{{ name }}/*.tar.xz 2>/dev/null | grep -v '{{ jdupes_file }}')
+rm -f $(ls /boot/config/plugins/{{ name }}/*.tar.xz 2>/dev/null | grep -v '{{ libjodycode_file }}')
 
 # Handle autostart
 if [ "$AUTOSTART" == "no" ]; then
@@ -148,6 +166,11 @@ fi
 <INLINE>
 <![CDATA[
 removepkg {{ package_name }}
+
+killall jdupes >/dev/null 2>&1
+killall libjodycode >/dev/null 2>&1
+rm -f /usr/bin/jdupes
+rm -f /usr/bin/libjodycode
 rm -rf /usr/local/emhttp/plugins/{{ name }}
 rm -rf /boot/config/plugins/{{ name }}
 ]]>

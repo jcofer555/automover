@@ -7,6 +7,7 @@
 - Monitor selected pool disks only (cache, other pools — excludes array)
 - Enable dry-run mode to simulate triggers
 - Selected pool's usage % is displayed
+- Only moves from pool -> array or pool -> pool and skips any shares set to array -> pool
 - Threshold setting to prevent moving unless pool is at least that % full
 - Autostart at boot option
 - Move now button to bypass filters
