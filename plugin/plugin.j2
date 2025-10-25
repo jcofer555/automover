@@ -23,12 +23,10 @@ For older releases, see https://github.com/{{ env['GITHUB_REPOSITORY'] }}/releas
 
 <FILE Name="/boot/config/plugins/{{ name }}/{{ jdupes_file }}">
 <URL>https://github.com/{{ env['GITHUB_REPOSITORY'] }}/raw/refs/tags/{{ env['PLUGIN_TAG'] }}/packages/{{ jdupes_file }}</URL>
-<SHA256>{{ jdupes_checksum }}</SHA256>
 </FILE>
 
 <FILE Name="/boot/config/plugins/{{ name }}/{{ libjodycode_file }}">
 <URL>https://github.com/{{ env['GITHUB_REPOSITORY'] }}/raw/refs/tags/{{ env['PLUGIN_TAG'] }}/packages/{{ libjodycode_file }}</URL>
-<SHA256>{{ libjodycode_checksum }}</SHA256>
 </FILE>
 
 <FILE Name="/boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz">
