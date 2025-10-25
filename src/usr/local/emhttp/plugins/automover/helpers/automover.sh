@@ -70,7 +70,7 @@ run_qbit_script() {
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
 
   if [[ ! -f "$python_script" ]]; then
-    echo "qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE"
+    echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE"
     return
   fi
 
@@ -86,7 +86,7 @@ run_qbit_script() {
     --status-filter "$QBITTORRENT_STATUS" \
     "--$action" 2>&1 | grep -E '^(Running qBittorrent|Paused|Resumed|qBittorrent)' >> "$LAST_RUN_FILE"
 
-  echo "qbittorrent $action completed." >> "$LAST_RUN_FILE"
+  echo "Qbittorrent $action completed." >> "$LAST_RUN_FILE"
 }
 
 # ==========================================================
@@ -108,7 +108,8 @@ fi
 for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
-           QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER; do
+           QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
+           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -250,11 +251,17 @@ if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
 fi
 
 # ==========================================================
-#  Stop managed container (optional, skip in dry run)
+#  Stop managed containers (optional, skip in dry run)
 # ==========================================================
-if [[ "$DRY_RUN" != "yes" && -n "$QBIT_MANAGE_CONTAINERNAME" && "$QBIT_MANAGE_CONTAINERNAME" != "no" ]]; then
-  echo "Stopping Docker container: $QBIT_MANAGE_CONTAINERNAME" >> "$LAST_RUN_FILE"
-  docker stop "$QBIT_MANAGE_CONTAINERNAME"
+if [[ "$DRY_RUN" != "yes" && -n "$CONTAINER_NAMES" ]]; then
+  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+  for container in "${CONTAINERS[@]}"; do
+    container=$(echo "$container" | xargs)  # trim spaces
+    [[ -z "$container" ]] && continue
+    echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
+    docker stop "$container" || \
+      echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
+  done
 fi
 
 # ==========================================================
@@ -319,6 +326,12 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   fi
 
   [[ ! -d "$src" ]] && continue
+
+  # Skip if source is on array (prevent array -> pool moves)
+  if [[ "$src" == /mnt/user0/* ]]; then
+    echo "Skipping $share_name (array → pool moves are not allowed)" >> "$LAST_RUN_FILE"
+    continue
+  fi
 
 excludes=()
 if [[ "$MOVE_NOW" == false && "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
@@ -410,11 +423,17 @@ if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
 fi
 
 # ==========================================================
-#  Restart managed container (optional, skip in dry run)
+#  Restart managed containers (optional, skip in dry run)
 # ==========================================================
-if [[ "$DRY_RUN" != "yes" && -n "$QBIT_MANAGE_CONTAINERNAME" && "$QBIT_MANAGE_CONTAINERNAME" != "no" ]]; then
-  echo "Starting Docker container: $QBIT_MANAGE_CONTAINERNAME" >> "$LAST_RUN_FILE"
-  docker start "$QBIT_MANAGE_CONTAINERNAME"
+if [[ "$DRY_RUN" != "yes" && -n "$CONTAINER_NAMES" ]]; then
+  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+  for container in "${CONTAINERS[@]}"; do
+    container=$(echo "$container" | xargs)
+    [[ -z "$container" ]] && continue
+    echo "Starting Docker container: $container" >> "$LAST_RUN_FILE"
+    docker start "$container" || \
+      echo "Failed to start container: $container" >> "$LAST_RUN_FILE"
+  done
 fi
 
 # ==========================================================
@@ -458,6 +477,81 @@ if [[ "$DRY_RUN" != "yes" ]]; then
       fi
     done
   done
+fi
+
+# ==========================================================
+#  Optional: Re-hardlink media duplicates using jdupes
+# ==========================================================
+if [[ "$ENABLE_JDUPES" == "yes" ]]; then
+if command -v jdupes >/dev/null 2>&1; then
+  TEMP_LIST="/tmp/automover_jdupes_list.txt"
+  HASH_DIR="$HASH_PATH"
+  HASH_DB="${HASH_DIR}/jdupes_hash_database.db"
+
+  # Ensure HASH_DIR
+  if [[ ! -d "$HASH_DIR" ]]; then
+    mkdir -p "$HASH_DIR"
+    chmod 777 "$HASH_DIR"
+  else
+    echo "Using existing jdupes database: $HASH_DB" >> "$LAST_RUN_FILE"
+  fi
+
+if [[ ! -f "$HASH_DB" ]]; then
+  touch "$HASH_DB"
+  chmod 666 "$HASH_DB"
+  echo "Creating jdupes hash database at $HASH_DIR" >> "$LAST_RUN_FILE"
+fi
+
+  # Extract destination file paths from Automover log
+  grep -E -- ' -> ' "$AUTOMOVER_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
+
+  if [[ ! -s "$TEMP_LIST" ]]; then
+    echo "No moved files found, skipping jdupes step." >> "$LAST_RUN_FILE"
+    return
+  fi
+
+  # Determine affected shares from destination paths (e.g., /mnt/user0/movies)
+  mapfile -t SHARES < <(awk -F'/' '$2=="mnt" && $3=="user0" && $4!="" {print $4}' "$TEMP_LIST" | sort -u)
+
+  # Excluded shares
+  EXCLUDES=("appdata" "system" "domains" "isos")
+
+  for share in "${SHARES[@]}"; do
+    # Skip excluded shares
+    skip=false
+    for ex in "${EXCLUDES[@]}"; do
+      [[ "$share" == "$ex" ]] && skip=true && break
+    done
+    [[ "$skip" == true ]] && {
+      echo "Skipping excluded share: $share" >> "$LAST_RUN_FILE"
+      continue
+    }
+
+    SHARE_PATH="/mnt/user/${share}"
+
+    [[ -d "$SHARE_PATH" ]] || {
+      echo "Skipping missing path: $SHARE_PATH" >> "$LAST_RUN_FILE"
+      continue
+    }
+
+    echo "Jdupes processing share $share" >> "$LAST_RUN_FILE"
+
+    # Run jdupes on this share’s destination folder
+/usr/bin/jdupes -rLX onlyext:mp4,mkv,avi -y "$HASH_DB" "$SHARE_PATH" 2>&1 \
+  | grep -v -E \
+      -e "^Creating a new hash database " \
+      -e "^[[:space:]]*AT YOUR OWN RISK\. Report hashdb issues to jody@jodybruchon\.com" \
+      -e "^[[:space:]]*yet and basic .*" \
+      -e "^[[:space:]]*but there are LOTS OF QUIRKS.*" \
+      -e "^WARNING: THE HASH DATABASE FEATURE IS UNDER HEAVY DEVELOPMENT!.*" \
+  >> "$LAST_RUN_FILE"
+
+    echo "Completed jdupes step for $share" >> "$LAST_RUN_FILE"
+  done
+
+else
+  echo "Jdupes not installed, skipping jdupes step." >> "$LAST_RUN_FILE"
+fi
 fi
 
 # ==========================================================

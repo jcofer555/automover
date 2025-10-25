@@ -26,7 +26,9 @@ $args = [
     $_GET['QBITTORRENT_STATUS'] ?? '',
     $_GET['HIDDEN_FILTER'] ?? '',
     $_GET['FORCE_RECONSTRUCTIVE_WRITE'] ?? '',
-    $_GET['QBIT_MANAGE_CONTAINERNAME'] ?? '',
+    $_GET['CONTAINER_NAMES'] ?? '',
+    $_GET['ENABLE_JDUPES'] ?? '',
+    $_GET['HASH_PATH'] ?? '',
 ];
 
 // Escape each argument for safety

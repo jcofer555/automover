@@ -24,9 +24,23 @@ QBITTORRENT_DAYS_TO="${17:-2}"
 QBITTORRENT_STATUS="${18:-completed}"
 HIDDEN_FILTER="${19:-no}"
 FORCE_RECONSTRUCTIVE_WRITE="${20:-no}"
-QBIT_MANAGE_CONTAINERNAME="${21:-}"
+CONTAINER_NAMES_RAW="${21:-}"
+ENABLE_JDUPES="${22:-no}"
+HASH_PATH="${23:-/mnt/user/appdata}"
 
-# Write all settings cleanly and atomically
+# ==========================================================
+#  Normalize and sanitize CONTAINER_NAMES
+# ==========================================================
+if [[ -n "$CONTAINER_NAMES_RAW" ]]; then
+  # Remove extra spaces after commas, trim leading/trailing whitespace
+  CONTAINER_NAMES=$(echo "$CONTAINER_NAMES_RAW" | sed 's/, */,/g' | xargs)
+else
+  CONTAINER_NAMES=""
+fi
+
+# ==========================================================
+#  Write all settings cleanly and atomically
+# ==========================================================
 {
   echo "POOL_NAME=\"$POOL_NAME\""
   echo "THRESHOLD=\"$THRESHOLD\""
@@ -48,7 +62,9 @@ QBIT_MANAGE_CONTAINERNAME="${21:-}"
   echo "QBITTORRENT_STATUS=\"$QBITTORRENT_STATUS\""
   echo "HIDDEN_FILTER=\"$HIDDEN_FILTER\""
   echo "FORCE_RECONSTRUCTIVE_WRITE=\"$FORCE_RECONSTRUCTIVE_WRITE\""
-  echo "QBIT_MANAGE_CONTAINERNAME=\"$QBIT_MANAGE_CONTAINERNAME\""
+  echo "CONTAINER_NAMES=\"$CONTAINER_NAMES\""
+  echo "ENABLE_JDUPES=\"$ENABLE_JDUPES\""
+  echo "HASH_PATH=\"$HASH_PATH\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

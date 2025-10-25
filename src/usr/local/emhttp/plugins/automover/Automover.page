@@ -68,7 +68,9 @@ $defaults = [
     'QBITTORRENT_STATUS' => 'completed',
     'HIDDEN_FILTER' => 'no',
     'FORCE_RECONSTRUCTIVE_WRITE' => 'no',
-    'QBIT_MANAGE_CONTAINERNAME' => ''
+    'CONTAINER_NAMES' => '',
+    'ENABLE_JDUPES' => 'no',
+    'HASH_PATH' => '/mnt/user/appdata'
 ];
 
 // Load existing config if present
@@ -98,13 +100,61 @@ $settings = $existing;
   --status-green: #2ECC40;
 }
 
-#automover-settings {
+/* === Layout Wrapper === */
+#automover-wrapper {
+  display: flex;
+  flex-wrap: nowrap;              /* stay side-by-side */
+  align-items: flex-start;        /* align at top */
+  justify-content: space-evenly;  /* even horizontal spacing */
+  gap: 20px;                      /* space between panels */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* === Each Panel (auto-sizing) === */
+#automover-settings,
+#moved-log-container,
+#last-run-container {
   background: #111;
   border-radius: 12px;
   box-shadow: 0 0 12px rgba(0, 128, 128, .3);
+  color: #f0f8ff;
   padding: 20px;
-  text-align: left;
-  width: fit-content;
+  flex: 1 1 auto;        /* grow and shrink dynamically */
+  height: auto;          /* dynamic height */
+  max-height: none;      /* remove fixed limit */
+  overflow: visible;     /* expand with content */
+  min-width: 0;          /* prevent overflow on long content */
+  box-sizing: border-box;
+}
+
+/* === Optional: fine-tune widths === */
+#automover-settings { flex-basis: 25%; }
+#moved-log-container { flex-basis: 53%; }
+#last-run-container  { flex-basis: 22%; }
+
+/* === Log Panels: scroll only if too long === */
+#moved-log-container pre {
+  max-height: 53vh;
+  overflow-y: auto;
+  margin: 0;
+}
+
+#last-run-container pre {
+  max-height: 63vh;
+  overflow-y: auto;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  #automover-wrapper {
+    flex-wrap: wrap;
+  }
+  #automover-settings,
+  #moved-log-container,
+  #last-run-container {
+    flex: 1 1 100%;
+  }
 }
 
 .form-row {
@@ -342,37 +392,6 @@ input.invalid + .field-warning {
   }
 }
 
-#automover-wrapper {
-  align-items: flex-start;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 30px;
-}
-
-#automover-settings {
-  flex: 1;
-  height: 105vh;
-  max-width: 450px;
-  max-height: 105vh;
-}
-
-#moved-log-container {
-  align-items: flex-start;
-  background: #111;
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 128, 128, .3);
-  color: #f0f8ff;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  font-family: sans-serif;
-  height: 105vh;
-  max-height: 105vh;
-  max-width: 970px;
-  overflow-y: auto;
-  padding: 20px;
-}
-
 #moved-log-container h3 {
   color: var(--primary-blue);
   font-size: 18px;
@@ -423,20 +442,6 @@ input.invalid + .field-warning {
   font-size: 14px;
   text-align: right;
   white-space: nowrap;
-}
-
-#last-run-container {
-  background: #111;
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 128, 128, .3);
-  color: #f0f8ff;
-  flex: 1;
-  font-family: sans-serif;
-  height: 105vh;
-  max-height: 105vh;
-  max-width: 420px;
-  overflow-y: auto;
-  padding: 10px;
 }
 
 #last-run-container h3 {
@@ -509,11 +514,7 @@ input[type="number"]::-webkit-outer-spin-button {
   text-overflow: ellipsis;
   transition: width .2s;
   white-space: nowrap;
-  width: auto;
-}
-
-.select-pool.expanded {
-  width: auto !important;
+  width: 200px;
 }
 
 #save-messages div {
@@ -746,7 +747,14 @@ a:focus-visible {
 }
 
 #qbit_status {
-  width: auto;
+  width: 200px;
+  min-width: fit-content;
+  max-width: 100%;
+  display: inline-block;
+}
+
+#HASH_PATH {
+  width: 200px;
   min-width: fit-content;
   max-width: 100%;
   display: inline-block;
@@ -802,6 +810,13 @@ a:focus-visible {
       </div>
     </div>
 
+  <div class="form-pair">
+    <label for="container_names" class="tooltip" data-tooltip="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable.">Stop Containers:</label>
+    <div class="input-wrapper">
+      <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed" value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
+    </div>
+  </div>
+
     <!-- Age -->
     <div class="form-pair" id="age-days-container" style="display:none;">
       <label for="age_days" class="tooltip" data-tooltip="Only move files older than this many days.">Age (days):</label>
@@ -828,7 +843,7 @@ a:focus-visible {
   <div class="form-pair">
     <label for="qbit_host" class="tooltip" data-tooltip="Example: 10.100.10.250:8080">Host:</label>
     <div class="input-wrapper">
-      <input type="text" id="qbit_host" value="<?php echo htmlspecialchars($settings['QBITTORRENT_HOST'] ?? '') ?>">
+      <input type="text" id="qbit_host" placeholder="e.g. 10.100.10.250:8080"value="<?php echo htmlspecialchars($settings['QBITTORRENT_HOST'] ?? '') ?>">
       <div id="qbit-host-warning" class="field-warning">Host is required</div>
     </div>
   </div>
@@ -846,14 +861,6 @@ a:focus-visible {
     <div class="input-wrapper">
       <input type="password" id="qbit_pass" value="<?php echo htmlspecialchars($settings['QBITTORRENT_PASSWORD'] ?? '') ?>">
       <div id="qbit-pass-warning" class="field-warning">Password is required</div>
-    </div>
-  </div>
-
-    <div class="form-pair">
-    <label for="qbit_manage" class="tooltip" data-tooltip="Optional: Enter a Docker container name to stop during moves and start afterward. Leave blank to disable.">Qbit Manage:</label>
-    <div class="input-wrapper">
-      <input type="text" id="qbit_manage" value="<?php echo htmlspecialchars($settings['QBIT_MANAGE_CONTAINERNAME'] ?? '') ?>">
-      <div id="qbit-manage-warning" class="field-warning">Container name is optional</div>
     </div>
   </div>
 
@@ -892,6 +899,37 @@ a:focus-visible {
       ?>
     </select>
   </div>
+
+<div class="form-pair" id="hashPathRow" style="display:none;">
+  <label for="HASH_PATH" class="tooltip" 
+         data-tooltip="Pick a share to save the jdupes hash database.">
+    Hash Location:
+  </label>
+<select id="HASH_PATH" name="HASH_PATH">
+  <?php
+    $sharesFile = '/var/local/emhttp/shares.ini';
+    $default = '/mnt/user/appdata';
+    $current = $settings['HASH_PATH'] ?? $default;
+
+    if (file_exists($sharesFile)) {
+      $shares = parse_ini_file($sharesFile, true);
+      foreach ($shares as $shareName => $shareData) {
+        $path = "/mnt/user/$shareName";
+        $selected = ($current === $path || (!isset($settings['HASH_PATH']) && $shareName === 'appdata')) ? 'selected' : '';
+        echo "<option value=\"$path\" $selected>$shareName</option>";
+      }
+    } else {
+      // Fallback when shares.ini isn't found
+      $options = ['appdata', 'system', 'domains', 'isos'];
+      foreach ($options as $shareName) {
+        $path = "/mnt/user/$shareName";
+        $selected = ($current === $path || (!isset($settings['HASH_PATH']) && $shareName === 'appdata')) ? 'selected' : '';
+        echo "<option value=\"$path\" $selected>$shareName</option>";
+      }
+    }
+  ?>
+</select>
+</div>
 
 </div>
 
@@ -995,6 +1033,14 @@ a:focus-visible {
 
       <label class="form-check tooltip" data-tooltip="Force Unraid to use reconstructive (turbo) write mode during file moves">
         <input type="checkbox" id="force_reconstructive_write" <?php echo ($settings['FORCE_RECONSTRUCTIVE_WRITE'] ?? '') === 'yes' ? 'checked' : '' ?>> Force Turbo Write
+      </label>
+
+      <label class="form-check tooltip" data-tooltip="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos.">
+        
+      </label>
+
+      <label class="form-check tooltip" data-tooltip="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos.">
+        <input type="checkbox" id="ENABLE_JDUPES" <?php echo ($settings['ENABLE_JDUPES'] ?? '') === 'yes' ? 'checked' : ''; ?>> Enable Jdupes
       </label>
     </div>
 
@@ -1182,6 +1228,33 @@ if (data.ok) {
     alert('Move Now failed');
   });
 });
+
+  // === Toggle HASH_PATH dropdown visibility based on ENABLE_JDUPES ===
+const enableJdupesCheckbox = document.getElementById('ENABLE_JDUPES');
+const hashPathRow = document.getElementById('hashPathRow');
+const hashPathSelect = document.getElementById('HASH_PATH');
+
+function toggleHashPath() {
+  if (enableJdupesCheckbox.checked) {
+    hashPathRow.style.display = '';
+
+    // Default to appdata if nothing selected
+    if (!hashPathSelect.value || hashPathSelect.value.trim() === '') {
+      for (const option of hashPathSelect.options) {
+        if (option.text.toLowerCase() === 'appdata') {
+          hashPathSelect.value = option.value;
+          break;
+        }
+      }
+    }
+  } else {
+    hashPathRow.style.display = 'none';
+    hashPathSelect.value = '';
+  }
+}
+
+enableJdupesCheckbox.addEventListener('change', toggleHashPath);
+window.addEventListener('DOMContentLoaded', toggleHashPath);
 
   // NEW: exclusions UI
   const enableExcl = document.getElementById('enable_exclusions');
@@ -1885,7 +1958,9 @@ removeExtBtn.addEventListener('click', () => {
         QBITTORRENT_STATUS: document.getElementById('qbit_status').value,
         HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
         FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
-        QBIT_MANAGE_CONTAINERNAME: document.getElementById('qbit_manage').value,
+        CONTAINER_NAMES: document.getElementById('container_names').value,
+        ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
+        HASH_PATH: document.getElementById('HASH_PATH').value,
       };
 
 const ordered = [
@@ -1909,7 +1984,9 @@ const ordered = [
   ['QBITTORRENT_STATUS', settings.QBITTORRENT_STATUS],
   ['HIDDEN_FILTER', settings.HIDDEN_FILTER],
   ['FORCE_RECONSTRUCTIVE_WRITE', settings.FORCE_RECONSTRUCTIVE_WRITE],
-  ['QBIT_MANAGE_CONTAINERNAME', settings.QBIT_MANAGE_CONTAINERNAME],
+  ['CONTAINER_NAMES', settings.CONTAINER_NAMES],
+  ['ENABLE_JDUPES', settings.ENABLE_JDUPES],
+  ['HASH_PATH', settings.HASH_PATH],
 ];
 const query = new URLSearchParams(ordered).toString();
       const confirmBadge = document.getElementById('save-confirmation');
@@ -2052,8 +2129,8 @@ document.addEventListener("DOMContentLoaded", () => {
 <?php if (file_exists('/boot/config/plugins/ca.mover.tuning.plg')): ?>
   <div id="mover-tuning-warning" style="
     position: fixed;
-    bottom: 35px;
-    left: 50%;
+    bottom: 7%;
+    left: 52%;
     transform: translateX(-50%);
     background: #222;
     color: #ffcc00;
