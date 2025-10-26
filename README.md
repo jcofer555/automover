@@ -14,6 +14,8 @@
 - Allow or deny moving when parity is checking
 - Interval setting to check threshold with a minimum of 1 minute
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
+- Jdupes option built in to re-hardlink any files after every move
+- Option to stop containers before moves and start them back after finish
 - Ability to force turbo write on during move
 - Ability to disable unraids built in mover schedule
 - Ability to manually set file/folder excludes
@@ -23,7 +25,8 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="454" alt="image thumb png 7400e14e87d560712419c1783bdb4796" src="https://github.com/user-attachments/assets/16d7b0ee-8e74-4f8c-af6c-d110abe30932" />
+<img width="1000" height="462" alt="image thumb png de0c40f96c770341b4db0c6e79c5819b" src="https://github.com/user-attachments/assets/53e18fef-a134-4832-a9ca-4b16cd947c51" />
+
 
 
 
