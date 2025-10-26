@@ -234,7 +234,7 @@ if [[ "$MOVE_NOW" == false ]]; then
     cleanup
   fi
 
-  echo "$POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)" >> "$LAST_RUN_FILE"
+  echo "$POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%) - Continuing" >> "$LAST_RUN_FILE"
 
   if [[ "$USED" -le "$THRESHOLD" ]]; then
     echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"

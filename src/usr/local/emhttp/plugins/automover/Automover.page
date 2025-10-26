@@ -763,15 +763,23 @@ a:focus-visible {
 
 <div id="automover-wrapper">
   <form id="automover-settings">
-        <div class="status-container">
+    <div class="status-container">
       <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
       <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run available</span></div>
     </div>
 
 <div class="form-group">
-  <button type="button" id="save-settings" class="btn tooltip" data-tooltip="Save your configuration settings and start the automover service.">Save & Start</button>
-  <button type="button" id="stop-button" class="btn tooltip" data-tooltip="Stop Automover service.">Stop</button>
-  <button type="button" id="moveNowBtn" class="btn tooltip" data-tooltip="Run Automover immediately, ignoring filters.">Move Now</button>
+  <span title="Save your configuration settings and start the automover service" class="automovertip">
+    <button type="button" id="save-settings">Save & Start</button>
+  </span>
+
+  <span title="Stop Automover service" class="automovertip">
+    <button type="button" id="stop-button">Stop</button>
+  </span>
+
+  <span title="Run Automover immediately, ignoring exclusions and filters" class="automovertip">
+    <button type="button" id="moveNowBtn">Move Now</button>
+  </span>
 </div>
 
     <div id="move-now-confirmation" style="display:none;margin-top:10px;">✅ Moving Now</div>
@@ -783,57 +791,81 @@ a:focus-visible {
 
     <!-- Pool -->
     <div class="form-pair">
-      <label for="pool" class="tooltip" data-tooltip="Choose which pool to monitor for disk usage.">Pool:</label>
-      <select id="pool" class="select-pool" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
+    <label for="pool"
+      <span title="Choose which pool to monitor for disk usage" class="automovertip">Pool:</span>
+    </label>
+      <span title="Choose which pool to monitor for disk usage" class="automovertip">
+        <select id="pool" class="select-pool" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
+      </span>
     </div>
 
     <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has mover direction assigned in either direction. Nothing would be moved with this pool selected.</div>
-    <br>
 
     <!-- Threshold -->
     <div class="form-pair">
-      <label for="threshold" class="tooltip" data-tooltip="Set the disk usage percentage threshold that triggers the mover.">Threshold (%):</label>
+      <label for="threshold"
+        <span title="Set the disk usage percentage threshold that triggers the mover" class="automovertip">Threshole (%):</span>
+      </label>
       <div class="input-wrapper">
-        <input type="number" id="threshold" class="short-input" min="0" max="100" step="1"
+        <span title="Set the disk usage percentage threshold that triggers the mover" class="automovertip">
+          <input type="number" id="threshold" class="short-input" min="0" max="100" step="1"
           value="<?php echo htmlspecialchars($settings['THRESHOLD'] ?? '') ?>">
-        <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
+        </span>
+      <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
       </div>
     </div>
 
     <!-- Interval -->
     <div class="form-pair">
-      <label for="interval" class="tooltip" data-tooltip="Interval between usage checks in minutes.">Interval (minutes):</label>
-      <div class="input-wrapper">
-        <input type="number" id="interval" class="short-input" min="1" step="1"
+      <label for="interval"  
+        <span title="Interval 1-59 minutes, anything over 60 will be rounded to the nearest hour, day, week, or month" class="automovertip">Interval (minutes):</span>
+      </label>
+        <div class="input-wrapper">
+        <span title="Interval 1-59 minutes, anything over 60 will be rounded to the nearest hour, day, week, or month" class="automovertip">
+          <input type="number" id="interval" class="short-input" min="1" step="1"
           value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? '') ?>">
-        <div id="interval-warning" class="field-warning">Interval must be at least 1 minutes</div>
+        </span>
+      <div id="interval-warning" class="field-warning">Interval must be at least 1 minutes</div>
       </div>
     </div>
 
-  <div class="form-pair">
-    <label for="container_names" class="tooltip" data-tooltip="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable.">Stop Containers:</label>
-    <div class="input-wrapper">
-      <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed" value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
+    <!-- Container Names -->
+   <div class="form-pair">
+    <label for="container_names"
+      <span title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable" class="automovertip">Stop Containers:</span>
+    </label>
+      <div class="input-wrapper">
+      <span title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable" class="automovertip">
+        <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed" value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
+      </span>
     </div>
   </div>
 
     <!-- Age -->
     <div class="form-pair" id="age-days-container" style="display:none;">
-      <label for="age_days" class="tooltip" data-tooltip="Only move files older than this many days.">Age (days):</label>
+      <label for="age_days"
+        <span title="Only move files older than this many days" class="automovertip">Age (days):</span>
+      </label>
       <div class="input-wrapper">
+      <span title="Only move files older than this many days" class="automovertip">
         <input type="number" id="age_days" class="short-input" min="1" step="1"
-          value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
-        <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
+        value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
+      </span>
+    <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
       </div>
     </div>
 
     <!-- Size -->
     <div class="form-pair" id="size-mb-container" style="display:none;">
-      <label for="size_mb" class="tooltip" data-tooltip="Only move files larger than this size (in MB).">Min Size (MB):</label>
+      <label for="size_mb"
+        <span title="Only move files larger than this size (in MB)" class="automovertip">Min Size (MB):</span>
+      </label>
       <div class="input-wrapper">
+      <span title="Only move files larger than this size (in MB)" class="automovertip">
         <input type="number" id="size_mb" class="short-input" min="1" step="1"
           value="<?php echo htmlspecialchars($settings['SIZE_MB'] ?? '') ?>">
-        <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
+      </span>
+    <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
       </div>
     </div>
 
@@ -841,104 +873,135 @@ a:focus-visible {
 <div id="qbit-fields" style="display:none;">
 
   <div class="form-pair">
-    <label for="qbit_host" class="tooltip" data-tooltip="Example: 10.100.10.250:8080">Host:</label>
+    <label for="qbit_host"
+      <span title="Example: 10.100.10.250:8080" class="automovertip">Host:</span>
+    </label>
     <div class="input-wrapper">
+    <span title="Example: 10.100.10.250:8080" class="automovertip">
       <input type="text" id="qbit_host" placeholder="e.g. 10.100.10.250:8080"value="<?php echo htmlspecialchars($settings['QBITTORRENT_HOST'] ?? '') ?>">
-      <div id="qbit-host-warning" class="field-warning">Host is required</div>
+    </span>
+  <div id="qbit-host-warning" class="field-warning">Host is required</div>
     </div>
   </div>
 
   <div class="form-pair">
-    <label for="qbit_user" class="tooltip" data-tooltip="Qbittorrent webui username">Username:</label>
+    <label for="qbit_user"
+      <span title="Qbittorrent webui username" class="automovertip">Username:</span>
+    </label>
     <div class="input-wrapper">
+    <span title="Qbittorrent webui username" class="automovertip">
       <input type="text" id="qbit_user" value="<?php echo htmlspecialchars($settings['QBITTORRENT_USERNAME'] ?? '') ?>">
-      <div id="qbit-user-warning" class="field-warning">Username is required</div>
+    </span>
+  <div id="qbit-user-warning" class="field-warning">Username is required</div>
     </div>
   </div>
 
   <div class="form-pair">
-    <label for="qbit_pass" class="tooltip" data-tooltip="Qbittorrent webui password">Password:</label>
+    <label for="qbit_pass"
+      <span title="Qbittorrent webui password" class="automovertip">Password:</span>
+    </label>
     <div class="input-wrapper">
+    <span title="Qbittorrent webui password" class="automovertip">
       <input type="password" id="qbit_pass" value="<?php echo htmlspecialchars($settings['QBITTORRENT_PASSWORD'] ?? '') ?>">
-      <div id="qbit-pass-warning" class="field-warning">Password is required</div>
+    </span>
+  <div id="qbit-pass-warning" class="field-warning">Password is required</div>
     </div>
   </div>
 
   <div class="form-pair">
-    <label for="qbit_days_from" class="tooltip" data-tooltip="Torrents newer than this age (days) will be ignored">Days From:</label>
+    <label for="qbit_days_from"
+      <span title="Torrents newer than this age (days) will be ignored" class="automovertip">Days From:</span>
+    </label>
     <div class="input-wrapper">
+    <span title="Torrents newer than this age (days) will be ignored" class="automovertip">
       <input type="number" id="qbit_days_from" class="short-input" min="0" max="999" step="1"
         value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_FROM'] ?? '') ?>">
-      <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 999</div>
+    </span>
+  <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 999</div>
     </div>
   </div>
 
   <div class="form-pair">
-    <label for="qbit_days_to" class="tooltip" data-tooltip="Torrents Older than this age (days) to be ignored">Days To:</label>
+    <label for="qbit_days_to"
+      <span title="Torrents older than this age (days) will be ignored" class="automovertip">Days To:</span>
+    </label>
     <div class="input-wrapper">
+    <span title="Torrents older than this age (days) will be ignored" class="automovertip">
       <input type="number" id="qbit_days_to" class="short-input" min="1" max="999" step="1"
         value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
-      <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 999</div>
-      <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
+    </span>
+  <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 999</div>
+  <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
     </div>
   </div>
 
   <div class="form-pair">
-    <label for="qbit_status" class="tooltip" data-tooltip="Which status of torrents to act on">Status:</label>
-    <select id="qbit_status">
-      <?php
-      $statuses = [
-        'completed', 'all', 'downloading', 'seeding', 'paused', 'stopped',
-        'active', 'inactive', 'resumed', 'running', 'stalled', 'stalled_uploading',
-        'stalled_downloading', 'checking', 'moving', 'errored'
-      ];
-      foreach ($statuses as $status) {
-          $selected = ($settings['QBITTORRENT_STATUS'] ?? 'completed') === $status ? 'selected' : '';
-          echo "<option value=\"$status\" $selected>$status</option>";
-      }
-      ?>
-    </select>
+    <label for="qbit_status"
+      <span title="Which status of torrents to act on" class="automovertip">Status:</span>
+    </label>
+    <span title="Which status of torrents to act on" class="automovertip">
+      <select id="qbit_status">
+        <?php
+        $statuses = [
+          'completed', 'all', 'downloading', 'seeding', 'paused', 'stopped',
+          'active', 'inactive', 'resumed', 'running', 'stalled', 'stalled_uploading',
+          'stalled_downloading', 'checking', 'moving', 'errored'
+        ];
+        foreach ($statuses as $status) {
+            $selected = ($settings['QBITTORRENT_STATUS'] ?? 'completed') === $status ? 'selected' : '';
+            echo "<option value=\"$status\" $selected>$status</option>";
+        }
+        ?>
+      </select>
+  </span>
   </div>
 
 <div class="form-pair" id="hashPathRow" style="display:none;">
-  <label for="HASH_PATH" class="tooltip" 
-         data-tooltip="Pick a share to save the jdupes hash database.">
-    Hash Location:
+  <label for="HASH_PATH"
+    <span title="Pick a share to save the jdupes hash database" class="automovertip">Hash Location:</span>
   </label>
-<select id="HASH_PATH" name="HASH_PATH">
-  <?php
-    $sharesFile = '/var/local/emhttp/shares.ini';
-    $default = '/mnt/user/appdata';
-    $current = $settings['HASH_PATH'] ?? $default;
+  <span title="Pick a share to save the jdupes hash database" class="automovertip">
+    <select id="HASH_PATH" name="HASH_PATH">
+      <?php
+        $sharesFile = '/var/local/emhttp/shares.ini';
+        $default = '/mnt/user/appdata';
+        $current = $settings['HASH_PATH'] ?? $default;
 
-    if (file_exists($sharesFile)) {
-      $shares = parse_ini_file($sharesFile, true);
-      foreach ($shares as $shareName => $shareData) {
-        $path = "/mnt/user/$shareName";
-        $selected = ($current === $path || (!isset($settings['HASH_PATH']) && $shareName === 'appdata')) ? 'selected' : '';
-        echo "<option value=\"$path\" $selected>$shareName</option>";
-      }
-    } else {
-      // Fallback when shares.ini isn't found
-      $options = ['appdata', 'system', 'domains', 'isos'];
-      foreach ($options as $shareName) {
-        $path = "/mnt/user/$shareName";
-        $selected = ($current === $path || (!isset($settings['HASH_PATH']) && $shareName === 'appdata')) ? 'selected' : '';
-        echo "<option value=\"$path\" $selected>$shareName</option>";
-      }
-    }
-  ?>
-</select>
+        if (file_exists($sharesFile)) {
+          $shares = parse_ini_file($sharesFile, true);
+          foreach ($shares as $shareName => $shareData) {
+            $path = "/mnt/user/$shareName";
+            $selected = ($current === $path || (!isset($settings['HASH_PATH']) && $shareName === 'appdata')) ? 'selected' : '';
+            echo "<option value=\"$path\" $selected>$shareName</option>";
+          }
+        } else {
+          // Fallback when shares.ini isn't found
+          $options = ['appdata', 'system', 'domains', 'isos'];
+          foreach ($options as $shareName) {
+            $path = "/mnt/user/$shareName";
+            $selected = ($current === $path || (!isset($settings['HASH_PATH']) && $shareName === 'appdata')) ? 'selected' : '';
+            echo "<option value=\"$path\" $selected>$shareName</option>";
+          }
+        }
+      ?>
+    </select>
+  </span>
 </div>
 
 </div>
 
     <!-- Exclusions row (appears below Interval when enabled) -->
     <div class="form-pair" id="exclusions-row" style="display:none;">
-      <label for="exclusions-field" class="tooltip" data-tooltip="Open the file picker to add or remove excluded paths">Exclusions:</label>
+      <label for="exclusions-field"
+        <span title="Open the file picker to add or remove excluded paths" class="automovertip">Exclusions:</span>
+      </label>
       <div class="input-wrapper">
+      <span title="Open the file picker to add or remove excluded paths" class="automovertip">
         <input id="exclusions-field" type="text" readonly value="Click to open file picker" title="Click to open file picker">
+      </span>
+      <span title="Open to view/edit exclusions" class="automovertip">
         <button id="viewExclusionsBtn" type="button">View/Edit Exclusions</button>
+      </span>
       </div>
     </div>
 
@@ -999,49 +1062,69 @@ a:focus-visible {
 
     <!-- Checkboxes row -->
     <div class="checkbox-row">
-      <label class="form-check tooltip" data-tooltip="Start Automover automatically when Unraid boots">
-        <input type="checkbox" id="autostart" <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
-      </label>
+      <span title="Start Automover automatically when Unraid boots" class="automovertip">
+        <label>
+          <input type="checkbox" id="autostart" <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Enable an exclusions list of files and folders that won't be moved">
-        <input type="checkbox" id="enable_exclusions" <?php echo ($settings['EXCLUSIONS_ENABLED'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Exclusions
-      </label>
+      <span title="Enable an exclusions list of files and folders that won't be moved" class="automovertip">
+        <label>
+          <input type="checkbox" id="enable_exclusions" <?php echo ($settings['EXCLUSIONS_ENABLED'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Exclusions
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Allow Automover to run even when Unraid is doing a parity check">
-        <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity
-      </label>
+      <span title="Allow Automover to run even when Unraid is doing a parity check" class="automovertip">
+        <label>
+          <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Enable to move files only if older than the specified amount of days old">
-        <input type="checkbox" id="age_based_filter" <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Age Based Filter
-      </label>
+      <span title="Enable to move files only if older than the specified amount of days old" class="automovertip">
+        <label>
+          <input type="checkbox" id="age_based_filter" <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Age Based Filter
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Enable to simulate moves without actually transferring files">
-        <input type="checkbox" id="dry_run" <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
-      </label>
+      <span title="Enable to simulate moves without actually transferring files" class="automovertip">
+        <label>
+          <input type="checkbox" id="dry_run" <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Enable to move only files larger than the specified size in MB">
-        <input type="checkbox" id="size_based_filter" <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
-      </label>
+      <span title="Enable to move only files larger than the specified size in MB" class="automovertip">
+        <label>
+          <input type="checkbox" id="size_based_filter" <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Pause qbittorrent torrents before move and resume after">
-        <input type="checkbox" id="qbit_script" <?php echo ($settings['QBITTORRENT_SCRIPT'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Qbit Script
-      </label>
+      <span title="Enable to pause qbittorrent torrents before move and resume after" class="automovertip">
+        <label>
+          <input type="checkbox" id="qbit_script" <?php echo ($settings['QBITTORRENT_SCRIPT'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Qbit Script
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Skip hidden files and folders (those starting with a dot)">
-        <input type="checkbox" id="hidden_filter" <?php echo ($settings['HIDDEN_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Hidden Filter
-      </label>
+      <span title="Skip hidden files and folders (those starting with a dot)" class="automovertip">
+        <label>
+          <input type="checkbox" id="hidden_filter" <?php echo ($settings['HIDDEN_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Hidden Filter
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Force Unraid to use reconstructive (turbo) write mode during file moves">
-        <input type="checkbox" id="force_reconstructive_write" <?php echo ($settings['FORCE_RECONSTRUCTIVE_WRITE'] ?? '') === 'yes' ? 'checked' : '' ?>> Force Turbo Write
-      </label>
+      <span title="Force Unraid to use reconstructive (turbo) write mode during file moves" class="automovertip">
+        <label>
+          <input type="checkbox" id="force_reconstructive_write" <?php echo ($settings['FORCE_RECONSTRUCTIVE_WRITE'] ?? '') === 'yes' ? 'checked' : '' ?>> Force Turbo Write
+        </label>
+      </span>
 
-      <label class="form-check tooltip" data-tooltip="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos.">
+      <label>
         
       </label>
 
-      <label class="form-check tooltip" data-tooltip="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos.">
-        <input type="checkbox" id="ENABLE_JDUPES" <?php echo ($settings['ENABLE_JDUPES'] ?? '') === 'yes' ? 'checked' : ''; ?>> Enable Jdupes
-      </label>
+      <span title="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos" class="automovertip">
+        <label>
+          <input type="checkbox" id="ENABLE_JDUPES" <?php echo ($settings['ENABLE_JDUPES'] ?? '') === 'yes' ? 'checked' : ''; ?>> Enable Jdupes
+        </label>
+      </span>
     </div>
 
 <div id="python-warning"
@@ -2081,6 +2164,10 @@ document.addEventListener('DOMContentLoaded', () => {
     updateWarningVisibility(); // Run on page load to reflect current state
   }
 });
+
+   $('.automovertip').tooltipster({
+        maxWidth: 300
+    });
 </script>
 <script>
 // === Disable buttons immediately after click ===
@@ -2129,7 +2216,7 @@ document.addEventListener("DOMContentLoaded", () => {
 <?php if (file_exists('/boot/config/plugins/ca.mover.tuning.plg')): ?>
   <div id="mover-tuning-warning" style="
     position: fixed;
-    bottom: 7%;
+    bottom: 0%;
     left: 52%;
     transform: translateX(-50%);
     background: #222;
