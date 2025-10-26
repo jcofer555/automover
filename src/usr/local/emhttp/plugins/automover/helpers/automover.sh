@@ -86,7 +86,7 @@ run_qbit_script() {
     --status-filter "$QBITTORRENT_STATUS" \
     "--$action" 2>&1 | grep -E '^(Running qBittorrent|Paused|Resumed|qBittorrent)' >> "$LAST_RUN_FILE"
 
-  echo "Qbittorrent $action completed." >> "$LAST_RUN_FILE"
+  echo "Qbittorrent $action completed" >> "$LAST_RUN_FILE"
 }
 
 # ==========================================================
@@ -506,7 +506,7 @@ fi
   grep -E -- ' -> ' "$AUTOMOVER_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
 
   if [[ ! -s "$TEMP_LIST" ]]; then
-    echo "No moved files found, skipping jdupes step." >> "$LAST_RUN_FILE"
+    echo "No moved files found, skipping jdupes step" >> "$LAST_RUN_FILE"
     return
   fi
 
@@ -550,7 +550,7 @@ fi
   done
 
 else
-  echo "Jdupes not installed, skipping jdupes step." >> "$LAST_RUN_FILE"
+  echo "Jdupes not installed, skipping jdupes step" >> "$LAST_RUN_FILE"
 fi
 fi
 

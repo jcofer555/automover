@@ -128,20 +128,38 @@ $settings = $existing;
   box-sizing: border-box;
 }
 
+#last-run-container {
+  padding-top: 10px !important;  /* reduce from default 20px */
+}
+
+#last-run-container h3 {
+  margin-top: 0 !important;      /* remove any top margin */
+  margin-bottom: 10px;            /* keep small spacing below title */
+}
+
+#moved-log-container {
+  padding-top: 10px !important;  /* reduce from default 20px */
+}
+
+#moved-log-container h3 {
+  margin-top: 0 !important;      /* remove any top margin */
+  margin-bottom: 10px;            /* keep small spacing below title */
+}
+
 /* === Optional: fine-tune widths === */
-#automover-settings { flex-basis: 25%; }
-#moved-log-container { flex-basis: 53%; }
+#automover-settings { flex-basis: 23%; }
+#moved-log-container { flex-basis: 55%; }
 #last-run-container  { flex-basis: 22%; }
 
 /* === Log Panels: scroll only if too long === */
 #moved-log-container pre {
-  max-height: 53vh;
+  max-height: 54vh;
   overflow-y: auto;
   margin: 0;
 }
 
 #last-run-container pre {
-  max-height: 63vh;
+  max-height: 66vh;
   overflow-y: auto;
   margin: 0;
 }
@@ -301,15 +319,16 @@ input[type="checkbox"] {
 
 .form-pair input[type="text"],
 .form-pair input[type="password"] {
-  width: 100%;               /* Full width under input-wrapper */
-  max-width: 300px;          /* Cap the input width if needed */
+  width: 200px;               /* Full width under input-wrapper */
+  min-width: fit-content;
+  max-width: 100%;          /* Cap the input width if needed */
 }
 
 .short-input {
   flex: 0 0 auto;
-  max-width: 70px;
-  min-width: 70px;
-  width: 70px;
+  max-width: 100px;
+  min-width: 100px;
+  width: 100px;
 }
 
 .short-input-filter {
@@ -543,10 +562,14 @@ input[type="number"]::-webkit-outer-spin-button {
   display: flex;
   flex-direction: column;
   height: 600px;
+  min-height: fit-content;
+  max-height: 100%;
   overflow: hidden;
   padding: 18px;
   position: relative;
   width: 800px;
+  min-width: fit-content;
+  max-width: 100%;
 }
 
 #exclusion-modal .header {
@@ -577,7 +600,6 @@ input[type="number"]::-webkit-outer-spin-button {
 
 #exclusion-modal .row {
   align-items: center;
-  border-bottom: 1px solid #00aaff22;
   cursor: default;
   display: flex;
   gap: 0px;
@@ -657,7 +679,9 @@ input[type="number"]::-webkit-outer-spin-button {
   font-style: italic;
   opacity: 0.6;
   user-select: none;
-  width: 250px;
+  width: 200px;
+  min-width: fit-content;
+  max-width: 100%;
 }
 
 #exclusion-modal .crumb {
@@ -1000,7 +1024,7 @@ a:focus-visible {
         <input id="exclusions-field" type="text" readonly value="Click to open file picker" title="Click to open file picker">
       </span>
       <span title="Open to view/edit exclusions" class="automovertip">
-        <button id="viewExclusionsBtn" type="button">View/Edit Exclusions</button>
+        <button id="viewExclusionsBtn" type="button">Exclusions</button>
       </span>
       </div>
     </div>
@@ -1008,7 +1032,7 @@ a:focus-visible {
 <div id="exclusion-view-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0;
   background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
   <div class="modal-body" style="background:#111; color:white; padding:20px; border-radius:10px;
-  width:800px; height:600px; overflow:hidden; display:flex; flex-direction:column;">
+  width:800px; min-width: fit-content; max-width: 100%; height:600px; min-height: fit-content; max-height: 100%; overflow:hidden; display:flex; flex-direction:column;">
     <h3 style="margin-top:0;">View/Edit Exclusions</h3>
     <p style="margin-top:4px; margin-bottom:10px; color:#aaa; font-style:italic; font-size:13px;">
       * Any array paths changed or added need to be entered as <code>user0</code> instead of <code>disk#</code>.
