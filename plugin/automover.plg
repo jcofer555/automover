@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.10.80"
+  version="2025.10.81.4"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,12 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.10.81.4
+
+- Added option enable jdupes to re-hardlink files after every move
+- Added option to stop containers before move and start them after
+- Webui changes
+
 ### 2025.10.80
 
 - Added option to stop qbit manage when using the qbittorrent script
@@ -25,18 +31,22 @@
 
 - Added better tooltips
 
-### 2025.10.79.4
-
-- Change webui field inputs
-
 
 For older releases, see https://github.com/jcofer555/automover/releases
 ]]>
 </CHANGES>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.80-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.10.80/unraid-automover-2025.10.80-noarch-1.txz</URL>
-<SHA256>1188064610b1e5fe4ef9c83c8bcbe83b8c0e34485d634978d230f59ced1eb262</SHA256>
+<FILE Name="/boot/config/plugins/automover/jdupes-1.30.0-x86_64-2_slackdce.txz">
+<URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/jdupes-1.30.0-x86_64-2_slackdce.txz</URL>
+</FILE>
+
+<FILE Name="/boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.txz">
+<URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
+</FILE>
+
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.10.81.4-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.10.81.4/unraid-automover-2025.10.81.4-noarch-1.txz</URL>
+<SHA256>c064914f2271934b58577cb1b199bdb2d31871a99544eee736b74cd52171ac61</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -49,7 +59,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.10.80-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.10.81.4-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -57,6 +67,8 @@ CRON_FILE="/boot/config/plugins/automover/automover.cron"
 
 # Install the package
 upgradepkg --install-new "$PACKAGE_TXZ"
+upgradepkg --install-new "/boot/config/plugins/automover/jdupes-1.30.0-x86_64-2_slackdce.txz"
+upgradepkg --install-new "/boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.txz"
 
 # Ordered config keys
 ordered_keys=(
@@ -80,7 +92,9 @@ ordered_keys=(
 	"QBITTORRENT_STATUS"
 	"HIDDEN_FILTER"
 	"FORCE_RECONSTRUCTIVE_WRITE"
-	"QBIT_MANAGE_CONTAINERNAME"
+	"CONTAINER_NAMES"
+	"ENABLE_JDUPES"
+	"HASH_PATH"
 )
 
 # ==========================================================
@@ -127,7 +141,7 @@ if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.10.80-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.10.81.4-noarch-1.txz" -delete
 
 # Handle autostart
 if [ "$AUTOSTART" == "no" ]; then
@@ -135,7 +149,7 @@ if [ "$AUTOSTART" == "no" ]; then
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.10.80"
+    echo " Version: 2025.10.81.4"
     echo "----------------------------------------------------"
     echo ""
 else
@@ -146,7 +160,7 @@ else
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.10.80"
+    echo " Version: 2025.10.81.4"
     echo "----------------------------------------------------"
     echo ""
 fi
@@ -161,6 +175,10 @@ fi
 <INLINE>
 <![CDATA[
 removepkg unraid-automover
+removepkg "/boot/config/plugins/automover/jdupes-1.30.0-x86_64-2_slackdce.txz"
+removepkg "/boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.txz"
+rm -f /boot/config/plugins/automover/jdupes-1.30.0-x86_64-2_slackdce.txz
+rm -f /boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.txz
 rm -rf /usr/local/emhttp/plugins/automover
 rm -rf /boot/config/plugins/automover
 ]]>
