@@ -147,8 +147,8 @@ $settings = $existing;
 }
 
 /* === Optional: fine-tune widths === */
-#automover-settings { flex-basis: 23%; }
-#moved-log-container { flex-basis: 55%; }
+#automover-settings { flex-basis: 25%; }
+#moved-log-container { flex-basis: 53%; }
 #last-run-container  { flex-basis: 22%; }
 
 /* === Log Panels: scroll only if too long === */
@@ -315,33 +315,30 @@ input[type="checkbox"] {
 .form-pair select {
   background: #111;
   color: #fff;
+  width: 200px;               /* Full width under input-wrapper */
+  min-width: fit-content;
+  max-width: 100%;          /* Cap the input width if needed */
 }
 
 .form-pair input[type="text"],
 .form-pair input[type="password"] {
-  width: 200px;               /* Full width under input-wrapper */
   min-width: fit-content;
   max-width: 100%;          /* Cap the input width if needed */
 }
 
 .short-input {
   flex: 0 0 auto;
-  max-width: 100px;
-  min-width: 100px;
-  width: 100px;
+
 }
 
 .short-input-filter {
   flex: 0 0 auto;
-  max-width: 160px;
-  min-width: 160px;
-  width: 160px;
+
 }
 
 #pool.short-input {
   flex: 0 0 auto;
-  max-width: 100%;
-  min-width: 60px;
+
 }
 
 input.invalid {
