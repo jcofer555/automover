@@ -444,7 +444,7 @@ echo "Finished move process" >> "$LAST_RUN_FILE"
 # ==========================================================
 #  Cleanup Empty Folders (including ZFS datasets)
 # ==========================================================
-if [[ "$DRY_RUN" != "yes" ]]; then
+if [[ "$DRY_RUN" != "yes" && "$ENABLE_CLEANUP" == "yes" && "$moved_anything" == true ]]; then
 
   for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     [[ -f "$cfg" ]] || continue
@@ -477,10 +477,12 @@ if [[ "$DRY_RUN" != "yes" ]]; then
       fi
     done
   done
+
+  echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
 fi
 
 # ==========================================================
-#  Optional: Re-hardlink media duplicates using jdupes
+#  Re-hardlink media duplicates using jdupes
 # ==========================================================
 if [[ "$ENABLE_JDUPES" == "yes" ]]; then
 if command -v jdupes >/dev/null 2>&1; then

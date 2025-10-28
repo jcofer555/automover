@@ -29,6 +29,7 @@ $args = [
     $_GET['CONTAINER_NAMES'] ?? '',
     $_GET['ENABLE_JDUPES'] ?? '',
     $_GET['HASH_PATH'] ?? '',
+    $_GET['ENABLE_CLEANUP'] ?? '',
 ];
 
 // Escape each argument for safety

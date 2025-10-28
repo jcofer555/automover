@@ -70,7 +70,8 @@ $defaults = [
     'FORCE_RECONSTRUCTIVE_WRITE' => 'no',
     'CONTAINER_NAMES' => '',
     'ENABLE_JDUPES' => 'no',
-    'HASH_PATH' => '/mnt/user/appdata'
+    'HASH_PATH' => '/mnt/user/appdata',
+    'ENABLE_CLEANUP' => 'no'
 ];
 
 // Load existing config if present
@@ -395,6 +396,8 @@ input.invalid + .field-warning {
   padding: 6px 12px;
   transition: opacity .4s ease;
   width: fit-content;
+  display: inline-block;
+  margin-top: 10px;
 }
 
 @keyframes flash {
@@ -1141,9 +1144,11 @@ a:focus-visible {
         </label>
       </span>
 
-      <label>
-        
-      </label>
+<span title="Enable to cleanup folders and datasets from source path" class="automovertip">
+  <label>
+    <input type="checkbox" id="enable_cleanup" <?php echo ($settings['ENABLE_CLEANUP'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Cleanup
+  </label>
+</span>
 
       <span title="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos" class="automovertip">
         <label>
@@ -2069,6 +2074,7 @@ removeExtBtn.addEventListener('click', () => {
         CONTAINER_NAMES: document.getElementById('container_names').value,
         ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
         HASH_PATH: document.getElementById('HASH_PATH').value,
+        ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
       };
 
 const ordered = [
@@ -2095,6 +2101,7 @@ const ordered = [
   ['CONTAINER_NAMES', settings.CONTAINER_NAMES],
   ['ENABLE_JDUPES', settings.ENABLE_JDUPES],
   ['HASH_PATH', settings.HASH_PATH],
+  ['ENABLE_CLEANUP', settings.ENABLE_CLEANUP],
 ];
 const query = new URLSearchParams(ordered).toString();
       const confirmBadge = document.getElementById('save-confirmation');
@@ -2102,40 +2109,74 @@ const query = new URLSearchParams(ordered).toString();
       messageBox.style.display = 'block';
 
       fetch('/plugins/automover/helpers/save_settings.php?' + query + '&csrf_token=' + encodeURIComponent(csrf_token))
-        .then(res => res.text())
-        .then(text => {
-          let data;
-          try { data = JSON.parse(text); } catch(e) { throw new Error('Invalid JSON'); }
-          if (data.status === 'ok') {
-            confirmBadge.style.display='inline-block'; confirmBadge.style.opacity='0'; confirmBadge.style.animation='none'; void confirmBadge.offsetWidth; confirmBadge.style.animation='flash .4s ease'; confirmBadge.style.opacity='1';
-            setTimeout(()=>{ confirmBadge.style.opacity='0'; confirmBadge.style.display='none'; }, 3000);
+.then(res => res.text())
+.then(text => {
+  let data;
+  try { 
+    data = JSON.parse(text); 
+  } catch(e) { 
+    throw new Error('Invalid JSON'); 
+  }
 
-            if (Array.isArray(data.messages)) data.messages.forEach(msg=>{ const line=document.createElement('div'); line.textContent=msg; messageBox.appendChild(line); });
+  if (data.status === 'ok') {
+    // ✅ Show the "Saved & Started Automover" toast (matching Stop Automover)
+    const confirmBadge = document.getElementById('save-confirmation');
+    confirmBadge.style.display = 'inline-block';
+    confirmBadge.style.opacity = '0';
+    confirmBadge.style.animation = 'none';
+    void confirmBadge.offsetWidth; // restart animation cleanly
+    confirmBadge.style.animation = 'flash .4s ease';
+    confirmBadge.style.opacity = '1';
 
-            fetch('/plugins/automover/helpers/start_cron.php?' + new URLSearchParams(settings) + '&csrf_token=' + encodeURIComponent(csrf_token))
-              .then(res => res.json())
-              .then(startData => {
-                updateStatus();
-                if (Array.isArray(startData.messages)) startData.messages.forEach(msg=>{ const line=document.createElement('div'); line.textContent=msg; messageBox.appendChild(line); });
-                          if (startData.flag_changed) {
-            if (moverCheckbox) {
-              moverCheckbox.checked = false;
-              const notice = document.createElement('div');
-              notice.style.color = 'orange';
-              notice.textContent = '';
-              messageBox.appendChild(notice);
-            }
-          }
-              })
-              .catch(() => {
-                document.getElementById('status-text').textContent = 'Error starting cron';
-                messageBox.innerHTML += `<div style="color:red;">❌ Error starting Automover</div>`;
-              });
-          } else {
-            messageBox.innerHTML = `<div style="color:red;">❌ ${data.message || 'Save failed'}</div>`;
-          }
-        })
-        .catch(() => { messageBox.innerHTML = `<div style="color:red;">❌ Save request failed</div>`; });
+    setTimeout(() => {
+      confirmBadge.style.opacity = '0';
+      confirmBadge.style.display = 'none'; // collapse space after fade
+    }, 3000);
+
+    // 📝 Append any save messages
+    messageBox.innerHTML = '';
+    messageBox.style.display = 'block';
+    if (Array.isArray(data.messages)) {
+      data.messages.forEach(msg => {
+        const line = document.createElement('div');
+        line.textContent = msg;
+        messageBox.appendChild(line);
+      });
+    }
+
+    // 🚀 Start Automover Cron
+    fetch('/plugins/automover/helpers/start_cron.php?' + new URLSearchParams(settings) + '&csrf_token=' + encodeURIComponent(csrf_token))
+      .then(res => res.json())
+      .then(startData => {
+        updateStatus();
+        if (Array.isArray(startData.messages)) {
+          startData.messages.forEach(msg => {
+            const line = document.createElement('div');
+            line.textContent = msg;
+            messageBox.appendChild(line);
+          });
+        }
+
+        if (startData.flag_changed && typeof moverCheckbox !== 'undefined') {
+          moverCheckbox.checked = false;
+          const notice = document.createElement('div');
+          notice.style.color = 'orange';
+          notice.textContent = '';
+          messageBox.appendChild(notice);
+        }
+      })
+      .catch(() => {
+        document.getElementById('status-text').textContent = 'Error starting cron';
+        messageBox.innerHTML += `<div style="color:red;">❌ Error starting Automover</div>`;
+      });
+
+  } else {
+    messageBox.innerHTML = `<div style="color:red;">❌ ${data.message || 'Save failed'}</div>`;
+  }
+})
+.catch(() => { 
+  messageBox.innerHTML = `<div style="color:red;">❌ Save request failed</div>`; 
+});
     });
   });
 

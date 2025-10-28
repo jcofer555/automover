@@ -27,6 +27,7 @@ FORCE_RECONSTRUCTIVE_WRITE="${20:-no}"
 CONTAINER_NAMES_RAW="${21:-}"
 ENABLE_JDUPES="${22:-no}"
 HASH_PATH="${23:-/mnt/user/appdata}"
+ENABLE_CLEANUP="${24:-no}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -65,6 +66,7 @@ fi
   echo "CONTAINER_NAMES=\"$CONTAINER_NAMES\""
   echo "ENABLE_JDUPES=\"$ENABLE_JDUPES\""
   echo "HASH_PATH=\"$HASH_PATH\""
+  echo "ENABLE_CLEANUP=\"$ENABLE_CLEANUP\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'
