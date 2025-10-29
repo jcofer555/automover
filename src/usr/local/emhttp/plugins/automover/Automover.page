@@ -158,13 +158,13 @@ $settings = $existing;
 
 /* === Log Panels: scroll only if too long === */
 #moved-log-container pre {
-  max-height: 55vh;
+  max-height: 56vh;
   overflow-y: auto;
   margin: 0;
 }
 
 #last-run-container pre {
-  max-height: 66vh;
+  max-height: 65vh;
   overflow-y: auto;
   margin: 0;
 }
@@ -458,6 +458,85 @@ input.invalid + .field-warning {
   color: var(--primary-blue);
   font-size: 18px;
   margin: 0;
+}
+
+.log-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.log-header-row h3 {
+  color: var(--primary-blue);
+  font-size: 18px;
+  margin: 0;
+}
+
+.log-header-row button {
+  margin-top: -1px;
+  background: transparent;
+  color: #ff8800;
+  border: 2px solid #ff6600;
+}
+
+.log-header-row button:hover {
+  background: linear-gradient(90deg, #ff3c00 0%, #ff8800 100%);
+  color: #fff;
+  box-shadow: 0 0 8px rgba(255, 136, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.log-header-row button:active {
+  transform: translateY(0);
+  box-shadow: 0 0 4px rgba(255, 136, 0, 0.2);
+}
+
+.toast-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  position: relative;
+}
+
+.toast-wrapper .toast-inline {
+  align-self: flex-end;
+}
+
+.toast-inline {
+  display: block;           /* take full row under button */
+  border-radius: 6px;
+  color: #ff8800;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  margin-top: 6px;
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.3s ease,
+    height 0.3s ease,
+    margin 0.3s ease;
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.toast-inline.show {
+  opacity: 1;
+  height: auto;
+  margin-top: 8px;
+  transform: translateY(0);
+}
+
+.toast-inline.hide {
+  opacity: 0;
+  height: 0;
+  margin-top: 0;
+  transform: translateY(-6px);
 }
 
 .log-stats {
@@ -1165,19 +1244,33 @@ a:focus-visible {
 </div>
   </form>
 
-  <div id="moved-log-container">
-    <div class="log-header">
-      <h3>Mover Log For Last Run</h3>
-      <div id="log-counts" class="log-stats"></div>
-    </div>
-    <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom:12px;">
-    <pre id="automover-log">Loading</pre>
+<div id="moved-log-container">
+<div class="log-header-row">
+  <h3>Mover Log For Last Run</h3>
+  <div class="toast-wrapper">
+    <span title="Clear the mover log for last run log" class="automovertip">
+      <button id="clear-mover-log">Clear Log</button>
+    </span>
+    <div id="toast-mover" class="toast-inline"></div>
   </div>
+</div>
+  <div id="log-counts" class="log-stats"></div>
+  <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom:12px;">
+  <pre id="automover-log">Loading</pre>
+</div>
 
-  <div id="last-run-container">
-    <h3>Last Run Details</h3>
-    <pre id="last-run-log">Loading last run log</pre>
+<div id="last-run-container">
+<div class="log-header-row">
+  <h3>Last Run Details</h3>
+  <div class="toast-wrapper">
+    <span title="Clear the last run details log" class="automovertip">
+      <button id="clear-last-run-log">Clear Log</button>
+    </span>
+    <div id="toast-last" class="toast-inline"></div>
   </div>
+</div>
+  <pre id="last-run-log">Loading last run log</pre>
+</div>
 </div>
 
 <!-- Modal -->
@@ -2234,6 +2327,74 @@ document.addEventListener('DOMContentLoaded', () => {
    $('.automovertip').tooltipster({
         maxWidth: 300
     });
+
+function showToast(toastEl, message, type = "ok") {
+  if (!toastEl) return;
+  toastEl.textContent = message;
+  toastEl.style.color = type === "ok" ? "#00ffaa" : "#ff5555";
+  toastEl.classList.remove("hide");
+  void toastEl.offsetWidth;
+  toastEl.classList.add("show");
+
+  clearTimeout(toastEl._timer);
+  toastEl._timer = setTimeout(() => {
+    toastEl.classList.remove("show");
+    toastEl.classList.add("hide");
+    // fully remove after fade to reclaim space
+    setTimeout(() => (toastEl.textContent = ""), 400);
+  }, 2000);
+}
+
+// === Clear Log Buttons (toast feedback) ===
+const clearLastRunBtn = document.getElementById("clear-last-run-log");
+const clearMoverBtn   = document.getElementById("clear-mover-log");
+const toastLast       = document.getElementById("toast-last");
+const toastMover      = document.getElementById("toast-mover");
+
+if (clearLastRunBtn) {
+  clearLastRunBtn.addEventListener("click", function () {
+    if (confirm("Are you sure you want to clear the Last Run Log?")) {
+      fetch("/plugins/automover/helpers/clear_log.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRF-TOKEN": csrfToken
+        },
+        body: "log=last&csrf_token=" + encodeURIComponent(csrfToken)
+      })
+      .then(r => r.json())
+      .then(data => {
+        showToast(toastLast, data.message, data.ok ? "ok" : "err");
+        if (data.ok) document.getElementById("last-run-log").textContent = "";
+      })
+      .catch(() => showToast(toastLast, "Failed to clear log", "err"));
+    }
+  });
+}
+
+if (clearMoverBtn) {
+  clearMoverBtn.addEventListener("click", function () {
+    if (confirm("Are you sure you want to clear the Mover Log?")) {
+      fetch("/plugins/automover/helpers/clear_log.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRF-TOKEN": csrfToken
+        },
+        body: "log=mover&csrf_token=" + encodeURIComponent(csrfToken)
+      })
+      .then(r => r.json())
+      .then(data => {
+        showToast(toastMover, data.message, data.ok ? "ok" : "err");
+        if (data.ok) {
+          document.getElementById("automover-log").textContent = "";
+          document.getElementById("log-counts").textContent = "";
+        }
+      })
+      .catch(() => showToast(toastMover, "Failed to clear log", "err"));
+    }
+  });
+}
 </script>
 <script>
 // === Disable buttons immediately after click ===
