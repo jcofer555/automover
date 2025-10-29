@@ -118,8 +118,7 @@ done
 # ==========================================================
 if [[ "$MOVE_NOW" == true ]]; then
   if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run active — skipping move now execution" >> "$LAST_RUN_FILE"
-    # Keep DRY_RUN as 'yes' and exit early so move now doesn’t override filters
+    # Don't log yet — the header block will log this message
     MOVE_NOW=false
   else
     echo "Move now mode active — disabling all filters and checks" >> "$LAST_RUN_FILE"
@@ -144,6 +143,11 @@ start_time=$(date +%s)
   echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — all filters and exclusions disabled for this run"
 } >> "$LAST_RUN_FILE"
+
+# If Move Now was requested but dry run is active, note it right after the header
+if [[ "$MOVE_NOW" == false && "$DRY_RUN" == "yes" ]]; then
+  echo "Dry run active — skipping move now execution" >> "$LAST_RUN_FILE"
+fi
 
 log_session_end() {
   end_time=$(date +%s)
@@ -222,7 +226,6 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 RSYNC_OPTS=(-aiH --checksum)
 if [[ "$DRY_RUN" == "yes" ]]; then
   RSYNC_OPTS+=(--dry-run)
-  echo "Dry run active — no files will actually be moved" >> "$LAST_RUN_FILE"
 else
   RSYNC_OPTS+=(--remove-source-files)
 fi
@@ -292,7 +295,7 @@ fi
 #  Begin Movement (status update)
 # ==========================================================
 if [[ "$DRY_RUN" == "yes" ]]; then
-  echo "Dry run active — starting move process" >> "$LAST_RUN_FILE"
+  echo ""
   echo "Dry Run: Simulating Moves" > "$STATUS_FILE"
 else
   echo "Starting move process" >> "$LAST_RUN_FILE"
@@ -319,6 +322,12 @@ dry_run_nothing=true
 moved_anything=false
 SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
+
+# Add dry run header message to Automover log (top of file)
+if [[ "$DRY_RUN" == "yes" ]]; then
+  echo "Dry run active - the following files would have been moved" > "$AUTOMOVER_LOG"
+  echo "" >> "$AUTOMOVER_LOG"
+fi
 
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   [[ -f "$cfg" ]] || continue
@@ -428,7 +437,7 @@ fi
 
   if [[ "$file_count" -gt 0 ]]; then
     if [[ "$DRY_RUN" == "yes" ]]; then
-      echo "Dry run: $file_count files *would* be moved for share: $share_name" >> "$LAST_RUN_FILE"
+      echo "Dry run active - $file_count files would have been moved for share: $share_name" >> "$LAST_RUN_FILE"
     else
       echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
     fi
@@ -482,7 +491,7 @@ fi
 #  Finish and restore previous status
 # ==========================================================
 if [[ "$DRY_RUN" == "yes" ]]; then
-  echo "Dry run active — finished move process" >> "$LAST_RUN_FILE"
+  echo ""
 else
   echo "Finished move process" >> "$LAST_RUN_FILE"
 fi
