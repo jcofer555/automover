@@ -827,7 +827,7 @@ a:focus-visible {
       </span>
     </div>
 
-    <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has mover direction assigned in either direction. Nothing would be moved with this pool selected.</div>
+    <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has mover direction cache -> array. Nothing would be moved with this pool selected.</div>
 
     <!-- Threshold -->
     <div class="form-pair">
