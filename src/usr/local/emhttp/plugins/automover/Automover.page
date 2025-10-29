@@ -158,7 +158,7 @@ $settings = $existing;
 
 /* === Log Panels: scroll only if too long === */
 #moved-log-container pre {
-  max-height: 56vh;
+  max-height: 55vh;
   overflow-y: auto;
   margin: 0;
 }
@@ -510,7 +510,7 @@ input.invalid + .field-warning {
   font-size: 13px;
   font-weight: 600;
   padding: 6px 12px;
-  margin-top: 6px;
+  margin-top: -17px;
   opacity: 0;
   height: 0;
   overflow: hidden;
