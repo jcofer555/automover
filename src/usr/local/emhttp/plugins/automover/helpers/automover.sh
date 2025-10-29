@@ -117,16 +117,21 @@ done
 #  Move now mode disables all filters and restrictions
 # ==========================================================
 if [[ "$MOVE_NOW" == true ]]; then
-  echo "Move now mode active — disabling all filters and checks" >> "$LAST_RUN_FILE"
-  AGE_FILTER_ENABLED=false
-  SIZE_FILTER_ENABLED=false
-  AGE_BASED_FILTER="no"
-  SIZE_BASED_FILTER="no"
-  HIDDEN_FILTER="no"
-  DRY_RUN="no"
-  ALLOW_DURING_PARITY="yes"
-  EXCLUSIONS_FILE="/dev/null"
-  THRESHOLD=0
+  if [[ "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run active — skipping move now execution" >> "$LAST_RUN_FILE"
+    # Keep DRY_RUN as 'yes' and exit early so move now doesn’t override filters
+    MOVE_NOW=false
+  else
+    echo "Move now mode active — disabling all filters and checks" >> "$LAST_RUN_FILE"
+    AGE_FILTER_ENABLED=false
+    SIZE_FILTER_ENABLED=false
+    AGE_BASED_FILTER="no"
+    SIZE_BASED_FILTER="no"
+    HIDDEN_FILTER="no"
+    ALLOW_DURING_PARITY="yes"
+    EXCLUSIONS_FILE="/dev/null"
+    THRESHOLD=0
+  fi
 fi
 
 
