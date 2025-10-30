@@ -12,7 +12,7 @@
 - Autostart at boot option
 - Move now button to bypass filters
 - Allow or deny moving when parity is checking
-- Interval setting to check threshold with a minimum of 1 minute
+- Two schedule modes interval and cron expression to choose from
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
 - Jdupes option built in to re-hardlink any files after every move
 - Option to stop containers before moves and start them back after finish
@@ -25,7 +25,8 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="462" alt="image thumb png de0c40f96c770341b4db0c6e79c5819b" src="https://github.com/user-attachments/assets/53e18fef-a134-4832-a9ca-4b16cd947c51" />
+<img width="1000" height="461" alt="image thumb png eaff00c943be13079f4fab5f1149eb5a" src="https://github.com/user-attachments/assets/47f66d67-c423-454f-8161-80a51276c6e7" />
+
 
 
 
