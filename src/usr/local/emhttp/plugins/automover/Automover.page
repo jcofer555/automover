@@ -2271,7 +2271,6 @@ $settings = $existing;
         });
     });
 
-    // Save & Start
     // === Save & Start Automover ===
     saveBtn.addEventListener('click', function () {
       const intervalInput = document.getElementById('interval');
@@ -2365,13 +2364,21 @@ $settings = $existing;
       formData.append('QBITTORRENT_DAYS_TO', qbitDaysTo);
       formData.append('QBITTORRENT_STATUS', qbitStatus);
 
+// --- Save settings first ---
+fetch('/plugins/automover/helpers/save_settings.php?' + formData.toString(), {
+  method: 'GET'
+})
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'ok') {
+      // ✅ Settings saved successfully — now start the cron
       fetch('/plugins/automover/helpers/start_cron.php', {
         method: 'POST',
         body: formData
       })
         .then(r => r.json())
-        .then(data => {
-          if (data.status === 'ok') {
+        .then(data2 => {
+          if (data2.status === 'ok') {
             confirmBadge.style.display = 'block';
             confirmBadge.style.opacity = '1';
             confirmBadge.style.animation = 'flash 0.4s ease';
@@ -2384,13 +2391,17 @@ $settings = $existing;
               }, 400);
             }, 2000);
           } else {
-            alert('❌ Failed to update Automover schedule: ' + (data.message || 'Unknown error'));
+            alert('❌ Failed to start Automover cron: ' + (data2.message || 'Unknown error'));
           }
-        })
-        .catch(err => {
-          console.error('Save error:', err);
-          alert('❌ Save failed — check console for details.');
         });
+    } else {
+      alert('❌ Failed to save settings: ' + (data.message || 'Unknown error'));
+    }
+  })
+  .catch(err => {
+    console.error('Save error:', err);
+    alert('❌ Save failed — check console for details.');
+  });
     });
 
     // Initial counts

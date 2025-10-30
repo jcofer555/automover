@@ -13,6 +13,9 @@ STATUS_FILE="/tmp/automover/automover_status.txt"
 mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover.lock"
 
+# Clear old in-use file list before each run
+> "$IN_USE_FILE"
+
 # Preserve whatever status was set before starting
 PREV_STATUS="Stopped"
 if [[ -f "$STATUS_FILE" ]]; then
@@ -21,7 +24,7 @@ fi
 
 if [ -f "$LOCK_FILE" ]; then
   if ps -p "$(cat "$LOCK_FILE")" > /dev/null 2>&1; then
-    echo "Another instance of $SCRIPT_NAME is already running. Exiting." >> "$LAST_RUN_FILE"
+    echo "Another instance of $SCRIPT_NAME is already running exiting without running" >> "$LAST_RUN_FILE"
     exit 0
   else
     rm -f "$LOCK_FILE"
@@ -163,32 +166,6 @@ log_session_end() {
 }
 
 # ==========================================================
-#  Generate In-Use File Exclusion List (skip in dry run)
-# ==========================================================
-> "$IN_USE_FILE"
-
-if [[ "$DRY_RUN" == "yes" ]]; then
-  echo "Dry run active — skipping in-use file scan" >> "$LAST_RUN_FILE"
-else
-  EXCLUDES=("user" "user0" "addons" "disks" "remotes" "rootshare")
-  for dir in /mnt/*; do
-    base="$(basename "$dir")"
-    [[ " ${EXCLUDES[*]} " =~ " $base " ]] && continue
-    [[ -d "$dir" ]] || continue
-    lsof +D "$dir" 2>/dev/null | awk -v path="$dir" '
-      $4 ~ /^[0-9]+[rwu]$/ && $9 ~ "^/mnt/" {
-        file=$9
-        if (file ~ "^/mnt/disk[0-9]+/") {
-          sub("^/mnt/disk[0-9]+", "/mnt/user0", file)
-        }
-        print file
-      }
-    ' >> "$IN_USE_FILE"
-  done
-  sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
-fi
-
-# ==========================================================
 #  Parity Check Guard (unless MOVE_NOW)
 # ==========================================================
 if [[ "$ALLOW_DURING_PARITY" == "no" && "$MOVE_NOW" == false ]]; then
@@ -314,14 +291,13 @@ if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
 fi
 
 # ==========================================================
-#  Movement Logic
+#  Movement Logic (now checks fuser per file dynamically)
 # ==========================================================
 dry_run_nothing=true
 moved_anything=false
 SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
 
-# Add dry run header message to Automover log (top of file)
 if [[ "$DRY_RUN" == "yes" ]]; then
   echo "Dry run active - the following files would have been moved" > "$AUTOMOVER_LOG"
   echo "" >> "$AUTOMOVER_LOG"
@@ -374,61 +350,52 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     continue
   fi
 
-excludes=()
-if [[ "$MOVE_NOW" == false && "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ -z "$line" || "$line" =~ ^# ]] && continue
+  excludes=()
+  if [[ "$MOVE_NOW" == false && "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ -z "$line" || "$line" =~ ^# ]] && continue
+      if [[ "$line" == *'*'* || "$line" != /* ]]; then
+        excludes+=("--exclude=$line")
+        continue
+      fi
+      abs_path=$(realpath -m "$line")
+      if [[ "$abs_path" == "$src"* ]]; then
+        rel_path="${abs_path#$src/}"
+        excludes+=("--exclude=$rel_path")
+      fi
+    done < "$EXCLUSIONS_FILE"
+  fi
 
-    # Wildcard or relative pattern — pass as-is
-    if [[ "$line" == *'*'* || "$line" != /* ]]; then
-      excludes+=("--exclude=$line")
-      continue
-    fi
+  # === Hidden filter ===
+  if [[ "$MOVE_NOW" == false && "$HIDDEN_FILTER" == "yes" ]]; then
+    cd "$src" || continue
+    while IFS= read -r hidden_dir; do
+      rel="${hidden_dir#./}"
+      excludes+=("--exclude=$rel" "--exclude=$rel/*" "--exclude=$rel/**")
+    done < <(find . -type d -name '.*' 2>/dev/null)
+    while IFS= read -r hidden_file; do
+      rel="${hidden_file#./}"
+      excludes+=("--exclude=$rel")
+    done < <(find . -type f -name '.*' 2>/dev/null)
+    cd - >/dev/null 2>&1 || true
+  fi
 
-    # Absolute path — convert to relative
-    abs_path=$(realpath -m "$line")
-    if [[ "$abs_path" == "$src"* ]]; then
-      rel_path="${abs_path#$src/}"
-      excludes+=("--exclude=$rel_path")
-    fi
-  done < "$EXCLUSIONS_FILE"
-fi
-
-# === Hidden file/folder filter (strict recursive for both files and directories) ===
-if [[ "$MOVE_NOW" == false && "$HIDDEN_FILTER" == "yes" ]]; then
-
+  # === Dynamic fuser per-file exclusion integrated here ===
+  tmpfile=$(mktemp)
   cd "$src" || continue
 
-  # --- Exclude hidden directories (the folder itself and everything inside) ---
-  while IFS= read -r hidden_dir; do
-    rel="${hidden_dir#./}"
-    excludes+=("--exclude=$rel" "--exclude=$rel/*" "--exclude=$rel/**")
-  done < <(find . -type d -name '.*' 2>/dev/null)
+  find . -type f -print0 |
+    while IFS= read -r -d '' f; do
+      abs="$src/${f#./}"
+      if ! fuser "$abs" >/dev/null 2>&1; then
+        printf '%s\0' "${f#./}"
+      else
+        echo "$abs" >> "$IN_USE_FILE"
+      fi
+    done > "$tmpfile"
 
-  # --- Exclude hidden files (not inside hidden dirs) ---
-  while IFS= read -r hidden_file; do
-    rel="${hidden_file#./}"
-    excludes+=("--exclude=$rel")
-  done < <(find . -type f -name '.*' 2>/dev/null)
-
-  cd - >/dev/null 2>&1 || true
-fi
-
-  if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
-    if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
-      mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
-    elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
-      mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
-    elif [[ "$SIZE_FILTER_ENABLED" == true ]]; then
-      mapfile -t filtered_files < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
-    fi
-    mapfile -t filtered_dirs < <(cd "$src" && find . -type d -empty -printf '%P/\n' 2>/dev/null)
-    all_filtered_items=("${filtered_files[@]}" "${filtered_dirs[@]}")
-    (( ${#all_filtered_items[@]} == 0 )) && continue
-    output=$(printf '%s\n' "${all_filtered_items[@]}" | rsync "${RSYNC_OPTS[@]}" "${excludes[@]}" --files-from=- "$src/" "$dst/" 2>/dev/null)
-  else
-    output=$(rsync "${RSYNC_OPTS[@]}" "${excludes[@]}" "$src/" "$dst/" 2>/dev/null)
-  fi
+  output=$(rsync "${RSYNC_OPTS[@]}" "${excludes[@]}" --from0 --files-from="$tmpfile" "$src/" "$dst/" 2>/dev/null)
+  rm -f "$tmpfile"
 
   file_lines=$(echo "$output" | awk '$1 ~ /^>f/' | cut -c13-)
   file_count=$(echo "$file_lines" | grep -c .)
