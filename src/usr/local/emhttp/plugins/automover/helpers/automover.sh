@@ -32,7 +32,7 @@ echo $$ > "$LOCK_FILE"
 
 # --- Ensure cleanup on all exit conditions ---
 cleanup() {
-  echo "$PREV_STATUS" > "$STATUS_FILE"    # ✅ Restore prior status
+  echo "$PREV_STATUS" > "$STATUS_FILE"
   rm -f "$LOCK_FILE"
   exit
 }
@@ -109,7 +109,7 @@ for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
            QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
-           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP; do
+           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP MODE CRON_EXPRESSION; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -132,7 +132,6 @@ if [[ "$MOVE_NOW" == true ]]; then
     THRESHOLD=0
   fi
 fi
-
 
 # ==========================================================
 #  Log Header
@@ -313,7 +312,6 @@ if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
     /usr/local/sbin/mdcmd set md_write_method 1
   fi
 fi
-
 
 # ==========================================================
 #  Movement Logic

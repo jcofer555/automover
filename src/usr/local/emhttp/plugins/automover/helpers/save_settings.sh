@@ -28,6 +28,8 @@ CONTAINER_NAMES_RAW="${21:-}"
 ENABLE_JDUPES="${22:-no}"
 HASH_PATH="${23:-/mnt/user/appdata}"
 ENABLE_CLEANUP="${24:-no}"
+MODE="${25:-minutes}"
+CRON_EXPRESSION="${26:-}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -67,6 +69,8 @@ fi
   echo "ENABLE_JDUPES=\"$ENABLE_JDUPES\""
   echo "HASH_PATH=\"$HASH_PATH\""
   echo "ENABLE_CLEANUP=\"$ENABLE_CLEANUP\""
+  echo "MODE=\"$MODE\""
+  echo "CRON_EXPRESSION=\"$CRON_EXPRESSION\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

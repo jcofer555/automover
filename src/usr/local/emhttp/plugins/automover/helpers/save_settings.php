@@ -30,6 +30,8 @@ $args = [
     $_GET['ENABLE_JDUPES'] ?? '',
     $_GET['HASH_PATH'] ?? '',
     $_GET['ENABLE_CLEANUP'] ?? '',
+    $_GET['MODE'] ?? '',
+    $_GET['CRON_EXPRESSION'] ?? '',
 ];
 
 // Escape each argument for safety

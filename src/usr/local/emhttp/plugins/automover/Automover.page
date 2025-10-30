@@ -6,40 +6,40 @@ Tag="icon.png"
 Markdown="false"
 ---
 <script>
-// UNIVERSAL CSRF TOKEN DISCOVERY for Unraid plugin pages
-let csrfToken = "<?= $_GET['csrf_token'] ?? ($_COOKIE['csrf_token'] ?? '') ?>";
+  // UNIVERSAL CSRF TOKEN DISCOVERY for Unraid plugin pages
+  let csrfToken = "<?= $_GET['csrf_token'] ?? ($_COOKIE['csrf_token'] ?? '') ?>";
 
-// Try dynamic lookup from global scope, cookie, or meta
-if (!csrfToken || csrfToken === "undefined" || csrfToken === "") {
-  try {
-    // 1️⃣ Try the global variable used by Unraid's WebGUI JS
-    if (typeof window.csrf_token !== "undefined" && window.csrf_token) {
-      csrfToken = window.csrf_token;
-    }
+  // Try dynamic lookup from global scope, cookie, or meta
+  if (!csrfToken || csrfToken === "undefined" || csrfToken === "") {
+    try {
+      // 1️⃣ Try the global variable used by Unraid's WebGUI JS
+      if (typeof window.csrf_token !== "undefined" && window.csrf_token) {
+        csrfToken = window.csrf_token;
+      }
 
-    // 2️⃣ Try any embedded meta tag
-    if ((!csrfToken || csrfToken === "") && document.querySelector("meta[name='csrf_token']")) {
-      csrfToken = document.querySelector("meta[name='csrf_token']").getAttribute("content");
-    }
+      // 2️⃣ Try any embedded meta tag
+      if ((!csrfToken || csrfToken === "") && document.querySelector("meta[name='csrf_token']")) {
+        csrfToken = document.querySelector("meta[name='csrf_token']").getAttribute("content");
+      }
 
-    // 3️⃣ Try cookie (most Unraid builds set it)
-    if ((!csrfToken || csrfToken === "") && document.cookie.includes("csrf_token=")) {
-      const m = document.cookie.match(/csrf_token=([^;]+)/);
-      if (m) csrfToken = decodeURIComponent(m[1]);
-    }
+      // 3️⃣ Try cookie (most Unraid builds set it)
+      if ((!csrfToken || csrfToken === "") && document.cookie.includes("csrf_token=")) {
+        const m = document.cookie.match(/csrf_token=([^;]+)/);
+        if (m) csrfToken = decodeURIComponent(m[1]);
+      }
 
-    // 4️⃣ Fallback: try to extract from any script tag in the parent frame
-    if ((!csrfToken || csrfToken === "") && window.parent) {
-      try {
-        if (window.parent.csrf_token) csrfToken = window.parent.csrf_token;
-      } catch (e) { /* ignore cross-frame */ }
+      // 4️⃣ Fallback: try to extract from any script tag in the parent frame
+      if ((!csrfToken || csrfToken === "") && window.parent) {
+        try {
+          if (window.parent.csrf_token) csrfToken = window.parent.csrf_token;
+        } catch (e) { /* ignore cross-frame */ }
+      }
+    } catch (err) {
+      console.warn("CSRF token discovery failed:", err);
     }
-  } catch (err) {
-    console.warn("CSRF token discovery failed:", err);
   }
-}
 
-console.log("Resolved CSRF token:", csrfToken || "<empty>");
+  console.log("Resolved CSRF token:", csrfToken || "<empty>");
 </script>
 
 
@@ -71,7 +71,9 @@ $defaults = [
     'CONTAINER_NAMES' => '',
     'ENABLE_JDUPES' => 'no',
     'HASH_PATH' => '/mnt/user/appdata',
-    'ENABLE_CLEANUP' => 'no'
+    'ENABLE_CLEANUP' => 'no',
+    'MODE' => 'minutes',
+    'CRON_EXPRESSION' => ''
 ];
 
 // Load existing config if present
@@ -96,959 +98,1048 @@ $settings = $existing;
 ?>
 
 <style>
-:root {
-  --primary-blue: #00aaff;
-  --status-green: #2ECC40;
-}
-
-/* === Layout Wrapper === */
-#automover-wrapper {
-  display: flex;
-  flex-wrap: nowrap;              /* stay side-by-side */
-  align-items: flex-start;        /* align at top */
-  justify-content: space-evenly;  /* even horizontal spacing */
-  gap: 20px;                      /* space between panels */
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* === Each Panel (auto-sizing) === */
-#automover-settings,
-#moved-log-container,
-#last-run-container {
-  background: #111;
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 128, 128, .3);
-  color: #f0f8ff;
-  padding: 20px;
-  flex: 1 1 auto;        /* grow and shrink dynamically */
-  height: auto;          /* dynamic height */
-  max-height: none;      /* remove fixed limit */
-  overflow: visible;     /* expand with content */
-  min-width: 0;          /* prevent overflow on long content */
-  box-sizing: border-box;
-}
-
-#automover-settings {
-  padding-top: 0px !important;  /* reduce from default 20px */
-}
-
-#last-run-container {
-  padding-top: 10px !important;  /* reduce from default 20px */
-}
-
-#last-run-container h3 {
-  margin-top: 0 !important;      /* remove any top margin */
-  margin-bottom: 10px;            /* keep small spacing below title */
-}
-
-#moved-log-container {
-  padding-top: 10px !important;  /* reduce from default 20px */
-}
-
-#moved-log-container h3 {
-  margin-top: 0 !important;      /* remove any top margin */
-  margin-bottom: 10px;            /* keep small spacing below title */
-}
-
-/* === Optional: fine-tune widths === */
-#automover-settings { flex-basis: 25%; }
-#moved-log-container { flex-basis: 53%; }
-#last-run-container  { flex-basis: 22%; }
-
-/* === Log Panels: scroll only if too long === */
-#moved-log-container pre {
-  max-height: 55vh;
-  overflow-y: auto;
-  margin: 0;
-}
-
-#last-run-container pre {
-  max-height: 65vh;
-  overflow-y: auto;
-  margin: 0;
-}
-
-@media (max-width: 1100px) {
-  #automover-wrapper {
-    flex-wrap: wrap;
+  :root {
+    --primary-blue: #00aaff;
+    --status-green: #2ECC40;
   }
+
+  /* === Layout Wrapper === */
+  #automover-wrapper {
+    display: flex;
+    flex-wrap: nowrap;
+    /* stay side-by-side */
+    align-items: flex-start;
+    /* align at top */
+    justify-content: space-evenly;
+    /* even horizontal spacing */
+    gap: 20px;
+    /* space between panels */
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* === Each Panel (auto-sizing) === */
   #automover-settings,
   #moved-log-container,
   #last-run-container {
-    flex: 1 1 100%;
+    background: #111;
+    border-radius: 12px;
+    box-shadow: 0 0 12px rgba(0, 128, 128, .3);
+    color: #f0f8ff;
+    padding: 20px;
+    flex: 1 1 auto;
+    /* grow and shrink dynamically */
+    height: auto;
+    /* dynamic height */
+    max-height: none;
+    /* remove fixed limit */
+    overflow: visible;
+    /* expand with content */
+    min-width: 0;
+    /* prevent overflow on long content */
+    box-sizing: border-box;
   }
-}
 
-.form-row {
-  flex-direction: column;
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-label {
-  color: var(--primary-blue);
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-input,
-select {
-  background: #111;
-  border: 1px solid var(--primary-blue);
-  border-radius: 5px;
-  color: #fff;
-  padding: 8px;
-}
-
-button {
-  border: none;
-  border-radius: 4px;
-  color: #fff;
-  cursor: pointer;
-  margin-right: 10px;
-  padding: 8px 15px;
-}
-
-.checkbox-row {
-  align-items: center;
-  display: grid;
-  gap: 0 0px;
-  grid-template-columns: repeat(2, 1fr);
-  margin-top: 10px;
-}
-
-.checkbox-row label {
-  align-items: center;
-  cursor: pointer;
-  display: flex;
-  font-size: 15px;
-  gap: 0px;
-  line-height: 1.4;
-}
-
-.checkbox-row input[type="checkbox"] {
-  accent-color: var(--primary-blue);
-  transform: scale(1.2);
-}
-
-.form-check {
-  align-items: center;
-  color: var(--primary-blue);
-  cursor: pointer;
-  display: inline-flex;
-  gap: 8px;
-}
-
-input[type="checkbox"] {
-  accent-color: var(--primary-blue);
-  cursor: pointer;
-  height: 16px;
-  width: 16px;
-}
-
-.form-check input {
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.status-container {
-  margin-top: 20px;
-}
-
-.status-row {
-  align-items: center;
-  display: flex;
-  margin-bottom: 6px;
-}
-
-.status-label {
-  color: var(--primary-blue);
-  font-weight: bold;
-  width: 75px;
-}
-
-#status-text,
-#last-run-text {
-  color: var(--status-green);
-}
-
-.tooltip {
-  display: inline-block;
-  position: relative;
-}
-
-.tooltip:hover::after {
-  background: #333;
-  border-radius: 4px;
-  bottom: 125%;
-  color: #fff;
-  content: attr(data-tooltip);
-  font-size: 12px;
-  left: 0;
-  opacity: .9;
-  padding: 6px 10px;
-  position: absolute;
-  text-transform: none;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-.form-pair {
-  display: flex;
-  align-items: center;       /* Center vertically */
-  justify-content: flex-start;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.input-wrapper {
-  display: flex;
-  flex-direction: column;
-  flex: 1;                   /* Let input fill remaining width */
-}
-
-.form-pair label {
-  width: 130px;              /* Match other field labels */
-  color: var(--primary-blue);
-  font-weight: bold;
-  text-align: left;         /* Align text right for consistency */
-  margin-right: 10px;
-}
-
-.form-pair input,
-.form-pair select {
-  background: #111;
-  color: #fff;
-  width: 200px;               /* Full width under input-wrapper */
-  min-width: fit-content;
-  max-width: 100%;          /* Cap the input width if needed */
-}
-
-.form-pair input[type="text"],
-.form-pair input[type="password"] {
-  min-width: fit-content;
-  max-width: 100%;          /* Cap the input width if needed */
-}
-
-.short-input {
-  flex: 0 0 auto;
-
-}
-
-.short-input-filter {
-  flex: 0 0 auto;
-
-}
-
-#pool.short-input {
-  flex: 0 0 auto;
-
-}
-
-input.invalid {
-  border-color: red;
-  color: red;
-}
-
-.field-warning {
-  color: red;
-  display: none;
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-input.invalid + .field-warning {
-  display: block;
-}
-
-@keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
+  #automover-settings {
+    padding-top: 0px !important;
+    /* reduce from default 20px */
   }
-  25% {
-    transform: translateX(-5px);
-  }
-  50% {
-    transform: translateX(5px);
-  }
-  75% {
-    transform: translateX(-5px);
-  }
-}
 
-#automover-settings.shake {
-  animation: shake .3s;
-}
+  #last-run-container {
+    padding-top: 10px !important;
+    /* reduce from default 20px */
+  }
 
-#move-now-confirmation,
-#save-confirmation,
-#stop-confirmation {
-  animation: flash .4s ease;
-  background: var(--primary-blue);
-  border-radius: 6px;
-  clear: both;
-  color: #fff;
-  display: block;
-  font-weight: bold;
-  margin-top: 12px;
-  opacity: 0;
-  padding: 6px 12px;
-  transition: opacity .4s ease;
-  width: fit-content;
-  display: inline-block;
-  margin-top: 10px;
-}
+  #last-run-container h3 {
+    margin-top: 0 !important;
+    /* remove any top margin */
+    margin-bottom: 10px;
+    /* keep small spacing below title */
+  }
 
-@keyframes flash {
-  0% {
+  #moved-log-container {
+    padding-top: 10px !important;
+    /* reduce from default 20px */
+  }
+
+  #moved-log-container h3 {
+    margin-top: 0 !important;
+    /* remove any top margin */
+    margin-bottom: 10px;
+    /* keep small spacing below title */
+  }
+
+  /* === Optional: fine-tune widths === */
+  #automover-settings {
+    flex-basis: 25%;
+  }
+
+  #moved-log-container {
+    flex-basis: 53%;
+  }
+
+  #last-run-container {
+    flex-basis: 22%;
+  }
+
+  /* === Log Panels: scroll only if too long === */
+  #moved-log-container pre {
+    max-height: 55vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  #last-run-container pre {
+    max-height: 65vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  @media (max-width: 1100px) {
+    #automover-wrapper {
+      flex-wrap: wrap;
+    }
+
+    #automover-settings,
+    #moved-log-container,
+    #last-run-container {
+      flex: 1 1 100%;
+    }
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+
+  label {
+    color: var(--primary-blue);
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+
+  input,
+  select {
+    background: #111;
+    border: 1px solid var(--primary-blue);
+    border-radius: 5px;
+    color: #fff;
+    padding: 8px;
+  }
+
+  button {
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    margin-right: 10px;
+    padding: 8px 15px;
+  }
+
+  .checkbox-row {
+    align-items: center;
+    display: grid;
+    gap: 0 0px;
+    grid-template-columns: repeat(2, 1fr);
+    margin-top: 10px;
+  }
+
+  .checkbox-row label {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-size: 15px;
+    gap: 0px;
+    line-height: 1.4;
+  }
+
+  .checkbox-row input[type="checkbox"] {
+    accent-color: var(--primary-blue);
+    transform: scale(1.2);
+  }
+
+  .form-check {
+    align-items: center;
+    color: var(--primary-blue);
+    cursor: pointer;
+    display: inline-flex;
+    gap: 8px;
+  }
+
+  input[type="checkbox"] {
+    accent-color: var(--primary-blue);
+    cursor: pointer;
+    height: 16px;
+    width: 16px;
+  }
+
+  .form-check input {
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .status-container {
+    margin-top: 20px;
+  }
+
+  .status-row {
+    align-items: center;
+    display: flex;
+    margin-bottom: 6px;
+  }
+
+  .status-label {
+    color: var(--primary-blue);
+    font-weight: bold;
+    width: 75px;
+  }
+
+  #status-text,
+  #last-run-text {
+    color: var(--status-green);
+  }
+
+  .tooltip {
+    display: inline-block;
+    position: relative;
+  }
+
+  .tooltip:hover::after {
+    background: #333;
+    border-radius: 4px;
+    bottom: 125%;
+    color: #fff;
+    content: attr(data-tooltip);
+    font-size: 12px;
+    left: 0;
+    opacity: .9;
+    padding: 6px 10px;
+    position: absolute;
+    text-transform: none;
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  .form-pair {
+    display: flex;
+    align-items: center;
+    /* Center vertically */
+    justify-content: flex-start;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+
+  .input-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    /* Let input fill remaining width */
+  }
+
+  .form-pair label {
+    width: 130px;
+    /* Match other field labels */
+    color: var(--primary-blue);
+    font-weight: bold;
+    text-align: left;
+    /* Align text right for consistency */
+    margin-right: 10px;
+  }
+
+  .form-pair input,
+  .form-pair select {
+    background: #111;
+    color: #fff;
+    width: 200px;
+    /* Full width under input-wrapper */
+    min-width: fit-content;
+    max-width: 100%;
+    /* Cap the input width if needed */
+  }
+
+  .form-pair input[type="text"],
+  .form-pair input[type="password"] {
+    min-width: fit-content;
+    max-width: 100%;
+    /* Cap the input width if needed */
+  }
+
+  .short-input {
+    flex: 0 0 auto;
+
+  }
+
+  .short-input-filter {
+    flex: 0 0 auto;
+
+  }
+
+  #pool.short-input {
+    flex: 0 0 auto;
+
+  }
+
+  input.invalid {
+    border-color: red;
+    color: red;
+  }
+
+  .field-warning {
+    color: red;
+    display: none;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  input.invalid+.field-warning {
+    display: block;
+  }
+
+  @keyframes shake {
+
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+
+    25% {
+      transform: translateX(-5px);
+    }
+
+    50% {
+      transform: translateX(5px);
+    }
+
+    75% {
+      transform: translateX(-5px);
+    }
+  }
+
+  #automover-settings.shake {
+    animation: shake .3s;
+  }
+
+  #move-now-confirmation,
+  #save-confirmation,
+  #stop-confirmation {
+    animation: flash .4s ease;
+    background: var(--primary-blue);
+    border-radius: 6px;
+    clear: both;
+    color: #fff;
+    display: block;
+    font-weight: bold;
+    margin-top: 12px;
     opacity: 0;
-    transform: scale(1);
+    padding: 6px 12px;
+    transition: opacity .4s ease;
+    width: fit-content;
+    display: inline-block;
+    margin-top: 10px;
   }
-  50% {
+
+  @keyframes flash {
+    0% {
+      opacity: 0;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  #moved-log-container h3 {
+    color: var(--primary-blue);
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  #automover-log {
+    background: #111;
+    border: 1px solid var(--primary-blue);
+    border-radius: 8px;
+    box-sizing: border-box;
+    color: #00ffaa;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 10px;
+    white-space: pre-wrap;
+    width: 100%;
+    word-break: break-word;
+  }
+
+  #log-counts {
+    color: var(--primary-blue);
+    font-size: 14px;
+    margin-bottom: 0px;
+    text-align: left;
+    width: 100%;
+  }
+
+  .skipped-line {
+    color: #ffd700;
+  }
+
+  .log-header {
+    align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px;
+  }
+
+  .log-header h3 {
+    color: var(--primary-blue);
+    font-size: 18px;
+    margin: 0;
+  }
+
+  .log-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .log-header-row h3 {
+    color: var(--primary-blue);
+    font-size: 18px;
+    margin: 0;
+  }
+
+  .log-header-row button {
+    margin-top: -1px;
+    background: transparent;
+    color: #ff8800;
+    border: 2px solid #ff6600;
+  }
+
+  .log-header-row button:hover {
+    background: linear-gradient(90deg, #ff3c00 0%, #ff8800 100%);
+    color: #fff;
+    box-shadow: 0 0 8px rgba(255, 136, 0, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .log-header-row button:active {
+    transform: translateY(0);
+    box-shadow: 0 0 4px rgba(255, 136, 0, 0.2);
+  }
+
+  .toast-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    position: relative;
+  }
+
+  .toast-wrapper .toast-inline {
+    align-self: flex-end;
+  }
+
+  .toast-inline {
+    display: block;
+    /* take full row under button */
+    border-radius: 6px;
+    color: #ff8800;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px;
+    margin-top: -17px;
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    transform: translateY(-6px);
+    transition:
+      opacity 0.4s ease,
+      transform 0.3s ease,
+      height 0.3s ease,
+      margin 0.3s ease;
+    pointer-events: none;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .toast-inline.show {
     opacity: 1;
+    height: auto;
+    margin-top: 8px;
+    transform: translateY(0);
+  }
+
+  .toast-inline.hide {
+    opacity: 0;
+    height: 0;
+    margin-top: 0;
+    transform: translateY(-6px);
+  }
+
+  .log-stats {
+    color: #00ffaa;
+    font-size: 14px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  #last-run-container h3 {
+    color: var(--primary-blue);
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  #last-run-log {
+    background: #111;
+    border: 1px solid var(--primary-blue);
+    border-radius: 8px;
+    color: #00ffaa;
+    font-family: monospace;
+    font-size: 13px;
+    max-height: 95vh;
+    overflow-y: auto;
+    padding: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  #log-filter {
+    background: #111;
+    border: 1px solid var(--primary-blue);
+    border-radius: 6px;
+    box-shadow: 0 0 6px rgba(0, 128, 128, .3);
+    color: #00ffaa;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 8px 12px;
+    transition: border-color .2s, box-shadow .2s;
+    width: 200px;
+  }
+
+  #log-filter:focus {
+    border-color: #00bfff;
+    box-shadow: 0 0 10px rgba(0, 191, 255, .5);
+    outline: none;
+  }
+
+  #log-filter::placeholder {
+    color: #008080;
+  }
+
+  input[type="number"].short-input {
+    -moz-appearance: auto;
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
+
+  /* Restore number input spinner alignment for Unraid 7.2 */
+  input[type="number"] {
+    padding-right: 0;
+    /* remove internal spacing */
+  }
+
+  /* Force Chrome/Webkit to place arrows at field edge */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+    right: 0;
+    position: absolute;
+  }
+
+  .select-pool {
+    min-width: fit-content;
+    appearance: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: width .2s;
+    white-space: nowrap;
+    width: 200px;
+  }
+
+  #save-messages div {
+    opacity: 1;
+    transition: opacity .6s;
+  }
+
+  /* Modal picker */
+  #exclusion-modal {
+    align-items: center;
+    background: rgba(0, 0, 0, .8);
+    bottom: 0;
+    display: none;
+    justify-content: center;
+    left: 0;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 9999;
+  }
+
+  #exclusion-modal .box {
+    background: #111;
+    border-radius: 10px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    height: 600px;
+    min-height: fit-content;
+    max-height: 100%;
+    overflow: hidden;
+    padding: 18px;
+    position: relative;
+    width: 800px;
+    min-width: fit-content;
+    max-width: 100%;
+  }
+
+  #exclusion-modal .header {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 0px;
+  }
+
+  #exclusion-modal .crumbs {
+    flex: 1;
+    overflow: auto;
+    white-space: nowrap;
+  }
+
+  #exclusion-modal .crumbs a {
+    color: #00bfff;
+    margin-right: 8px;
+    text-decoration: none;
+  }
+
+  #exclusion-modal .grid {
+    border: 1px solid #333;
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+  }
+
+  #exclusion-modal .row {
+    align-items: center;
+    cursor: default;
+    display: flex;
+    gap: 0px;
+    padding: 0px;
+  }
+
+  #exclusion-modal .row .name {
+    align-items: center;
+    color: #fff;
+    display: flex;
+    flex: 1;
+    font-weight: 500;
+    gap: 0px;
+  }
+
+  #exclusion-modal .row.folder .name {
+    color: var(--primary-blue);
+  }
+
+  #exclusion-modal .row .name .icon {
+    margin-right: 2px;
+  }
+
+  #exclusion-modal .row .name .label {
+    display: inline-block;
+  }
+
+  #exclusion-modal .row input[type="checkbox"] {
+    margin-right: 2px;
     transform: scale(1.1);
   }
-  100% {
-    opacity: 1;
-    transform: scale(1);
+
+  #exclusion-modal .row .type {
+    opacity: .7;
+    text-align: right;
+    width: 70px;
   }
-}
 
-#moved-log-container h3 {
-  color: var(--primary-blue);
-  font-size: 18px;
-  margin-bottom: 12px;
-}
+  #exclusion-modal .footer {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 0px;
+  }
 
-#automover-log {
-  background: #111;
-  border: 1px solid var(--primary-blue);
-  border-radius: 8px;
-  box-sizing: border-box;
-  color: #00ffaa;
-  font-family: monospace;
-  font-size: 13px;
-  padding: 10px;
-  white-space: pre-wrap;
-  width: 100%;
-  word-break: break-word;
-}
+  #exclusion-modal .toast {
+    border-radius: 6px;
+    bottom: 0px;
+    color: red;
+    display: none;
+    left: 16px;
+    padding: 8px 10px;
+    position: absolute;
+  }
 
-#log-counts {
-  color: var(--primary-blue);
-  font-size: 14px;
-  margin-bottom: 0px;
-  text-align: left;
-  width: 100%;
-}
+  #exclusion-modal .btn {
+    background: #0b5fff;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    padding: 8px 12px;
+  }
 
-.skipped-line {
-  color: #ffd700;
-}
+  #exclusion-modal .btn.secondary {
+    background: #444;
+  }
 
-.log-header {
-  align-items: flex-start;
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 12px;
-}
+  #exclusion-modal .btn.warn {
+    background: #b54708;
+  }
 
-.log-header h3 {
-  color: var(--primary-blue);
-  font-size: 18px;
-  margin: 0;
-}
+  #exclusions-field {
+    color: #ccc;
+    cursor: pointer;
+    font-style: italic;
+    opacity: 0.6;
+    user-select: none;
+    width: 200px;
+    min-width: fit-content;
+    max-width: 100%;
+  }
 
-.log-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
+  #exclusion-modal .crumb {
+    color: var(--primary-blue);
+    cursor: pointer;
+    font-weight: 500;
+    transition: color 0.2s ease;
+    user-select: none;
+  }
 
-.log-header-row h3 {
-  color: var(--primary-blue);
-  font-size: 18px;
-  margin: 0;
-}
+  #exclusion-view-modal .modal-body {
+    position: relative;
+  }
 
-.log-header-row button {
-  margin-top: -1px;
-  background: transparent;
-  color: #ff8800;
-  border: 2px solid #ff6600;
-}
+  #exclusion-view-modal .toast {
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid #00aaff55;
+    border-radius: 6px;
+    bottom: 12px;
+    color: #00ff99;
+    display: none;
+    font-weight: 600;
+    left: 50%;
+    padding: 8px 14px;
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
 
-.log-header-row button:hover {
-  background: linear-gradient(90deg, #ff3c00 0%, #ff8800 100%);
-  color: #fff;
-  box-shadow: 0 0 8px rgba(255, 136, 0, 0.4);
-  transform: translateY(-1px);
-}
+  #exclusion-view-modal .toast.error {
+    color: #ff5555;
+  }
 
-.log-header-row button:active {
-  transform: translateY(0);
-  box-shadow: 0 0 4px rgba(255, 136, 0, 0.2);
-}
+  #exclusion-modal .crumb:hover {
+    color: #ff3333;
+    text-decoration: underline;
+  }
 
-.toast-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  position: relative;
-}
+  #exclusion-modal .sep {
+    color: #999;
+  }
 
-.toast-wrapper .toast-inline {
-  align-self: flex-end;
-}
+  .footer>div {
+    gap: 6px !important;
+  }
 
-.toast-inline {
-  display: block;           /* take full row under button */
-  border-radius: 6px;
-  color: #ff8800;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 12px;
-  margin-top: -17px;
-  opacity: 0;
-  height: 0;
-  overflow: hidden;
-  transform: translateY(-6px);
-  transition:
-    opacity 0.4s ease,
-    transform 0.3s ease,
-    height 0.3s ease,
-    margin 0.3s ease;
-  pointer-events: none;
-  text-align: center;
-  white-space: nowrap;
-}
+  .footer button {
+    margin: 0 !important;
+  }
 
-.toast-inline.show {
-  opacity: 1;
-  height: auto;
-  margin-top: 8px;
-  transform: translateY(0);
-}
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-.toast-inline.hide {
-  opacity: 0;
-  height: 0;
-  margin-top: 0;
-  transform: translateY(-6px);
-}
+  /* Focus outline for keyboard users */
+  :focus-visible {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+  }
 
-.log-stats {
-  color: #00ffaa;
-  font-size: 14px;
-  text-align: right;
-  white-space: nowrap;
-}
+  /* Hover and focus for interactive elements */
+  button:hover,
+  input[type="checkbox"]:hover,
+  select:hover,
+  a:hover {
+    filter: brightness(1.1);
+  }
 
-#last-run-container h3 {
-  color: var(--primary-blue);
-  font-size: 18px;
-  margin-bottom: 12px;
-}
+  button:focus-visible,
+  input[type="checkbox"]:focus-visible,
+  select:focus-visible,
+  a:focus-visible {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+  }
 
-#last-run-log {
-  background: #111;
-  border: 1px solid var(--primary-blue);
-  border-radius: 8px;
-  color: #00ffaa;
-  font-family: monospace;
-  font-size: 13px;
-  max-height: 95vh;
-  overflow-y: auto;
-  padding: 10px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
+  /* Scrollbar dark theme for readability */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
 
-#log-filter {
-  background: #111;
-  border: 1px solid var(--primary-blue);
-  border-radius: 6px;
-  box-shadow: 0 0 6px rgba(0, 128, 128, .3);
-  color: #00ffaa;
-  font-family: monospace;
-  font-size: 13px;
-  padding: 8px 12px;
-  transition: border-color .2s, box-shadow .2s;
-  width: 200px;
-}
+  ::-webkit-scrollbar-thumb {
+    background: var(--primary-blue);
+    border-radius: 4px;
+  }
 
-#log-filter:focus {
-  border-color: #00bfff;
-  box-shadow: 0 0 10px rgba(0, 191, 255, .5);
-  outline: none;
-}
+  #qbit_status {
+    width: 200px;
+    min-width: fit-content;
+    max-width: 100%;
+    display: inline-block;
+  }
 
-#log-filter::placeholder {
-  color: #008080;
-}
-
-input[type="number"].short-input {
-  -moz-appearance: auto;
-  -webkit-appearance: auto;
-  appearance: auto;
-}
-
-/* Restore number input spinner alignment for Unraid 7.2 */
-input[type="number"] {
-  padding-right: 0; /* remove internal spacing */
-}
-
-/* Force Chrome/Webkit to place arrows at field edge */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  margin: 0;
-  right: 0;
-  position: absolute;
-}
-
-.select-pool {
-  min-width: fit-content;
-  appearance: none;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: width .2s;
-  white-space: nowrap;
-  width: 200px;
-}
-
-#save-messages div {
-  opacity: 1;
-  transition: opacity .6s;
-}
-
-/* Modal picker */
-#exclusion-modal {
-  align-items: center;
-  background: rgba(0, 0, 0, .8);
-  bottom: 0;
-  display: none;
-  justify-content: center;
-  left: 0;
-  position: fixed;
-  right: 0;
-  top: 0;
-  z-index: 9999;
-}
-
-#exclusion-modal .box {
-  background: #111;
-  border-radius: 10px;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  height: 600px;
-  min-height: fit-content;
-  max-height: 100%;
-  overflow: hidden;
-  padding: 18px;
-  position: relative;
-  width: 800px;
-  min-width: fit-content;
-  max-width: 100%;
-}
-
-#exclusion-modal .header {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-  margin-bottom: 0px;
-}
-
-#exclusion-modal .crumbs {
-  flex: 1;
-  overflow: auto;
-  white-space: nowrap;
-}
-
-#exclusion-modal .crumbs a {
-  color: #00bfff;
-  margin-right: 8px;
-  text-decoration: none;
-}
-
-#exclusion-modal .grid {
-  border: 1px solid #333;
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px;
-}
-
-#exclusion-modal .row {
-  align-items: center;
-  cursor: default;
-  display: flex;
-  gap: 0px;
-  padding: 0px;
-}
-
-#exclusion-modal .row .name {
-  align-items: center;
-  color: #fff;
-  display: flex;
-  flex: 1;
-  font-weight: 500;
-  gap: 0px;
-}
-
-#exclusion-modal .row.folder .name {
-  color: var(--primary-blue);
-}
-
-#exclusion-modal .row .name .icon {
-  margin-right: 2px;
-}
-
-#exclusion-modal .row .name .label {
-  display: inline-block;
-}
-
-#exclusion-modal .row input[type="checkbox"] {
-  margin-right: 2px;
-  transform: scale(1.1);
-}
-
-#exclusion-modal .row .type {
-  opacity: .7;
-  text-align: right;
-  width: 70px;
-}
-
-#exclusion-modal .footer {
-  align-items: center;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  margin-top: 0px;
-}
-
-#exclusion-modal .toast {
-  border-radius: 6px;
-  bottom: 0px;
-  color: red;
-  display: none;
-  left: 16px;
-  padding: 8px 10px;
-  position: absolute;
-}
-
-#exclusion-modal .btn {
-  background: #0b5fff;
-  border: none;
-  border-radius: 6px;
-  color: #fff;
-  cursor: pointer;
-  padding: 8px 12px;
-}
-
-#exclusion-modal .btn.secondary {
-  background: #444;
-}
-
-#exclusion-modal .btn.warn {
-  background: #b54708;
-}
-
-#exclusions-field {
-  color: #ccc;
-  cursor: pointer;
-  font-style: italic;
-  opacity: 0.6;
-  user-select: none;
-  width: 200px;
-  min-width: fit-content;
-  max-width: 100%;
-}
-
-#exclusion-modal .crumb {
-  color: var(--primary-blue);
-  cursor: pointer;
-  font-weight: 500;
-  transition: color 0.2s ease;
-  user-select: none;
-}
-
-#exclusion-view-modal .modal-body {
-  position: relative;
-}
-
-#exclusion-view-modal .toast {
-  background: rgba(0, 0, 0, 0.9);
-  border: 1px solid #00aaff55;
-  border-radius: 6px;
-  bottom: 12px;
-  color: #00ff99;
-  display: none;
-  font-weight: 600;
-  left: 50%;
-  padding: 8px 14px;
-  position: absolute;
-  transform: translateX(-50%);
-  z-index: 10;
-}
-
-#exclusion-view-modal .toast.error {
-  color: #ff5555;
-}
-
-#exclusion-modal .crumb:hover {
-  color: #ff3333;
-  text-decoration: underline;
-}
-
-#exclusion-modal .sep {
-  color: #999;
-}
-
-.footer > div {
-  gap: 6px !important;
-}
-
-.footer button {
-  margin: 0 !important;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-/* Focus outline for keyboard users */
-:focus-visible {
-  outline: 2px solid var(--primary-blue);
-  outline-offset: 2px;
-}
-
-/* Hover and focus for interactive elements */
-button:hover,
-input[type="checkbox"]:hover,
-select:hover,
-a:hover {
-  filter: brightness(1.1);
-}
-
-button:focus-visible,
-input[type="checkbox"]:focus-visible,
-select:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--primary-blue);
-  outline-offset: 2px;
-}
-
-/* Scrollbar dark theme for readability */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--primary-blue);
-  border-radius: 4px;
-}
-
-#qbit_status {
-  width: 200px;
-  min-width: fit-content;
-  max-width: 100%;
-  display: inline-block;
-}
-
-#HASH_PATH {
-  width: 200px;
-  min-width: fit-content;
-  max-width: 100%;
-  display: inline-block;
-}
+  #HASH_PATH {
+    width: 200px;
+    min-width: fit-content;
+    max-width: 100%;
+    display: inline-block;
+  }
 </style>
 
 <div id="automover-wrapper">
   <form id="automover-settings">
     <div class="status-container">
       <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
-      <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run available</span></div>
+      <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run
+          available</span></div>
     </div>
 
-<div class="form-group">
-  <span title="Save your configuration settings and start the automover service" class="automovertip">
-    <button type="button" id="save-settings">Save & Start</button>
-  </span>
+    <div class="form-group">
+      <span title="Save your configuration settings and start the automover service" class="automovertip">
+        <button type="button" id="save-settings">Save & Start</button>
+      </span>
 
-  <span title="Stop Automover service" class="automovertip">
-    <button type="button" id="stop-button">Stop</button>
-  </span>
+      <span title="Stop Automover service" class="automovertip">
+        <button type="button" id="stop-button">Stop</button>
+      </span>
 
-  <span title="Run Automover immediately, ignoring exclusions and filters" class="automovertip">
-    <button type="button" id="moveNowBtn">Move Now</button>
-  </span>
-</div>
+      <span title="Run Automover immediately, ignoring exclusions and filters" class="automovertip">
+        <button type="button" id="moveNowBtn">Move Now</button>
+      </span>
+    </div>
 
     <div id="move-now-confirmation" style="display:none;margin-top:10px;">✅ Moving Now</div>
     <div id="save-confirmation" style="display:none;margin-top:10px;">✅ Saved & Started Automover</div>
     <div id="stop-confirmation" style="display:none;margin-top:10px;">✅ Stopping Automover</div>
 
-    <div id="save-messages" style="display:none;margin-top:10px;margin-bottom:20px;background:#111;border-radius:6px;font-family:monospace;color:red;"></div>
+    <div id="save-messages"
+      style="display:none;margin-top:10px;margin-bottom:20px;background:#111;border-radius:6px;font-family:monospace;color:red;">
+    </div>
     <br><br>
 
     <!-- Pool -->
     <div class="form-pair">
-    <label for="pool"
-      <span title="Choose which pool to monitor for disk usage" class="automovertip">Pool:</span>
-    </label>
+      <label for="pool" <span title="Choose which pool to monitor for disk usage" class="automovertip">Pool:</span>
+      </label>
       <span title="Choose which pool to monitor for disk usage" class="automovertip">
-        <select id="pool" class="select-pool" data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
+        <select id="pool" class="select-pool"
+          data-selected="<?php echo htmlspecialchars($settings['POOL_NAME'] ?? '') ?>"></select>
       </span>
     </div>
 
-    <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has mover direction cache -> array. Nothing would be moved with this pool selected.</div>
+    <div id="pool-warning" class="field-warning">⚠️ This pool is not assigned to any share that has mover direction
+      cache -> array. Nothing would be moved with this pool selected.</div>
 
     <!-- Threshold -->
     <div class="form-pair">
-      <label for="threshold"
-        <span title="Set the disk usage percentage threshold that triggers the mover" class="automovertip">Threshole (%):</span>
+      <label for="threshold" <span title="Set the disk usage percentage threshold that triggers the mover"
+        class="automovertip">Threshole (%):</span>
       </label>
       <div class="input-wrapper">
         <span title="Set the disk usage percentage threshold that triggers the mover" class="automovertip">
           <input type="number" id="threshold" class="short-input" min="0" max="100" step="1"
-          value="<?php echo htmlspecialchars($settings['THRESHOLD'] ?? '') ?>">
+            value="<?php echo htmlspecialchars($settings['THRESHOLD'] ?? '') ?>">
         </span>
-      <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
+        <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
       </div>
     </div>
 
-    <!-- Interval -->
+    <!-- 🕒 Schedule Mode Toggle -->
     <div class="form-pair">
-      <label for="interval"  
-        <span title="Interval 1-59 minutes, anything over 60 will be rounded to the nearest hour, day, week, or month" class="automovertip">Interval (minutes):</span>
-      </label>
-        <div class="input-wrapper">
-        <span title="Interval 1-59 minutes, anything over 60 will be rounded to the nearest hour, day, week, or month" class="automovertip">
-          <input type="number" id="interval" class="short-input" min="1" step="1"
-          value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? '') ?>">
+      <label for="interval_mode">
+        <span title="Choose between interval-based scheduling or a cron expression" class="automovertip">
+          Schedule Mode:
         </span>
-      <div id="interval-warning" class="field-warning">Interval must be at least 1 minutes</div>
+      </label>
+      <div class="input-wrapper">
+        <span title="Choose between interval-based scheduling or a cron expression" class="automovertip">
+          <select id="interval_mode" class="select-pool">
+            <option value="minutes" <?php echo (($settings['MODE'] ?? 'minutes' )==='minutes' ) ? 'selected' : '' ; ?>
+              >Interval (minutes)</option>
+            <option value="cron" <?php echo (($settings['MODE'] ?? 'minutes' )==='cron' ) ? 'selected' : '' ; ?>>Cron
+              Expression</option>
+          </select>
+        </span>
+      </div>
+    </div>
+
+    <!-- ⏱️ Interval (Minutes) -->
+    <div class="form-pair" id="interval-minutes-row"
+      style="<?php echo (($settings['MODE'] ?? 'minutes') === 'minutes') ? '' : 'display:none;'; ?>">
+      <label for="interval">
+        <span title="Interval in minutes. Anything over 60 will be rounded to the nearest hour, day, week, or month"
+          class="automovertip">
+          Interval (minutes):
+        </span>
+      </label>
+      <div class="input-wrapper">
+        <span title="Interval in minutes. Anything over 60 will be rounded to the nearest hour, day, week, or month"
+          class="automovertip">
+          <input type="number" id="interval" class="short-input" min="1" step="1"
+            value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? 60); ?>">
+        </span>
+        <div id="interval-warning" class="field-warning">Interval must be at least 1 minute</div>
+      </div>
+    </div>
+
+    <!-- 🧭 Custom Cron Expression -->
+    <div class="form-pair" id="cron-expression-row"
+      style="<?php echo (($settings['MODE'] ?? 'minutes') === 'cron') ? '' : 'display:none;'; ?>">
+      <label for="cron_expression">
+        <span title="Enter a valid cron expression (e.g. 0 3 * * *)" class="automovertip">
+          Cron Expression:
+        </span>
+      </label>
+      <div class="input-wrapper">
+        <span title="Enter a valid cron expression (e.g. 0 3 * * *)" class="automovertip">
+          <input type="text" id="cron_expression" class="short-input" placeholder="e.g. 0 3 * * *"
+            value="<?php echo htmlspecialchars($settings['CRON_EXPRESSION'] ?? ''); ?>">
+        </span>
+        <div id="cron-warning" class="field-warning">Enter a valid cron expression (5 fields required)</div>
       </div>
     </div>
 
     <!-- Container Names -->
-   <div class="form-pair">
-    <label for="container_names"
-      <span title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable" class="automovertip">Stop Containers:</span>
-    </label>
+    <div class="form-pair">
+      <label for="container_names" <span
+        title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable"
+        class="automovertip">Stop Containers:</span>
+      </label>
       <div class="input-wrapper">
-      <span title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable" class="automovertip">
-        <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed" value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
-      </span>
+        <span
+          title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable"
+          class="automovertip">
+          <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed"
+            value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
+        </span>
+      </div>
     </div>
-  </div>
 
     <!-- Age -->
     <div class="form-pair" id="age-days-container" style="display:none;">
-      <label for="age_days"
-        <span title="Only move files older than this many days" class="automovertip">Age (days):</span>
+      <label for="age_days" <span title="Only move files older than this many days" class="automovertip">Age
+        (days):</span>
       </label>
       <div class="input-wrapper">
-      <span title="Only move files older than this many days" class="automovertip">
-        <input type="number" id="age_days" class="short-input" min="1" step="1"
-        value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
-      </span>
-    <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
+        <span title="Only move files older than this many days" class="automovertip">
+          <input type="number" id="age_days" class="short-input" min="1" step="1"
+            value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
+        </span>
+        <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
       </div>
     </div>
 
     <!-- Size -->
     <div class="form-pair" id="size-mb-container" style="display:none;">
-      <label for="size_mb"
-        <span title="Only move files larger than this size (in MB)" class="automovertip">Min Size (MB):</span>
+      <label for="size_mb" <span title="Only move files larger than this size (in MB)" class="automovertip">Min Size
+        (MB):</span>
       </label>
       <div class="input-wrapper">
-      <span title="Only move files larger than this size (in MB)" class="automovertip">
-        <input type="number" id="size_mb" class="short-input" min="1" step="1"
-          value="<?php echo htmlspecialchars($settings['SIZE_MB'] ?? '') ?>">
-      </span>
-    <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
+        <span title="Only move files larger than this size (in MB)" class="automovertip">
+          <input type="number" id="size_mb" class="short-input" min="1" step="1"
+            value="<?php echo htmlspecialchars($settings['SIZE_MB'] ?? '') ?>">
+        </span>
+        <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
       </div>
     </div>
 
-<!-- 🧩 Qbittorrent Configuration Fields -->
-<div id="qbit-fields" style="display:none;">
+    <!-- 🧩 Qbittorrent Configuration Fields -->
+    <div id="qbit-fields" style="display:none;">
 
-  <div class="form-pair">
-    <label for="qbit_host"
-      <span title="Example: 10.100.10.250:8080" class="automovertip">Host:</span>
-    </label>
-    <div class="input-wrapper">
-    <span title="Example: 10.100.10.250:8080" class="automovertip">
-      <input type="text" id="qbit_host" placeholder="e.g. 10.100.10.250:8080"value="<?php echo htmlspecialchars($settings['QBITTORRENT_HOST'] ?? '') ?>">
-    </span>
-  <div id="qbit-host-warning" class="field-warning">Host is required</div>
-    </div>
-  </div>
+      <div class="form-pair">
+        <label for="qbit_host" <span title="Example: 10.100.10.250:8080" class="automovertip">Host:</span>
+        </label>
+        <div class="input-wrapper">
+          <span title="Example: 10.100.10.250:8080" class="automovertip">
+            <input type="text" id="qbit_host" placeholder="e.g. 10.100.10.250:8080"
+              value="<?php echo htmlspecialchars($settings['QBITTORRENT_HOST'] ?? '') ?>">
+          </span>
+          <div id="qbit-host-warning" class="field-warning">Host is required</div>
+        </div>
+      </div>
 
-  <div class="form-pair">
-    <label for="qbit_user"
-      <span title="Qbittorrent webui username" class="automovertip">Username:</span>
-    </label>
-    <div class="input-wrapper">
-    <span title="Qbittorrent webui username" class="automovertip">
-      <input type="text" id="qbit_user" value="<?php echo htmlspecialchars($settings['QBITTORRENT_USERNAME'] ?? '') ?>">
-    </span>
-  <div id="qbit-user-warning" class="field-warning">Username is required</div>
-    </div>
-  </div>
+      <div class="form-pair">
+        <label for="qbit_user" <span title="Qbittorrent webui username" class="automovertip">Username:</span>
+        </label>
+        <div class="input-wrapper">
+          <span title="Qbittorrent webui username" class="automovertip">
+            <input type="text" id="qbit_user"
+              value="<?php echo htmlspecialchars($settings['QBITTORRENT_USERNAME'] ?? '') ?>">
+          </span>
+          <div id="qbit-user-warning" class="field-warning">Username is required</div>
+        </div>
+      </div>
 
-  <div class="form-pair">
-    <label for="qbit_pass"
-      <span title="Qbittorrent webui password" class="automovertip">Password:</span>
-    </label>
-    <div class="input-wrapper">
-    <span title="Qbittorrent webui password" class="automovertip">
-      <input type="password" id="qbit_pass" value="<?php echo htmlspecialchars($settings['QBITTORRENT_PASSWORD'] ?? '') ?>">
-    </span>
-  <div id="qbit-pass-warning" class="field-warning">Password is required</div>
-    </div>
-  </div>
+      <div class="form-pair">
+        <label for="qbit_pass" <span title="Qbittorrent webui password" class="automovertip">Password:</span>
+        </label>
+        <div class="input-wrapper">
+          <span title="Qbittorrent webui password" class="automovertip">
+            <input type="password" id="qbit_pass"
+              value="<?php echo htmlspecialchars($settings['QBITTORRENT_PASSWORD'] ?? '') ?>">
+          </span>
+          <div id="qbit-pass-warning" class="field-warning">Password is required</div>
+        </div>
+      </div>
 
-  <div class="form-pair">
-    <label for="qbit_days_from"
-      <span title="Torrents newer than this age (days) will be ignored" class="automovertip">Days From:</span>
-    </label>
-    <div class="input-wrapper">
-    <span title="Torrents newer than this age (days) will be ignored" class="automovertip">
-      <input type="number" id="qbit_days_from" class="short-input" min="0" max="999" step="1"
-        value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_FROM'] ?? '') ?>">
-    </span>
-  <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 999</div>
-    </div>
-  </div>
+      <div class="form-pair">
+        <label for="qbit_days_from" <span title="Torrents newer than this age (days) will be ignored"
+          class="automovertip">Days From:</span>
+        </label>
+        <div class="input-wrapper">
+          <span title="Torrents newer than this age (days) will be ignored" class="automovertip">
+            <input type="number" id="qbit_days_from" class="short-input" min="0" max="999" step="1"
+              value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_FROM'] ?? '') ?>">
+          </span>
+          <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 999</div>
+        </div>
+      </div>
 
-  <div class="form-pair">
-    <label for="qbit_days_to"
-      <span title="Torrents older than this age (days) will be ignored" class="automovertip">Days To:</span>
-    </label>
-    <div class="input-wrapper">
-    <span title="Torrents older than this age (days) will be ignored" class="automovertip">
-      <input type="number" id="qbit_days_to" class="short-input" min="1" max="999" step="1"
-        value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
-    </span>
-  <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 999</div>
-  <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
-    </div>
-  </div>
+      <div class="form-pair">
+        <label for="qbit_days_to" <span title="Torrents older than this age (days) will be ignored"
+          class="automovertip">Days To:</span>
+        </label>
+        <div class="input-wrapper">
+          <span title="Torrents older than this age (days) will be ignored" class="automovertip">
+            <input type="number" id="qbit_days_to" class="short-input" min="1" max="999" step="1"
+              value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
+          </span>
+          <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 999</div>
+          <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
+        </div>
+      </div>
 
-  <div class="form-pair">
-    <label for="qbit_status"
-      <span title="Which status of torrents to act on" class="automovertip">Status:</span>
-    </label>
-    <span title="Which status of torrents to act on" class="automovertip">
-      <select id="qbit_status">
-        <?php
+      <div class="form-pair">
+        <label for="qbit_status" <span title="Which status of torrents to act on" class="automovertip">Status:</span>
+        </label>
+        <span title="Which status of torrents to act on" class="automovertip">
+          <select id="qbit_status">
+            <?php
         $statuses = [
           'completed', 'all', 'downloading', 'seeding', 'paused', 'stopped',
           'active', 'inactive', 'resumed', 'running', 'stalled', 'stalled_uploading',
@@ -1059,17 +1150,17 @@ a:focus-visible {
             echo "<option value=\"$status\" $selected>$status</option>";
         }
         ?>
-      </select>
-  </span>
-  </div>
+          </select>
+        </span>
+      </div>
 
-<div class="form-pair" id="hashPathRow" style="display:none;">
-  <label for="HASH_PATH"
-    <span title="Pick a share to save the jdupes hash database" class="automovertip">Hash Location:</span>
-  </label>
-  <span title="Pick a share to save the jdupes hash database" class="automovertip">
-    <select id="HASH_PATH" name="HASH_PATH">
-      <?php
+      <div class="form-pair" id="hashPathRow" style="display:none;">
+        <label for="HASH_PATH" <span title="Pick a share to save the jdupes hash database" class="automovertip">Hash
+          Location:</span>
+        </label>
+        <span title="Pick a share to save the jdupes hash database" class="automovertip">
+          <select id="HASH_PATH" name="HASH_PATH">
+            <?php
         $sharesFile = '/var/local/emhttp/shares.ini';
         $default = '/mnt/user/appdata';
         $current = $settings['HASH_PATH'] ?? $default;
@@ -1091,46 +1182,49 @@ a:focus-visible {
           }
         }
       ?>
-    </select>
-  </span>
-</div>
+          </select>
+        </span>
+      </div>
 
-</div>
+    </div>
 
     <!-- Exclusions row (appears below Interval when enabled) -->
     <div class="form-pair" id="exclusions-row" style="display:none;">
-      <label for="exclusions-field"
-        <span title="Open the file picker to add or remove excluded paths" class="automovertip">Exclusions:</span>
+      <label for="exclusions-field" <span title="Open the file picker to add or remove excluded paths"
+        class="automovertip">Exclusions:</span>
       </label>
       <div class="input-wrapper">
-      <span title="Open the file picker to add or remove excluded paths" class="automovertip">
-        <input id="exclusions-field" type="text" readonly value="Click to open file picker" title="Click to open file picker">
-      </span>
-      <span title="Open to view/edit exclusions" class="automovertip">
-        <button id="viewExclusionsBtn" type="button">Exclusions</button>
-      </span>
+        <span title="Open the file picker to add or remove excluded paths" class="automovertip">
+          <input id="exclusions-field" type="text" readonly value="Click to open file picker"
+            title="Click to open file picker">
+        </span>
+        <span title="Open to view/edit exclusions" class="automovertip">
+          <button id="viewExclusionsBtn" type="button">Exclusions</button>
+        </span>
       </div>
     </div>
 
-<div id="exclusion-view-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+    <div id="exclusion-view-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0;
   background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
-  <div class="modal-body" style="background:#111; color:white; padding:20px; border-radius:10px;
+      <div class="modal-body"
+        style="background:#111; color:white; padding:20px; border-radius:10px;
   width:800px; min-width: fit-content; max-width: 100%; height:600px; min-height: fit-content; max-height: 100%; overflow:hidden; display:flex; flex-direction:column;">
-    <h3 style="margin-top:0;">View/Edit Exclusions</h3>
-    <p style="margin-top:4px; margin-bottom:10px; color:#aaa; font-style:italic; font-size:13px;">
-      * Any array paths changed or added need to be entered as <code>user0</code> instead of <code>disk#</code>.
-      For example: <code>/mnt/disk3/data/test/file.txt</code> should be entered as <code>/mnt/user0/data/test/file.txt</code>. This does not apply to pool paths.
-    </p>
+        <h3 style="margin-top:0;">View/Edit Exclusions</h3>
+        <p style="margin-top:4px; margin-bottom:10px; color:#aaa; font-style:italic; font-size:13px;">
+          * Any array paths changed or added need to be entered as <code>user0</code> instead of <code>disk#</code>.
+          For example: <code>/mnt/disk3/data/test/file.txt</code> should be entered as
+          <code>/mnt/user0/data/test/file.txt</code>. This does not apply to pool paths.
+        </p>
 
-    <textarea id="exclusionsEditor" style="
+        <textarea id="exclusionsEditor" style="
       background:#000; color:#fff; font-family:monospace;
       border:1px solid #333; border-radius:6px; padding:10px; resize:none;
       width:97%; height:480px; overflow-y:auto;"></textarea>
 
-<div style="display:flex; justify-content:space-between; margin-top:auto; padding-top:0px;">
-  <div>
-    <!-- Copy button now matches 'Remove Selected' style -->
-    <button id="copyExclusionsBtn" type="button" style="
+        <div style="display:flex; justify-content:space-between; margin-top:auto; padding-top:0px;">
+          <div>
+            <!-- Copy button now matches 'Remove Selected' style -->
+            <button id="copyExclusionsBtn" type="button" style="
       background:#444;
       color:#fff;
       border:none;
@@ -1140,8 +1234,8 @@ a:focus-visible {
       font-weight:500;
     ">Copy</button>
 
-    <!-- Save button now matches 'Add Selected' style -->
-    <button id="saveExclusionsBtn" type="button" style="
+            <!-- Save button now matches 'Add Selected' style -->
+            <button id="saveExclusionsBtn" type="button" style="
       background:#0b5fff;
       color:#fff;
       border:none;
@@ -1150,10 +1244,10 @@ a:focus-visible {
       padding:8px 12px;
       font-weight:600;
     ">Save</button>
-  </div>
+          </div>
 
-  <!-- Close button unchanged -->
-<button id="closeExclusionsView" type="button" style="
+          <!-- Close button unchanged -->
+          <button id="closeExclusionsView" type="button" style="
   background:#b54708;
   color:#fff;
   border:none;
@@ -1163,114 +1257,126 @@ a:focus-visible {
   font-weight:600;
   box-shadow:0 0 6px rgba(0,0,0,0.4);
 ">Close</button>
-</div>
-  </div>
-</div>
+        </div>
+      </div>
+    </div>
 
     <!-- Checkboxes row -->
     <div class="checkbox-row">
       <span title="Start Automover automatically when Unraid boots" class="automovertip">
         <label>
-          <input type="checkbox" id="autostart" <?php echo ($settings['AUTOSTART'] ?? '') === 'yes' ? 'checked' : '' ?>> Autostart on Boot
+          <input type="checkbox" id="autostart" <?php echo ($settings['AUTOSTART'] ?? '' )==='yes' ? 'checked' : '' ?>>
+          Autostart on Boot
         </label>
       </span>
 
       <span title="Enable an exclusions list of files and folders that won't be moved" class="automovertip">
         <label>
-          <input type="checkbox" id="enable_exclusions" <?php echo ($settings['EXCLUSIONS_ENABLED'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Exclusions
+          <input type="checkbox" id="enable_exclusions" <?php echo ($settings['EXCLUSIONS_ENABLED'] ?? '' )==='yes'
+            ? 'checked' : '' ?>> Enable Exclusions
         </label>
       </span>
 
       <span title="Allow Automover to run even when Unraid is doing a parity check" class="automovertip">
         <label>
-          <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY'] ?? '') === 'yes' ? 'checked' : '' ?>> Allow During Parity
+          <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY'] ?? '' )==='yes'
+            ? 'checked' : '' ?>> Allow During Parity
         </label>
       </span>
 
       <span title="Enable to move files only if older than the specified amount of days old" class="automovertip">
         <label>
-          <input type="checkbox" id="age_based_filter" <?php echo ($settings['AGE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Age Based Filter
+          <input type="checkbox" id="age_based_filter" <?php echo ($settings['AGE_BASED_FILTER'] ?? '' )==='yes'
+            ? 'checked' : '' ?>> Enable Age Based Filter
         </label>
       </span>
 
       <span title="Enable to simulate moves without actually transferring files" class="automovertip">
         <label>
-          <input type="checkbox" id="dry_run" <?php echo ($settings['DRY_RUN'] ?? '') === 'yes' ? 'checked' : '' ?>> Dry Run
+          <input type="checkbox" id="dry_run" <?php echo ($settings['DRY_RUN'] ?? '' )==='yes' ? 'checked' : '' ?>> Dry
+          Run
         </label>
       </span>
 
       <span title="Enable to move only files larger than the specified size in MB" class="automovertip">
         <label>
-          <input type="checkbox" id="size_based_filter" <?php echo ($settings['SIZE_BASED_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Size Based Filter
+          <input type="checkbox" id="size_based_filter" <?php echo ($settings['SIZE_BASED_FILTER'] ?? '' )==='yes'
+            ? 'checked' : '' ?>> Enable Size Based Filter
         </label>
       </span>
 
       <span title="Enable to pause qbittorrent torrents before move and resume after" class="automovertip">
         <label>
-          <input type="checkbox" id="qbit_script" <?php echo ($settings['QBITTORRENT_SCRIPT'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Qbit Script
+          <input type="checkbox" id="qbit_script" <?php echo ($settings['QBITTORRENT_SCRIPT'] ?? '' )==='yes'
+            ? 'checked' : '' ?>> Enable Qbit Script
         </label>
       </span>
 
       <span title="Skip hidden files and folders (those starting with a dot)" class="automovertip">
         <label>
-          <input type="checkbox" id="hidden_filter" <?php echo ($settings['HIDDEN_FILTER'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Hidden Filter
+          <input type="checkbox" id="hidden_filter" <?php echo ($settings['HIDDEN_FILTER'] ?? '' )==='yes' ? 'checked'
+            : '' ?>> Enable Hidden Filter
         </label>
       </span>
 
       <span title="Force Unraid to use reconstructive (turbo) write mode during file moves" class="automovertip">
         <label>
-          <input type="checkbox" id="force_reconstructive_write" <?php echo ($settings['FORCE_RECONSTRUCTIVE_WRITE'] ?? '') === 'yes' ? 'checked' : '' ?>> Force Turbo Write
+          <input type="checkbox" id="force_reconstructive_write" <?php echo ($settings['FORCE_RECONSTRUCTIVE_WRITE']
+            ?? '' )==='yes' ? 'checked' : '' ?>> Force Turbo Write
         </label>
       </span>
 
-<span title="Enable to cleanup folders and datasets from source path" class="automovertip">
-  <label>
-    <input type="checkbox" id="enable_cleanup" <?php echo ($settings['ENABLE_CLEANUP'] ?? '') === 'yes' ? 'checked' : '' ?>> Enable Cleanup
-  </label>
-</span>
-
-      <span title="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos" class="automovertip">
+      <span title="Enable to cleanup folders and datasets from source path" class="automovertip">
         <label>
-          <input type="checkbox" id="ENABLE_JDUPES" <?php echo ($settings['ENABLE_JDUPES'] ?? '') === 'yes' ? 'checked' : ''; ?>> Enable Jdupes
+          <input type="checkbox" id="enable_cleanup" <?php echo ($settings['ENABLE_CLEANUP'] ?? '' )==='yes' ? 'checked'
+            : '' ?>> Enable Cleanup
+        </label>
+      </span>
+
+      <span
+        title="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos"
+        class="automovertip">
+        <label>
+          <input type="checkbox" id="ENABLE_JDUPES" <?php echo ($settings['ENABLE_JDUPES'] ?? '' )==='yes' ? 'checked'
+            : '' ; ?>> Enable Jdupes
         </label>
       </span>
     </div>
 
-<div id="python-warning"
-     data-python-installed="<?php echo file_exists('/usr/bin/python3') ? '1' : '0'; ?>"
-     style="display:none; color:red; padding:8px 12px; border-radius:6px;
+    <div id="python-warning" data-python-installed="<?php echo file_exists('/usr/bin/python3') ? '1' : '0'; ?>" style="display:none; color:red; padding:8px 12px; border-radius:6px;
             margin-top:8px; font-weight:600; font-size:14px;">
-  ⚠️ Python3 is not installed and this option requires it. Install it from the Apps page.
-</div>
+      ⚠️ Python3 is not installed and this option requires it. Install it from the Apps page.
+    </div>
   </form>
 
-<div id="moved-log-container">
-<div class="log-header-row">
-  <h3>Mover Log For Last Run</h3>
-  <div class="toast-wrapper">
-    <span title="Clear the mover log for last run log" class="automovertip">
-      <button id="clear-mover-log">Clear Log</button>
-    </span>
-    <div id="toast-mover" class="toast-inline"></div>
+  <div id="moved-log-container">
+    <div class="log-header-row">
+      <h3>Mover Log For Last Run</h3>
+      <div class="toast-wrapper">
+        <span title="Clear the mover log for last run log" class="automovertip">
+          <button id="clear-mover-log">Clear Log</button>
+        </span>
+        <div id="toast-mover" class="toast-inline"></div>
+      </div>
+    </div>
+    <div id="log-counts" class="log-stats"></div>
+    <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword"
+      style="margin-bottom:12px;">
+    <pre id="automover-log">Loading</pre>
   </div>
-</div>
-  <div id="log-counts" class="log-stats"></div>
-  <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword" style="margin-bottom:12px;">
-  <pre id="automover-log">Loading</pre>
-</div>
 
-<div id="last-run-container">
-<div class="log-header-row">
-  <h3>Last Run Details</h3>
-  <div class="toast-wrapper">
-    <span title="Clear the last run details log" class="automovertip">
-      <button id="clear-last-run-log">Clear Log</button>
-    </span>
-    <div id="toast-last" class="toast-inline"></div>
+  <div id="last-run-container">
+    <div class="log-header-row">
+      <h3>Last Run Details</h3>
+      <div class="toast-wrapper">
+        <span title="Clear the last run details log" class="automovertip">
+          <button id="clear-last-run-log">Clear Log</button>
+        </span>
+        <div id="toast-last" class="toast-inline"></div>
+      </div>
+    </div>
+    <pre id="last-run-log">Loading last run log</pre>
   </div>
-</div>
-  <pre id="last-run-log">Loading last run log</pre>
-</div>
 </div>
 
 <!-- Modal -->
@@ -1311,8 +1417,7 @@ a:focus-visible {
     </div>
 
     <!-- Toast container -->
-    <div id="toast-container"
-         style="position:static; bottom:5px; right:15px;
+    <div id="toast-container" style="position:static; bottom:5px; right:15px;
                 display:flex; flex-direction:column; align-items:flex-end;
                 gap:6px; z-index:99999;">
     </div>
@@ -1321,1127 +1426,1142 @@ a:focus-visible {
 </div>
 
 <script>
-const stopBadge  = document.getElementById('stop-confirmation');
+  const stopBadge = document.getElementById('stop-confirmation');
 
-function updateStatus() {
-  fetch('/plugins/automover/helpers/status_check.php')
-    .then(res => res.json())
-    .then(data => {
-      document.getElementById('status-text').textContent = data.status;
-      document.getElementById('last-run-text').textContent = data.last_run;
-    })
-    .catch(() => { document.getElementById('status-text').textContent = 'No details available'; });
-}
-updateStatus();
-setInterval(updateStatus, 5000);
+  function updateStatus() {
+    fetch('/plugins/automover/helpers/status_check.php')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('status-text').textContent = data.status;
+        document.getElementById('last-run-text').textContent = data.last_run;
+      })
+      .catch(() => { document.getElementById('status-text').textContent = 'No details available'; });
+  }
+  updateStatus();
+  setInterval(updateStatus, 5000);
 
-// === 🧩 Poll for Automover completion (done flag) ===
-function checkAutomoverDone() {
-  fetch('/plugins/automover/helpers/check_done.php', { cache: 'no-store' })
-    .then(res => res.json())
-    .then(data => {
-      if (data.done) {
-        const buttons = [
-          document.getElementById('save-settings'),
-          document.getElementById('stop-button'),
-          document.getElementById('moveNowBtn'),
-        ];
-        buttons.forEach(btn => {
-          if (!btn) return;
-          btn.disabled = false;
-          btn.style.backgroundColor = '';
-          btn.style.opacity = '1';
-          btn.style.cursor = 'pointer';
+  // === 🧩 Poll for Automover completion (done flag) ===
+  function checkAutomoverDone() {
+    fetch('/plugins/automover/helpers/check_done.php', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.done) {
+          const buttons = [
+            document.getElementById('save-settings'),
+            document.getElementById('stop-button'),
+            document.getElementById('moveNowBtn'),
+          ];
+          buttons.forEach(btn => {
+            if (!btn) return;
+            btn.disabled = false;
+            btn.style.backgroundColor = '';
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+          });
+        }
+      })
+      .catch(() => { });
+  }
+
+  // run every 5s like your status updates
+  setInterval(checkAutomoverDone, 5000);
+
+  // Disable control buttons while Automover is running
+  function checkAutomoverLock() {
+    fetch('/plugins/automover/helpers/check_lock.php', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        const locked = data.locked === true;
+        const btnIds = ['save-settings', 'stop-button', 'moveNowBtn'];
+        btnIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.disabled = locked;
+            el.style.opacity = locked ? '0.5' : '1';
+            el.style.cursor = locked ? 'not-allowed' : 'pointer';
+          }
         });
-      }
-    })
-    .catch(() => {});
-}
+      })
+      .catch(() => { }); // ignore errors silently
+  }
 
-// run every 5s like your status updates
-setInterval(checkAutomoverDone, 5000);
-
-// Disable control buttons while Automover is running
-function checkAutomoverLock() {
-  fetch('/plugins/automover/helpers/check_lock.php', { cache: 'no-store' })
-    .then(res => res.json())
-    .then(data => {
-      const locked = data.locked === true;
-      const btnIds = ['save-settings', 'stop-button', 'moveNowBtn'];
-      btnIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.disabled = locked;
-          el.style.opacity = locked ? '0.5' : '1';
-          el.style.cursor = locked ? 'not-allowed' : 'pointer';
-        }
-      });
-    })
-    .catch(() => {}); // ignore errors silently
-}
-
-// Run once immediately, then every 5s (same as status polling)
-document.addEventListener('DOMContentLoaded', () => {
-  checkAutomoverLock();
-  setInterval(checkAutomoverLock, 5000);
-});
-
-document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('automover-settings');
-  const poolSelect = document.getElementById('pool');
-  const intervalInput = document.getElementById('interval');
-  const thresholdInput = document.getElementById('threshold');
-  const saveBtn = document.getElementById('save-settings');
-  const confirmBadge = document.getElementById('save-confirmation');
-  const moveNowBtn = document.getElementById('moveNowBtn');
-  const moveNowBadge = document.getElementById('move-now-confirmation');
-  let currentPoolSelection = poolSelect.dataset.selected || '';
-  const ageFilterCheckbox = document.getElementById('age_based_filter');
-  const ageDaysContainer  = document.getElementById('age-days-container');
-  const sizeFilterCheckbox= document.getElementById('size_based_filter');
-  const sizeMbContainer   = document.getElementById('size-mb-container');
-
-  moveNowBtn.addEventListener('click', () => {
-  // Trigger the move action (you may already have this logic elsewhere)
-  fetch('/plugins/automover/helpers/run_manual_move.php', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'X-CSRF-TOKEN': csrfToken
-    },
-    body: 'csrf_token=' + encodeURIComponent(csrfToken)
-  })
-  .then(res => res.json())
-  .then(data => {
-if (data.ok) {
-  moveNowBadge.style.display = 'block';
-  moveNowBadge.style.opacity = '1';
-  moveNowBadge.style.animation = 'flash 0.4s ease';
-
-  setTimeout(() => {
-    moveNowBadge.style.opacity = '0';
-    moveNowBadge.style.animation = '';
-    setTimeout(() => {
-      moveNowBadge.style.display = 'none'; // ✅ Collapse space after fade
-    }, 400); // match transition duration
-  }, 2000);
-} else {
-      alert('Move Now failed: ' + (data.error || 'Unknown error'));
-    }
-  })
-  .catch(err => {
-    console.error('Move Now error:', err);
-    alert('Move Now failed');
+  // Run once immediately, then every 5s (same as status polling)
+  document.addEventListener('DOMContentLoaded', () => {
+    checkAutomoverLock();
+    setInterval(checkAutomoverLock, 5000);
   });
-});
 
-  // === Toggle HASH_PATH dropdown visibility based on ENABLE_JDUPES ===
-const enableJdupesCheckbox = document.getElementById('ENABLE_JDUPES');
-const hashPathRow = document.getElementById('hashPathRow');
-const hashPathSelect = document.getElementById('HASH_PATH');
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('automover-settings');
+    const poolSelect = document.getElementById('pool');
+    const intervalInput = document.getElementById('interval');
+    const thresholdInput = document.getElementById('threshold');
+    const saveBtn = document.getElementById('save-settings');
+    const confirmBadge = document.getElementById('save-confirmation');
+    const moveNowBtn = document.getElementById('moveNowBtn');
+    const moveNowBadge = document.getElementById('move-now-confirmation');
+    let currentPoolSelection = poolSelect.dataset.selected || '';
+    const ageFilterCheckbox = document.getElementById('age_based_filter');
+    const ageDaysContainer = document.getElementById('age-days-container');
+    const sizeFilterCheckbox = document.getElementById('size_based_filter');
+    const sizeMbContainer = document.getElementById('size-mb-container');
 
-function toggleHashPath() {
-  if (enableJdupesCheckbox.checked) {
-    hashPathRow.style.display = '';
+    moveNowBtn.addEventListener('click', () => {
+      // Trigger the move action (you may already have this logic elsewhere)
+      fetch('/plugins/automover/helpers/run_manual_move.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRF-TOKEN': csrfToken
+        },
+        body: 'csrf_token=' + encodeURIComponent(csrfToken)
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            moveNowBadge.style.display = 'block';
+            moveNowBadge.style.opacity = '1';
+            moveNowBadge.style.animation = 'flash 0.4s ease';
 
-    // Default to appdata if nothing selected
-    if (!hashPathSelect.value || hashPathSelect.value.trim() === '') {
-      for (const option of hashPathSelect.options) {
-        if (option.text.toLowerCase() === 'appdata') {
-          hashPathSelect.value = option.value;
-          break;
+            setTimeout(() => {
+              moveNowBadge.style.opacity = '0';
+              moveNowBadge.style.animation = '';
+              setTimeout(() => {
+                moveNowBadge.style.display = 'none'; // ✅ Collapse space after fade
+              }, 400); // match transition duration
+            }, 2000);
+          } else {
+            alert('Move Now failed: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(err => {
+          console.error('Move Now error:', err);
+          alert('Move Now failed');
+        });
+    });
+
+    // --- Interval Toggle
+    (function waitForIntervalToggle() {
+      function initIntervalToggle() {
+        const modeSelect = document.getElementById('interval_mode');
+        const intervalRow = document.getElementById('interval-minutes-row');
+        const cronRow = document.getElementById('cron-expression-row');
+        const intervalInput = document.getElementById('interval');
+        const cronInput = document.getElementById('cron_expression');
+        const cronWarning = document.getElementById('cron-warning');
+
+        if (!modeSelect || !intervalRow || !cronRow) {
+          // DOM not ready yet — wait a bit longer
+          return false;
         }
+
+        // ✅ Live toggle function
+        function toggleMode(mode) {
+          if (mode === 'minutes') {
+            intervalRow.style.display = 'flex';
+            cronRow.style.display = 'none';
+            intervalInput.disabled = false;
+            cronInput.disabled = true;
+          } else {
+            intervalRow.style.display = 'none';
+            cronRow.style.display = 'flex';
+            intervalInput.disabled = true;
+            cronInput.disabled = false;
+          }
+        }
+
+        // Initialize visibility based on current selection
+        toggleMode(modeSelect.value);
+
+        // Listen for dropdown changes
+        modeSelect.addEventListener('change', (e) => toggleMode(e.target.value));
+
+        // Live validation for cron expression
+        cronInput.addEventListener('input', () => {
+          const valid = cronInput.value.trim().split(/\s+/).length === 5;
+          cronWarning.style.display = valid ? 'none' : 'block';
+          cronInput.classList.toggle('invalid', !valid);
+        });
+
+        return true;
+      }
+
+      // Try once immediately, then poll until elements exist
+      if (!initIntervalToggle()) {
+        const observer = new MutationObserver(() => {
+          if (initIntervalToggle()) observer.disconnect();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
+    })();
+
+    // === Toggle HASH_PATH dropdown visibility based on ENABLE_JDUPES ===
+    const enableJdupesCheckbox = document.getElementById('ENABLE_JDUPES');
+    const hashPathRow = document.getElementById('hashPathRow');
+    const hashPathSelect = document.getElementById('HASH_PATH');
+
+    function toggleHashPath() {
+      if (enableJdupesCheckbox.checked) {
+        hashPathRow.style.display = '';
+
+        // Default to appdata if nothing selected
+        if (!hashPathSelect.value || hashPathSelect.value.trim() === '') {
+          for (const option of hashPathSelect.options) {
+            if (option.text.toLowerCase() === 'appdata') {
+              hashPathSelect.value = option.value;
+              break;
+            }
+          }
+        }
+      } else {
+        hashPathRow.style.display = 'none';
+        hashPathSelect.value = '';
       }
     }
-  } else {
-    hashPathRow.style.display = 'none';
-    hashPathSelect.value = '';
-  }
-}
 
-enableJdupesCheckbox.addEventListener('change', toggleHashPath);
-window.addEventListener('DOMContentLoaded', toggleHashPath);
+    enableJdupesCheckbox.addEventListener('change', toggleHashPath);
+    window.addEventListener('DOMContentLoaded', toggleHashPath);
 
-  // NEW: exclusions UI
-  const enableExcl = document.getElementById('enable_exclusions');
-  const exclRow    = document.getElementById('exclusions-row');
-  const exclField  = document.getElementById('exclusions-field');
-  const exclCount  = document.getElementById('exclusions-count');
+    // NEW: exclusions UI
+    const enableExcl = document.getElementById('enable_exclusions');
+    const exclRow = document.getElementById('exclusions-row');
+    const exclField = document.getElementById('exclusions-field');
+    const exclCount = document.getElementById('exclusions-count');
 
-  function toggleAgeInput(){ ageDaysContainer.style.display = ageFilterCheckbox.checked ? 'flex':'none'; }
-  ageFilterCheckbox.addEventListener('change', toggleAgeInput); toggleAgeInput();
+    function toggleAgeInput() { ageDaysContainer.style.display = ageFilterCheckbox.checked ? 'flex' : 'none'; }
+    ageFilterCheckbox.addEventListener('change', toggleAgeInput); toggleAgeInput();
 
-  function toggleSizeInput(){ sizeMbContainer.style.display = sizeFilterCheckbox.checked ? 'flex':'none'; }
-  sizeFilterCheckbox.addEventListener('change', toggleSizeInput); toggleSizeInput();
+    function toggleSizeInput() { sizeMbContainer.style.display = sizeFilterCheckbox.checked ? 'flex' : 'none'; }
+    sizeFilterCheckbox.addEventListener('change', toggleSizeInput); toggleSizeInput();
 
-  function refreshExclusionsVisibility(){
-    exclRow.style.display = enableExcl.checked ? 'flex' : 'none';
-    if (enableExcl.checked) refreshExclusionCount();
-  }
-  enableExcl.addEventListener('change', refreshExclusionsVisibility);
-  refreshExclusionsVisibility();
+    function refreshExclusionsVisibility() {
+      exclRow.style.display = enableExcl.checked ? 'flex' : 'none';
+      if (enableExcl.checked) refreshExclusionCount();
+    }
+    enableExcl.addEventListener('change', refreshExclusionsVisibility);
+    refreshExclusionsVisibility();
 
-  // === QBITTORRENT FIELD TOGGLE ===
-const qbitCheckbox = document.getElementById('qbit_script');
-const qbitFields = document.getElementById('qbit-fields');
-function toggleQbitFields() {
-  qbitFields.style.display = qbitCheckbox.checked ? 'block' : 'none';
-}
-qbitCheckbox.addEventListener('change', toggleQbitFields);
-toggleQbitFields();
+    // === QBITTORRENT FIELD TOGGLE ===
+    const qbitCheckbox = document.getElementById('qbit_script');
+    const qbitFields = document.getElementById('qbit-fields');
+    function toggleQbitFields() {
+      qbitFields.style.display = qbitCheckbox.checked ? 'block' : 'none';
+    }
+    qbitCheckbox.addEventListener('change', toggleQbitFields);
+    toggleQbitFields();
 
-// --- element refs
-const viewBtn   = document.getElementById('viewExclusionsBtn');
-const viewModal = document.getElementById('exclusion-view-modal');
-const viewClose = document.getElementById('closeExclusionsView');
-const editor    = document.getElementById('exclusionsEditor');
-const copyBtn   = document.getElementById('copyExclusionsBtn');
-const exclusionssaveBtn   = document.getElementById('saveExclusionsBtn');
+    // --- element refs
+    const viewBtn = document.getElementById('viewExclusionsBtn');
+    const viewModal = document.getElementById('exclusion-view-modal');
+    const viewClose = document.getElementById('closeExclusionsView');
+    const editor = document.getElementById('exclusionsEditor');
+    const copyBtn = document.getElementById('copyExclusionsBtn');
+    const exclusionssaveBtn = document.getElementById('saveExclusionsBtn');
 
-// --- toast inside modal
-const exclusionstoast = document.createElement('div');
-exclusionstoast.id = 'exclToast';
-exclusionstoast.style.position = 'absolute';
-exclusionstoast.style.bottom = '28px';
-exclusionstoast.style.left = '50%';
-exclusionstoast.style.transform = 'translateX(-50%)';
-exclusionstoast.style.color = '#00ff99';
-exclusionstoast.style.padding = '8px 14px';
-exclusionstoast.style.borderRadius = '6px';
-exclusionstoast.style.fontWeight = '600';
-exclusionstoast.style.display = 'none';
-exclusionstoast.style.zIndex = '10';
-if (viewModal) viewModal.querySelector('div').appendChild(exclusionstoast);
+    // --- toast inside modal
+    const exclusionstoast = document.createElement('div');
+    exclusionstoast.id = 'exclToast';
+    exclusionstoast.style.position = 'absolute';
+    exclusionstoast.style.bottom = '28px';
+    exclusionstoast.style.left = '50%';
+    exclusionstoast.style.transform = 'translateX(-50%)';
+    exclusionstoast.style.color = '#00ff99';
+    exclusionstoast.style.padding = '8px 14px';
+    exclusionstoast.style.borderRadius = '6px';
+    exclusionstoast.style.fontWeight = '600';
+    exclusionstoast.style.display = 'none';
+    exclusionstoast.style.zIndex = '10';
+    if (viewModal) viewModal.querySelector('div').appendChild(exclusionstoast);
 
-function showexclusionstoast(msg, type = 'ok') {
-  exclusionstoast.textContent = msg;
-  exclusionstoast.style.color = (type === 'ok') ? '#00ff99' : '#ff5555';
-  exclusionstoast.style.display = 'block';
-  clearTimeout(showexclusionstoast._t);
-  showexclusionstoast._t = setTimeout(() => { exclusionstoast.style.display = 'none'; }, 1800);
-}
+    function showexclusionstoast(msg, type = 'ok') {
+      exclusionstoast.textContent = msg;
+      exclusionstoast.style.color = (type === 'ok') ? '#00ff99' : '#ff5555';
+      exclusionstoast.style.display = 'block';
+      clearTimeout(showexclusionstoast._t);
+      showexclusionstoast._t = setTimeout(() => { exclusionstoast.style.display = 'none'; }, 1800);
+    }
 
-// prevent form submits if buttons live in a <form>
-[viewBtn, copyBtn, exclusionssaveBtn, viewClose].forEach(b => {
-  if (b) b.setAttribute('type', 'button');
-});
+    // prevent form submits if buttons live in a <form>
+    [viewBtn, copyBtn, exclusionssaveBtn, viewClose].forEach(b => {
+      if (b) b.setAttribute('type', 'button');
+    });
 
-// --- open modal and load file
-viewBtn.addEventListener('click', e => {
-  e.preventDefault();
-  viewModal.style.display = 'flex';
+    // --- open modal and load file
+    viewBtn.addEventListener('click', e => {
+      e.preventDefault();
+      viewModal.style.display = 'flex';
 
-  fetch('/plugins/automover/helpers/manage_exclusions.php?action=get' +
+      fetch('/plugins/automover/helpers/manage_exclusions.php?action=get' +
         (typeof csrfToken !== 'undefined'
           ? '&csrf_token=' + encodeURIComponent(csrfToken)
           : ''), { cache: 'no-store' })
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        editor.value = (data.content || '').trim();
-      } else {
-        editor.value = data.error || '(Error loading exclusions.txt)';
-        showexclusionstoast('Error loading file', 'err');
-      }
-    })
-    .catch(err => {
-      console.error('GET error:', err);
-      editor.value = '(Error loading exclusions.txt)';
-      showexclusionstoast('Fetch error', 'err');
-    });
-});
-
-// --- copy (with fallback)
-copyBtn.addEventListener('click', e => {
-  e.preventDefault();
-  const txt = editor.value || '';
-
-  function fallbackCopy() {
-    const ta = document.createElement('textarea');
-    ta.value = txt;
-    ta.style.position = 'fixed';
-    ta.style.left = '-9999px';
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand('copy');
-      showexclusionstoast('✅ Copied!');
-    } catch {
-      showexclusionstoast('Copy failed', 'err');
-    }
-    document.body.removeChild(ta);
-  }
-
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(txt)
-      .then(() => showexclusionstoast('Copied!'))
-      .catch(() => fallbackCopy());
-  } else {
-    fallbackCopy();
-  }
-});
-
-// --- save
-exclusionssaveBtn.addEventListener('click', e => {
-  e.preventDefault();
-  const content = editor.value || '';
-
-fetch('/plugins/automover/helpers/manage_exclusions.php?action=save', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'X-CSRF-TOKEN': csrfToken        // header Unraid validates
-  },
-  body: 'csrf_token=' + encodeURIComponent(csrfToken) +
-        '&content='   + encodeURIComponent(content)
-})
-  .then(r => r.text())
-  .then(text => {
-    let data;
-    try { data = JSON.parse(text); } catch { throw new Error(text || 'No response'); }
-    if (data.ok) showexclusionstoast('✅ Save successful');
-    else showexclusionstoast(data.error || 'Save failed', 'err');
-  })
-  .catch(err => {
-    console.error('Save fetch error:', err);
-    showexclusionstoast('Save failed', 'err');
-  });
-
-});
-
-// --- close modal
-viewClose.addEventListener('click', e => {
-  e.preventDefault();
-  viewModal.style.display = 'none';
-});
-  
-  // Pool list
-  function updatePoolUsage() {
-    fetch('/plugins/automover/helpers/pool_usage.php')
-      .then(res => res.json())
-      .then(data => {
-        poolSelect.innerHTML = '';
-        const pools = Object.keys(data).filter(name => data[name] !== 'N/A');
-        if (pools.length === 0) {
-          poolSelect.innerHTML = '<option disabled>No pools detected - Is the array started?</option>';
-        } else {
-          pools.forEach(pool => {
-            const option = document.createElement('option');
-            option.value = pool;
-            option.textContent = `${pool} (${data[pool]}%)`;
-            if (pool === currentPoolSelection) option.selected = true;
-            poolSelect.appendChild(option);
-          });
-        }
-      })
-      .catch(() => { poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>'; });
-
-    poolSelect.addEventListener('change', () => { currentPoolSelection = poolSelect.value; });
-  }
-  updatePoolUsage();
-  setInterval(updatePoolUsage, 5000);
-
-  // Logs
-  const filterInput = document.getElementById('log-filter');
-  let filterTimer;
-  filterInput.addEventListener('input', () => {
-    clearTimeout(filterTimer);
-    filterTimer = setTimeout(loadMoverLog, 500);
-  });
-
-  function loadLastRunLog() {
-    fetch('/plugins/automover/helpers/fetch_last_run_log.php')
-      .then(res => res.text())
-      .then(data => { document.getElementById('last-run-log').textContent = data || 'No last run data available.'; })
-      .catch(() => { document.getElementById('last-run-log').textContent = 'Error loading last run log.'; });
-  }
-  loadLastRunLog();
-  setInterval(loadLastRunLog, 5000);
-
-  function loadMoverLog() {
-    const keyword = filterInput.value.trim();
-    const query   = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
-    fetch(`/plugins/automover/helpers/fetch_files_moved_log.php${query}`)
-      .then(res => res.json())
-      .then(data => {
-        const logContainer = document.getElementById('automover-log');
-        logContainer.innerHTML = '';
-        data.log.split('\n').forEach(line => {
-          const div = document.createElement('div');
-          div.textContent = line;
-          if (line.toLowerCase().includes('skipped')) div.classList.add('skipped-line');
-          logContainer.appendChild(div);
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            editor.value = (data.content || '').trim();
+          } else {
+            editor.value = data.error || '(Error loading exclusions.txt)';
+            showexclusionstoast('Error loading file', 'err');
+          }
+        })
+        .catch(err => {
+          console.error('GET error:', err);
+          editor.value = '(Error loading exclusions.txt)';
+          showexclusionstoast('Fetch error', 'err');
         });
-        document.getElementById('log-counts').innerHTML = `<h3>Total Files Moved: ${data.moved}</h3>`;
+    });
+
+    // --- copy (with fallback)
+    copyBtn.addEventListener('click', e => {
+      e.preventDefault();
+      const txt = editor.value || '';
+
+      function fallbackCopy() {
+        const ta = document.createElement('textarea');
+        ta.value = txt;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showexclusionstoast('✅ Copied!');
+        } catch {
+          showexclusionstoast('Copy failed', 'err');
+        }
+        document.body.removeChild(ta);
+      }
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(txt)
+          .then(() => showexclusionstoast('Copied!'))
+          .catch(() => fallbackCopy());
+      } else {
+        fallbackCopy();
+      }
+    });
+
+    // --- save
+    exclusionssaveBtn.addEventListener('click', e => {
+      e.preventDefault();
+      const content = editor.value || '';
+
+      fetch('/plugins/automover/helpers/manage_exclusions.php?action=save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRF-TOKEN': csrfToken        // header Unraid validates
+        },
+        body: 'csrf_token=' + encodeURIComponent(csrfToken) +
+          '&content=' + encodeURIComponent(content)
       })
-      .catch(() => {
-        document.getElementById('automover-log').textContent = 'Error loading log.';
-        document.getElementById('log-counts').textContent = '';
-      });
-  }
-  loadMoverLog();
-  setInterval(loadMoverLog, 5000);
+        .then(r => r.text())
+        .then(text => {
+          let data;
+          try { data = JSON.parse(text); } catch { throw new Error(text || 'No response'); }
+          if (data.ok) showexclusionstoast('✅ Save successful');
+          else showexclusionstoast(data.error || 'Save failed', 'err');
+        })
+        .catch(err => {
+          console.error('Save fetch error:', err);
+          showexclusionstoast('Save failed', 'err');
+        });
 
-  // Stop
-  document.getElementById('stop-button').addEventListener('click', function () {
-    const messageBox = document.getElementById('save-messages');
-    messageBox.innerHTML = '';
-    messageBox.style.display = 'none';
+    });
 
-    fetch('/plugins/automover/helpers/stop_cron.php')
-      .then(res => res.json())
-      .then(() => {
-        updateStatus();
-        updatePoolUsage();
-        stopBadge.style.display = 'inline-block';
-        stopBadge.style.opacity = '0';
-        stopBadge.style.animation = 'none';
-        void stopBadge.offsetWidth;
-        stopBadge.style.animation = 'flash .4s ease';
-        stopBadge.style.opacity = '1';
-        setTimeout(() => { stopBadge.style.opacity = '0'; stopBadge.style.display = 'none'; }, 3000);
-      })
-      .catch(() => { document.getElementById('status-text').textContent = 'Error stopping cron'; });
-  });
+    // --- close modal
+    viewClose.addEventListener('click', e => {
+      e.preventDefault();
+      viewModal.style.display = 'none';
+    });
 
-  // Validation
-  function validateField(input, rules, warningId) {
-    const value = input.value.trim();
-    const number = parseFloat(value);
-    const invalid = isNaN(number) || (rules.min !== undefined && number < rules.min) || (rules.max !== undefined && number > rules.max);
-    input.classList.toggle('invalid', invalid);
-    document.getElementById(warningId).style.display = invalid ? 'block' : 'none';
-    return !invalid;
-  }
-  // === Qbittorrent Validation ===
-const qbitHostInput = document.getElementById('qbit_host');
-const qbitUserInput = document.getElementById('qbit_user');
-const qbitPassInput = document.getElementById('qbit_pass');
-const qbitDaysFromInput = document.getElementById('qbit_days_from');
-const qbitDaysToInput = document.getElementById('qbit_days_to');
+    // Pool list
+    function updatePoolUsage() {
+      fetch('/plugins/automover/helpers/pool_usage.php')
+        .then(res => res.json())
+        .then(data => {
+          poolSelect.innerHTML = '';
+          const pools = Object.keys(data).filter(name => data[name] !== 'N/A');
+          if (pools.length === 0) {
+            poolSelect.innerHTML = '<option disabled>No pools detected - Is the array started?</option>';
+          } else {
+            pools.forEach(pool => {
+              const option = document.createElement('option');
+              option.value = pool;
+              option.textContent = `${pool} (${data[pool]}%)`;
+              if (pool === currentPoolSelection) option.selected = true;
+              poolSelect.appendChild(option);
+            });
+          }
+        })
+        .catch(() => { poolSelect.innerHTML = '<option disabled>Error fetching pool usage</option>'; });
 
-  intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 1 }, 'interval-warning'));
-  thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
-  const ageDaysInput = document.getElementById('age_days');
-  ageDaysInput.addEventListener('input', () => validateField(ageDaysInput, { min: 1 }, 'age-days-warning'));
-  const sizeMbInput = document.getElementById('size_mb');
-  sizeMbInput.addEventListener('input', () => validateField(sizeMbInput, { min: 1 }, 'size-mb-warning'));
+      poolSelect.addEventListener('change', () => { currentPoolSelection = poolSelect.value; });
+    }
+    updatePoolUsage();
+    setInterval(updatePoolUsage, 5000);
 
-  // === Qbittorrent Validation ===
-function validateQbitFields() {
-  if (!qbitCheckbox.checked) return true; // skip validation if not enabled
+    // Logs
+    const filterInput = document.getElementById('log-filter');
+    let filterTimer;
+    filterInput.addEventListener('input', () => {
+      clearTimeout(filterTimer);
+      filterTimer = setTimeout(loadMoverLog, 500);
+    });
 
-  let valid = true;
+    function loadLastRunLog() {
+      fetch('/plugins/automover/helpers/fetch_last_run_log.php')
+        .then(res => res.text())
+        .then(data => { document.getElementById('last-run-log').textContent = data || 'No last run data available.'; })
+        .catch(() => { document.getElementById('last-run-log').textContent = 'Error loading last run log.'; });
+    }
+    loadLastRunLog();
+    setInterval(loadLastRunLog, 5000);
 
-  // === HOST FIELD VALIDATION ===
-  const hostVal = qbitHostInput.value.trim();
-  const hasProtocol = /^https?:\/\//i.test(hostVal);
-  const hostWarning = document.getElementById("qbit-host-warning");
+    function loadMoverLog() {
+      const keyword = filterInput.value.trim();
+      const query = keyword ? `?filter=${encodeURIComponent(keyword)}` : '';
+      fetch(`/plugins/automover/helpers/fetch_files_moved_log.php${query}`)
+        .then(res => res.json())
+        .then(data => {
+          const logContainer = document.getElementById('automover-log');
+          logContainer.innerHTML = '';
+          data.log.split('\n').forEach(line => {
+            const div = document.createElement('div');
+            div.textContent = line;
+            if (line.toLowerCase().includes('skipped')) div.classList.add('skipped-line');
+            logContainer.appendChild(div);
+          });
+          document.getElementById('log-counts').innerHTML = `<h3>Total Files Moved: ${data.moved}</h3>`;
+        })
+        .catch(() => {
+          document.getElementById('automover-log').textContent = 'Error loading log.';
+          document.getElementById('log-counts').textContent = '';
+        });
+    }
+    loadMoverLog();
+    setInterval(loadMoverLog, 5000);
 
-  if (hostVal === "") {
-    qbitHostInput.classList.add("invalid");
-    hostWarning.textContent = "Host is required";
-    hostWarning.style.display = "block";
-    valid = false;
-  } else if (hasProtocol) {
-    qbitHostInput.classList.add("invalid");
-    hostWarning.textContent = "Don't use http(s):// — only yourip:port";
-    hostWarning.style.display = "block";
-    valid = false;
-  } else {
-    qbitHostInput.classList.remove("invalid");
-    hostWarning.style.display = "none";
-  }
+    // Stop
+    document.getElementById('stop-button').addEventListener('click', function () {
+      const messageBox = document.getElementById('save-messages');
+      messageBox.innerHTML = '';
+      messageBox.style.display = 'none';
 
-  // === USERNAME ===
-  if (qbitUserInput.value.trim() === "") {
-    qbitUserInput.classList.add("invalid");
-    document.getElementById("qbit-user-warning").style.display = "block";
-    valid = false;
-  } else {
-    qbitUserInput.classList.remove("invalid");
-    document.getElementById("qbit-user-warning").style.display = "none";
-  }
+      fetch('/plugins/automover/helpers/stop_cron.php')
+        .then(res => res.json())
+        .then(() => {
+          updateStatus();
+          updatePoolUsage();
+          stopBadge.style.display = 'inline-block';
+          stopBadge.style.opacity = '0';
+          stopBadge.style.animation = 'none';
+          void stopBadge.offsetWidth;
+          stopBadge.style.animation = 'flash .4s ease';
+          stopBadge.style.opacity = '1';
+          setTimeout(() => { stopBadge.style.opacity = '0'; stopBadge.style.display = 'none'; }, 3000);
+        })
+        .catch(() => { document.getElementById('status-text').textContent = 'Error stopping cron'; });
+    });
 
-  // === PASSWORD ===
-  if (qbitPassInput.value.trim() === "") {
-    qbitPassInput.classList.add("invalid");
-    document.getElementById("qbit-pass-warning").style.display = "block";
-    valid = false;
-  } else {
-    qbitPassInput.classList.remove("invalid");
-    document.getElementById("qbit-pass-warning").style.display = "none";
-  }
+    // Validation
+    function validateField(input, rules, warningId) {
+      const value = input.value.trim();
+      const number = parseFloat(value);
+      const invalid = isNaN(number) || (rules.min !== undefined && number < rules.min) || (rules.max !== undefined && number > rules.max);
+      input.classList.toggle('invalid', invalid);
+      document.getElementById(warningId).style.display = invalid ? 'block' : 'none';
+      return !invalid;
+    }
+    // === Qbittorrent Validation ===
+    const qbitHostInput = document.getElementById('qbit_host');
+    const qbitUserInput = document.getElementById('qbit_user');
+    const qbitPassInput = document.getElementById('qbit_pass');
+    const qbitDaysFromInput = document.getElementById('qbit_days_from');
+    const qbitDaysToInput = document.getElementById('qbit_days_to');
 
-  // === DAYS VALIDATION ===
-  const fromVal = parseInt(qbitDaysFromInput.value, 10);
-  const toVal = parseInt(qbitDaysToInput.value, 10);
+    intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 1 }, 'interval-warning'));
+    thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
+    const ageDaysInput = document.getElementById('age_days');
+    ageDaysInput.addEventListener('input', () => validateField(ageDaysInput, { min: 1 }, 'age-days-warning'));
+    const sizeMbInput = document.getElementById('size_mb');
+    sizeMbInput.addEventListener('input', () => validateField(sizeMbInput, { min: 1 }, 'size-mb-warning'));
 
-  const validFrom = !isNaN(fromVal) && fromVal >= 0 && fromVal <= 999;
-  const validTo = !isNaN(toVal) && toVal >= 1 && toVal <= 999;
-  const validOrder = validFrom && validTo && fromVal < toVal;
+    // === Qbittorrent Validation ===
+    function validateQbitFields() {
+      if (!qbitCheckbox.checked) return true; // skip validation if not enabled
 
-  qbitDaysFromInput.classList.toggle("invalid", !validFrom);
-  document.getElementById("qbit-days-from-warning").style.display = validFrom ? "none" : "block";
+      let valid = true;
 
-  qbitDaysToInput.classList.toggle("invalid", !validTo);
-  document.getElementById("qbit-days-to-warning").style.display = validTo ? "none" : "block";
+      // === HOST FIELD VALIDATION ===
+      const hostVal = qbitHostInput.value.trim();
+      const hasProtocol = /^https?:\/\//i.test(hostVal);
+      const hostWarning = document.getElementById("qbit-host-warning");
 
-  document.getElementById("qbit-days-order-warning").style.display = validOrder ? "none" : "block";
+      if (hostVal === "") {
+        qbitHostInput.classList.add("invalid");
+        hostWarning.textContent = "Host is required";
+        hostWarning.style.display = "block";
+        valid = false;
+      } else if (hasProtocol) {
+        qbitHostInput.classList.add("invalid");
+        hostWarning.textContent = "Don't use http(s):// — only yourip:port";
+        hostWarning.style.display = "block";
+        valid = false;
+      } else {
+        qbitHostInput.classList.remove("invalid");
+        hostWarning.style.display = "none";
+      }
 
-  if (!validFrom || !validTo || !validOrder) valid = false;
+      // === USERNAME ===
+      if (qbitUserInput.value.trim() === "") {
+        qbitUserInput.classList.add("invalid");
+        document.getElementById("qbit-user-warning").style.display = "block";
+        valid = false;
+      } else {
+        qbitUserInput.classList.remove("invalid");
+        document.getElementById("qbit-user-warning").style.display = "none";
+      }
 
-  return valid;
-}
+      // === PASSWORD ===
+      if (qbitPassInput.value.trim() === "") {
+        qbitPassInput.classList.add("invalid");
+        document.getElementById("qbit-pass-warning").style.display = "block";
+        valid = false;
+      } else {
+        qbitPassInput.classList.remove("invalid");
+        document.getElementById("qbit-pass-warning").style.display = "none";
+      }
 
-// 🔁 Live validation for qBittorrent fields
-[qbitHostInput, qbitUserInput, qbitPassInput, qbitDaysFromInput, qbitDaysToInput].forEach(input => {
-  if (input) input.addEventListener('input', validateQbitFields);
-});
-
-// 🔁 Also revalidate when toggling the "Enable Qbittorrent Script" checkbox
-if (qbitCheckbox) qbitCheckbox.addEventListener('change', validateQbitFields);
-
-// 🔁 Dynamic validation between Days From and Days To
-[qbitDaysFromInput, qbitDaysToInput].forEach(input => {
-  if (input) {
-    input.addEventListener('input', () => {
+      // === DAYS VALIDATION ===
       const fromVal = parseInt(qbitDaysFromInput.value, 10);
       const toVal = parseInt(qbitDaysToInput.value, 10);
-      const validOrder = !isNaN(fromVal) && !isNaN(toVal) && fromVal < toVal;
+
+      const validFrom = !isNaN(fromVal) && fromVal >= 0 && fromVal <= 999;
+      const validTo = !isNaN(toVal) && toVal >= 1 && toVal <= 999;
+      const validOrder = validFrom && validTo && fromVal < toVal;
+
+      qbitDaysFromInput.classList.toggle("invalid", !validFrom);
+      document.getElementById("qbit-days-from-warning").style.display = validFrom ? "none" : "block";
+
+      qbitDaysToInput.classList.toggle("invalid", !validTo);
+      document.getElementById("qbit-days-to-warning").style.display = validTo ? "none" : "block";
 
       document.getElementById("qbit-days-order-warning").style.display = validOrder ? "none" : "block";
-      qbitDaysFromInput.classList.toggle("invalid", !validOrder);
-      qbitDaysToInput.classList.toggle("invalid", !validOrder);
-    });
-  }
-});
 
-  // ===== Exclusions picker (helper + csrf_token) =====
-  const modal = document.getElementById('exclusion-modal');
-  const grid  = document.getElementById('picker-grid');
-  const crumbs= document.getElementById('crumbs');
-  const btnUp = document.getElementById('btn-up');
-  const btnClose = document.getElementById('btn-close');
-  const btnAdd = document.getElementById('btn-add');
-  const btnRemove = document.getElementById('btn-remove');
-  const toast = document.getElementById('picker-toast');
-  let currentPath = '/mnt';
+      if (!validFrom || !validTo || !validOrder) valid = false;
 
-let toastQueueDelay = 0; // keeps a running delay so toasts stagger
-
-function showToast(msg, type = 'ok') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const t = document.createElement('div');
-  t.textContent = msg;
-
-  t.style.color = type === 'err' ? '#ffaaaa' : '#00ff99';
-  t.style.padding = '0px 0px';
-  t.style.borderRadius = '0px';
-  t.style.fontWeight = '600';
-  t.style.boxShadow = '0 0 6px rgba(0,0,0,0.3)';
-  t.style.opacity = '0';
-  t.style.transform = 'translateX(30px)'; // slide from right
-  t.style.transition = 'opacity .3s ease, transform .3s ease';
-  t.style.minWidth = '160px';
-  t.style.textAlign = 'right';
-
-  container.appendChild(t);
-
-  // apply a small delay so multiple toasts don't appear at the exact same time
-  const delay = toastQueueDelay;
-  toastQueueDelay += 1000; // 1s between toasts
-
-  setTimeout(() => {
-    t.style.opacity = '1';
-    t.style.transform = 'translateX(0)';
-  }, delay + 50);
-
-  // fade out after it’s been visible for ~2 s
-  setTimeout(() => {
-    t.style.opacity = '0';
-    t.style.transform = 'translateX(30px)';
-    setTimeout(() => t.remove(), 300);
-  }, delay + 2350);
-
-  // reset queue after a few seconds (so future toasts don't keep offsetting forever)
-  setTimeout(() => { toastQueueDelay = 0; }, delay + 3000);
-}
-
-  function openPicker(){ modal.style.display='flex'; loadDir('/mnt'); }
-  function closePicker(){ modal.style.display='none'; }
-
-  exclField.addEventListener('click', openPicker);
-  btnClose.addEventListener('click', closePicker);
-
-function buildCrumbs(path) {
-  crumbs.innerHTML = '';
-
-  // Normalize and split
-  const cleanPath = path.replace(/\/+$/, '');
-  if (!cleanPath.startsWith('/mnt')) {
-    loadDir('/mnt');
-    return;
-  }
-
-  const parts = cleanPath.split('/').filter(Boolean);
-  let accum = '';
-
-  // Add root first
-  const root = document.createElement('span');
-  root.textContent = '/mnt';
-  root.className = 'crumb';
-  root.dataset.path = '/mnt';
-  crumbs.appendChild(root);
-
-  // Build deeper segments
-  for (let i = 1; i < parts.length; i++) {
-    const seg = parts[i];
-    const sep = document.createElement('span');
-    sep.textContent = ' / ';
-    sep.className = 'sep';
-    crumbs.appendChild(sep);
-
-    accum = accum ? accum + '/' + seg : '/mnt/' + seg;
-
-    const a = document.createElement('span');
-    a.textContent = seg;
-    a.className = 'crumb';
-    a.dataset.path = accum;
-    crumbs.appendChild(a);
-  }
-}
-
-// ✅ Delegated click handler (only one global listener needed)
-crumbs.addEventListener('click', e => {
-  const crumb = e.target.closest('.crumb');
-  if (!crumb) return;
-  const path = crumb.dataset.path;
-  if (!path) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-  loadDir(path);
-});
-
-  function loadDir(path){
-    const url = `/plugins/automover/helpers/update_exclusions.php?action=list_dir&path=${encodeURIComponent(path)}&csrf_token=${encodeURIComponent(csrf_token)}`;
-    fetch(url)
-      .then(r=>r.json())
-      .then(data=>{
-        if (!data.ok) throw new Error('list_dir failed');
-        currentPath = data.path || path;
-        buildCrumbs(currentPath);
-        grid.innerHTML = '';
-        data.items.forEach(it=>{
-const row = document.createElement('div');
-row.className = 'row';
-
-// --- Checkbox ---
-const cb = document.createElement('input');
-cb.type = 'checkbox';
-cb.dataset.path = it.path;
-
-// Disable if it's a root-level /mnt entry (like /mnt/disk1, /mnt/cache, etc.)
-if (/^\/mnt\/[^/]+$/.test(it.path)) {
-  cb.disabled = true;
-  cb.title = "Can't exclude entire disks or root pools";
-  cb.style.cursor = 'not-allowed';
-}
-
-// --- Name / Icon / Color ---
-const name = document.createElement('div');
-name.className = 'name';
-name.title = it.path;
-
-// Folder
-if (it.isDir) {
-  name.innerHTML = `<span class="icon">📁</span><span class="label">${it.name}</span>`;
-  name.style.color = 'var(--primary-blue)';
-  name.style.cursor = 'pointer';
-  name.addEventListener('click', () => loadDir(it.path));
-} else {
-  // File
-  name.innerHTML = `<span class="icon">📄</span><span class="label">${it.name}</span>`;
-  name.style.color = '#fff';
-}
-
-// --- Assemble Row ---
-row.appendChild(cb);
-row.appendChild(name);
-grid.appendChild(row);
-        });
-      })
-      .catch(()=>showToast('Error loading directory'));
-  }
-
-  btnUp.addEventListener('click', ()=>{
-    if (!currentPath || currentPath === '/mnt') return;
-    const up = currentPath.replace(/\/+$/,'').split('/').slice(0,-1).join('/') || '/mnt';
-    loadDir(up.startsWith('/mnt') ? up : '/mnt');
-  });
-
-  function selectedPaths(){ return Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map(cb=>cb.dataset.path); }
-
-  function refreshExclusionCount(){
-    fetch(`/plugins/automover/helpers/update_exclusions.php?action=get_exclusion_count&csrf_token=${encodeURIComponent(csrf_token)}`)
-      .then(r=>r.json())
-      .then(d=>{
-        if (d.ok){
-          exclCount.textContent = `${d.count} item${d.count===1?'':'s'}`;
-          exclField.value = d.count>0 ? `Click to open file picker` : 'Click to open file picker';
-        }
-      }).catch(()=>{});
-  }
-
-  btnAdd.addEventListener('click', ()=>{
-    const paths = selectedPaths();
-    if (paths.length===0){ showToast('No selection'); return; }
-    const body = new URLSearchParams(); body.append('csrf_token', csrf_token); paths.forEach(p=>body.append('paths[]', p));
-    fetch('/plugins/automover/helpers/update_exclusions.php?action=add_exclusions', { method:'POST', body })
-      .then(r=>r.json()).then(d=>{
-        if (d.ok){ showToast('✅ Added'); refreshExclusionCount(); }
-        else showToast('Add failed');
-      }).catch(()=>showToast('Add failed'));
-  });
-
-  btnRemove.addEventListener('click', ()=>{
-    const paths = selectedPaths();
-    if (paths.length===0){ showToast('No selection'); return; }
-    const body = new URLSearchParams(); body.append('csrf_token', csrf_token); paths.forEach(p=>body.append('paths[]', p));
-    fetch('/plugins/automover/helpers/update_exclusions.php?action=remove_exclusions', { method:'POST', body })
-      .then(r=>r.json()).then(d=>{
-        if (d.ok){ showToast('✅ Removed'); refreshExclusionCount(); }
-        else showToast('Remove failed');
-      }).catch(()=>showToast('Remove failed'));
-  });
-
-  btnClose.addEventListener('click', () => {
-  addExtBtn.style.display = 'none';
-  removeExtBtn.style.display = 'none';
-  selectedExts.clear();
-  modal.style.display = 'none';
-});
-
-// WILDCARD
-const addExtBtn = document.getElementById('addExtBtn');
-const removeExtBtn = document.getElementById('removeExtBtn');
-let selectedExts = new Set();
-
-document.addEventListener('change', (e) => {
-  if (!e.target.matches('#picker-grid input[type="checkbox"]')) return;
-
-  // collect all checked file extensions
-  selectedExts.clear();
-  const checked = Array.from(document.querySelectorAll('#picker-grid input[type="checkbox"]:checked'));
-  checked.forEach(cb => {
-    if (cb.dataset.isdir === 'true') return; // skip folders
-    const name = cb.dataset.path.split('/').pop();
-    const parts = name.split('.');
-    if (parts.length > 1) selectedExts.add(parts.pop());
-  });
-
-  if (selectedExts.size > 0) {
-    const label = Array.from(selectedExts).map(e => `*.${e}`).join(', ');
-    addExtBtn.textContent = `Add extensions as wildcards`;
-    removeExtBtn.textContent = `Remove extensions as wildcards`;
-    addExtBtn.style.display = 'inline-block';
-    removeExtBtn.style.display = 'inline-block';
-  } else {
-    addExtBtn.style.display = 'none';
-    removeExtBtn.style.display = 'none';
-  }
-});
-
-// ✅ Add extensions as wildcards
-addExtBtn.addEventListener('click', () => {
-  if (selectedExts.size === 0) return;
-
-  const body = new URLSearchParams();
-  body.append('csrf_token', csrf_token);
-  Array.from(selectedExts).forEach(ext => body.append('paths[]', `*.${ext}`));
-
-  fetch('/plugins/automover/helpers/update_exclusions.php?action=add_exclusions', {
-    method: 'POST',
-    body
-  })
-    .then(r => r.json())
-    .then(d => {
-      if (d.ok) {
-        let delay = 0;
-        Array.from(selectedExts).forEach(ext => {
-          setTimeout(() => showToast(`✅ Added *.${ext}`), delay);
-          delay += 350;
-        });
-      } else showToast('Failed to add wildcard(s)', 'err');
-    })
-    .catch(err => {
-      console.error('Add wildcard error:', err);
-      showToast('Error adding wildcard(s)', 'err');
-    });
-});
-
-// ✅ Remove extensions as wildcards
-removeExtBtn.addEventListener('click', () => {
-  if (selectedExts.size === 0) return;
-
-  const body = new URLSearchParams();
-  body.append('csrf_token', csrf_token);
-  Array.from(selectedExts).forEach(ext => body.append('paths[]', `*.${ext}`));
-
-  fetch('/plugins/automover/helpers/update_exclusions.php?action=remove_exclusions', {
-    method: 'POST',
-    body
-  })
-    .then(r => r.json())
-    .then(d => {
-      if (d.ok) {
-        let delay = 0;
-        Array.from(selectedExts).forEach(ext => {
-          setTimeout(() => showToast(`✅ Removed *.${ext}`), delay);
-          delay += 350;
-        });
-      } else showToast('Failed to remove wildcard(s)', 'err');
-    })
-    .catch(err => {
-      console.error('Remove wildcard error:', err);
-      showToast('Error removing wildcard(s)', 'err');
-    });
-});
-
-  // Save & Start
-  saveBtn.addEventListener('click', function () {
-    const intervalValid  = validateField(intervalInput, { min: 1 }, 'interval-warning');
-    const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
-    const ageDaysInput = document.getElementById('age_days');
-    const sizeMbInput  = document.getElementById('size_mb');
-    const ageDaysValid = !document.getElementById('age_based_filter').checked || validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
-    const sizeMbValid  = !document.getElementById('size_based_filter').checked || validateField(sizeMbInput,  { min: 1 }, 'size-mb-warning');
-    const qbitValid = validateQbitFields();
-    const allValid = intervalValid && thresholdValid && ageDaysValid && sizeMbValid && qbitValid;
-
-    const messageBox = document.getElementById('save-messages');
-    if (!allValid) {
-      form.classList.add('shake'); setTimeout(()=>form.classList.remove('shake'), 300);
-      messageBox.innerHTML = `<div style="color:red;">⚠️ Please correct the highlighted warnings.</div>`;
-      messageBox.style.display = 'block';
-      return;
+      return valid;
     }
 
-    // Ensure exclusions file exists if enabled
-    const ensurePromise = enableExcl.checked
-      ? fetch(`/plugins/automover/helpers/update_exclusions.php?action=ensure_exclusions&csrf_token=${encodeURIComponent(csrf_token)}`)
-          .then(r=>r.json()).then(d=>!!d.ok).catch(()=>false)
-      : Promise.resolve(true);
+    // 🔁 Live validation for qBittorrent fields
+    [qbitHostInput, qbitUserInput, qbitPassInput, qbitDaysFromInput, qbitDaysToInput].forEach(input => {
+      if (input) input.addEventListener('input', validateQbitFields);
+    });
 
-    ensurePromise.then(ok=>{
-      if (!ok) {
-        messageBox.innerHTML = `<div style="color:red;">❌ Could not create exclusions.txt</div>`;
-        messageBox.style.display = 'block';
+    // 🔁 Also revalidate when toggling the "Enable Qbittorrent Script" checkbox
+    if (qbitCheckbox) qbitCheckbox.addEventListener('change', validateQbitFields);
+
+    // 🔁 Dynamic validation between Days From and Days To
+    [qbitDaysFromInput, qbitDaysToInput].forEach(input => {
+      if (input) {
+        input.addEventListener('input', () => {
+          const fromVal = parseInt(qbitDaysFromInput.value, 10);
+          const toVal = parseInt(qbitDaysToInput.value, 10);
+          const validOrder = !isNaN(fromVal) && !isNaN(toVal) && fromVal < toVal;
+
+          document.getElementById("qbit-days-order-warning").style.display = validOrder ? "none" : "block";
+          qbitDaysFromInput.classList.toggle("invalid", !validOrder);
+          qbitDaysToInput.classList.toggle("invalid", !validOrder);
+        });
+      }
+    });
+
+    // ===== Exclusions picker (helper + csrf_token) =====
+    const modal = document.getElementById('exclusion-modal');
+    const grid = document.getElementById('picker-grid');
+    const crumbs = document.getElementById('crumbs');
+    const btnUp = document.getElementById('btn-up');
+    const btnClose = document.getElementById('btn-close');
+    const btnAdd = document.getElementById('btn-add');
+    const btnRemove = document.getElementById('btn-remove');
+    const toast = document.getElementById('picker-toast');
+    let currentPath = '/mnt';
+
+    let toastQueueDelay = 0; // keeps a running delay so toasts stagger
+
+    function showToast(msg, type = 'ok') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const t = document.createElement('div');
+      t.textContent = msg;
+
+      t.style.color = type === 'err' ? '#ffaaaa' : '#00ff99';
+      t.style.padding = '0px 0px';
+      t.style.borderRadius = '0px';
+      t.style.fontWeight = '600';
+      t.style.boxShadow = '0 0 6px rgba(0,0,0,0.3)';
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(30px)'; // slide from right
+      t.style.transition = 'opacity .3s ease, transform .3s ease';
+      t.style.minWidth = '160px';
+      t.style.textAlign = 'right';
+
+      container.appendChild(t);
+
+      // apply a small delay so multiple toasts don't appear at the exact same time
+      const delay = toastQueueDelay;
+      toastQueueDelay += 1000; // 1s between toasts
+
+      setTimeout(() => {
+        t.style.opacity = '1';
+        t.style.transform = 'translateX(0)';
+      }, delay + 50);
+
+      // fade out after it’s been visible for ~2 s
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transform = 'translateX(30px)';
+        setTimeout(() => t.remove(), 300);
+      }, delay + 2350);
+
+      // reset queue after a few seconds (so future toasts don't keep offsetting forever)
+      setTimeout(() => { toastQueueDelay = 0; }, delay + 3000);
+    }
+
+    function openPicker() { modal.style.display = 'flex'; loadDir('/mnt'); }
+    function closePicker() { modal.style.display = 'none'; }
+
+    exclField.addEventListener('click', openPicker);
+    btnClose.addEventListener('click', closePicker);
+
+    function buildCrumbs(path) {
+      crumbs.innerHTML = '';
+
+      // Normalize and split
+      const cleanPath = path.replace(/\/+$/, '');
+      if (!cleanPath.startsWith('/mnt')) {
+        loadDir('/mnt');
         return;
       }
 
-      const settings = {
-        POOL_NAME: poolSelect.value,
-        THRESHOLD: thresholdInput.value,
-        INTERVAL: intervalInput.value,
-        DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-        ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-        AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-        AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
-        AGE_DAYS: ageDaysInput.value,
-        SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
-        SIZE_MB: sizeMbInput.value,
-        EXCLUSIONS_ENABLED: enableExcl.checked ? 'yes' : 'no',
-        QBITTORRENT_SCRIPT: qbitCheckbox.checked ? 'yes' : 'no',
-        QBITTORRENT_HOST: document.getElementById('qbit_host').value,
-        QBITTORRENT_USERNAME: document.getElementById('qbit_user').value,
-        QBITTORRENT_PASSWORD: document.getElementById('qbit_pass').value,
-        QBITTORRENT_DAYS_FROM: document.getElementById('qbit_days_from').value,
-        QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value,
-        QBITTORRENT_STATUS: document.getElementById('qbit_status').value,
-        HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
-        FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
-        CONTAINER_NAMES: document.getElementById('container_names').value,
-        ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
-        HASH_PATH: document.getElementById('HASH_PATH').value,
-        ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
-      };
+      const parts = cleanPath.split('/').filter(Boolean);
+      let accum = '';
 
-const ordered = [
-  ['POOL_NAME', settings.POOL_NAME],
-  ['THRESHOLD', settings.THRESHOLD],
-  ['INTERVAL', settings.INTERVAL],
-  ['DRY_RUN', settings.DRY_RUN],
-  ['ALLOW_DURING_PARITY', settings.ALLOW_DURING_PARITY],
-  ['AUTOSTART', settings.AUTOSTART],
-  ['AGE_BASED_FILTER', settings.AGE_BASED_FILTER],
-  ['AGE_DAYS', settings.AGE_DAYS],
-  ['SIZE_BASED_FILTER', settings.SIZE_BASED_FILTER],
-  ['SIZE_MB', settings.SIZE_MB],
-  ['EXCLUSIONS_ENABLED', settings.EXCLUSIONS_ENABLED],
-  ['QBITTORRENT_SCRIPT', settings.QBITTORRENT_SCRIPT],
-  ['QBITTORRENT_HOST', settings.QBITTORRENT_HOST],
-  ['QBITTORRENT_USERNAME', settings.QBITTORRENT_USERNAME],
-  ['QBITTORRENT_PASSWORD', settings.QBITTORRENT_PASSWORD],
-  ['QBITTORRENT_DAYS_FROM', settings.QBITTORRENT_DAYS_FROM],
-  ['QBITTORRENT_DAYS_TO', settings.QBITTORRENT_DAYS_TO],
-  ['QBITTORRENT_STATUS', settings.QBITTORRENT_STATUS],
-  ['HIDDEN_FILTER', settings.HIDDEN_FILTER],
-  ['FORCE_RECONSTRUCTIVE_WRITE', settings.FORCE_RECONSTRUCTIVE_WRITE],
-  ['CONTAINER_NAMES', settings.CONTAINER_NAMES],
-  ['ENABLE_JDUPES', settings.ENABLE_JDUPES],
-  ['HASH_PATH', settings.HASH_PATH],
-  ['ENABLE_CLEANUP', settings.ENABLE_CLEANUP],
-];
-const query = new URLSearchParams(ordered).toString();
-      const confirmBadge = document.getElementById('save-confirmation');
-      messageBox.innerHTML = '';
-      messageBox.style.display = 'block';
+      // Add root first
+      const root = document.createElement('span');
+      root.textContent = '/mnt';
+      root.className = 'crumb';
+      root.dataset.path = '/mnt';
+      crumbs.appendChild(root);
 
-      fetch('/plugins/automover/helpers/save_settings.php?' + query + '&csrf_token=' + encodeURIComponent(csrf_token))
-.then(res => res.text())
-.then(text => {
-  let data;
-  try { 
-    data = JSON.parse(text); 
-  } catch(e) { 
-    throw new Error('Invalid JSON'); 
-  }
+      // Build deeper segments
+      for (let i = 1; i < parts.length; i++) {
+        const seg = parts[i];
+        const sep = document.createElement('span');
+        sep.textContent = ' / ';
+        sep.className = 'sep';
+        crumbs.appendChild(sep);
 
-  if (data.status === 'ok') {
-    // ✅ Show the "Saved & Started Automover" toast (matching Stop Automover)
-    const confirmBadge = document.getElementById('save-confirmation');
-    confirmBadge.style.display = 'inline-block';
-    confirmBadge.style.opacity = '0';
-    confirmBadge.style.animation = 'none';
-    void confirmBadge.offsetWidth; // restart animation cleanly
-    confirmBadge.style.animation = 'flash .4s ease';
-    confirmBadge.style.opacity = '1';
+        accum = accum ? accum + '/' + seg : '/mnt/' + seg;
 
-    setTimeout(() => {
-      confirmBadge.style.opacity = '0';
-      confirmBadge.style.display = 'none'; // collapse space after fade
-    }, 3000);
-
-    // 📝 Append any save messages
-    messageBox.innerHTML = '';
-    messageBox.style.display = 'block';
-    if (Array.isArray(data.messages)) {
-      data.messages.forEach(msg => {
-        const line = document.createElement('div');
-        line.textContent = msg;
-        messageBox.appendChild(line);
-      });
+        const a = document.createElement('span');
+        a.textContent = seg;
+        a.className = 'crumb';
+        a.dataset.path = accum;
+        crumbs.appendChild(a);
+      }
     }
 
-    // 🚀 Start Automover Cron
-    fetch('/plugins/automover/helpers/start_cron.php?' + new URLSearchParams(settings) + '&csrf_token=' + encodeURIComponent(csrf_token))
-      .then(res => res.json())
-      .then(startData => {
-        updateStatus();
-        if (Array.isArray(startData.messages)) {
-          startData.messages.forEach(msg => {
-            const line = document.createElement('div');
-            line.textContent = msg;
-            messageBox.appendChild(line);
+    // ✅ Delegated click handler (only one global listener needed)
+    crumbs.addEventListener('click', e => {
+      const crumb = e.target.closest('.crumb');
+      if (!crumb) return;
+      const path = crumb.dataset.path;
+      if (!path) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      loadDir(path);
+    });
+
+    function loadDir(path) {
+      const url = `/plugins/automover/helpers/update_exclusions.php?action=list_dir&path=${encodeURIComponent(path)}&csrf_token=${encodeURIComponent(csrf_token)}`;
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.ok) throw new Error('list_dir failed');
+          currentPath = data.path || path;
+          buildCrumbs(currentPath);
+          grid.innerHTML = '';
+          data.items.forEach(it => {
+            const row = document.createElement('div');
+            row.className = 'row';
+
+            // --- Checkbox ---
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.dataset.path = it.path;
+
+            // Disable if it's a root-level /mnt entry (like /mnt/disk1, /mnt/cache, etc.)
+            if (/^\/mnt\/[^/]+$/.test(it.path)) {
+              cb.disabled = true;
+              cb.title = "Can't exclude entire disks or root pools";
+              cb.style.cursor = 'not-allowed';
+            }
+
+            // --- Name / Icon / Color ---
+            const name = document.createElement('div');
+            name.className = 'name';
+            name.title = it.path;
+
+            // Folder
+            if (it.isDir) {
+              name.innerHTML = `<span class="icon">📁</span><span class="label">${it.name}</span>`;
+              name.style.color = 'var(--primary-blue)';
+              name.style.cursor = 'pointer';
+              name.addEventListener('click', () => loadDir(it.path));
+            } else {
+              // File
+              name.innerHTML = `<span class="icon">📄</span><span class="label">${it.name}</span>`;
+              name.style.color = '#fff';
+            }
+
+            // --- Assemble Row ---
+            row.appendChild(cb);
+            row.appendChild(name);
+            grid.appendChild(row);
           });
-        }
+        })
+        .catch(() => showToast('Error loading directory'));
+    }
 
-        if (startData.flag_changed && typeof moverCheckbox !== 'undefined') {
-          moverCheckbox.checked = false;
-          const notice = document.createElement('div');
-          notice.style.color = 'orange';
-          notice.textContent = '';
-          messageBox.appendChild(notice);
-        }
-      })
-      .catch(() => {
-        document.getElementById('status-text').textContent = 'Error starting cron';
-        messageBox.innerHTML += `<div style="color:red;">❌ Error starting Automover</div>`;
+    btnUp.addEventListener('click', () => {
+      if (!currentPath || currentPath === '/mnt') return;
+      const up = currentPath.replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/mnt';
+      loadDir(up.startsWith('/mnt') ? up : '/mnt');
+    });
+
+    function selectedPaths() { return Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.dataset.path); }
+
+    function refreshExclusionCount() {
+      fetch(`/plugins/automover/helpers/update_exclusions.php?action=get_exclusion_count&csrf_token=${encodeURIComponent(csrf_token)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            exclCount.textContent = `${d.count} item${d.count === 1 ? '' : 's'}`;
+            exclField.value = d.count > 0 ? `Click to open file picker` : 'Click to open file picker';
+          }
+        }).catch(() => { });
+    }
+
+    btnAdd.addEventListener('click', () => {
+      const paths = selectedPaths();
+      if (paths.length === 0) { showToast('No selection'); return; }
+      const body = new URLSearchParams(); body.append('csrf_token', csrf_token); paths.forEach(p => body.append('paths[]', p));
+      fetch('/plugins/automover/helpers/update_exclusions.php?action=add_exclusions', { method: 'POST', body })
+        .then(r => r.json()).then(d => {
+          if (d.ok) { showToast('✅ Added'); refreshExclusionCount(); }
+          else showToast('Add failed');
+        }).catch(() => showToast('Add failed'));
+    });
+
+    btnRemove.addEventListener('click', () => {
+      const paths = selectedPaths();
+      if (paths.length === 0) { showToast('No selection'); return; }
+      const body = new URLSearchParams(); body.append('csrf_token', csrf_token); paths.forEach(p => body.append('paths[]', p));
+      fetch('/plugins/automover/helpers/update_exclusions.php?action=remove_exclusions', { method: 'POST', body })
+        .then(r => r.json()).then(d => {
+          if (d.ok) { showToast('✅ Removed'); refreshExclusionCount(); }
+          else showToast('Remove failed');
+        }).catch(() => showToast('Remove failed'));
+    });
+
+    btnClose.addEventListener('click', () => {
+      addExtBtn.style.display = 'none';
+      removeExtBtn.style.display = 'none';
+      selectedExts.clear();
+      modal.style.display = 'none';
+    });
+
+    // WILDCARD
+    const addExtBtn = document.getElementById('addExtBtn');
+    const removeExtBtn = document.getElementById('removeExtBtn');
+    let selectedExts = new Set();
+
+    document.addEventListener('change', (e) => {
+      if (!e.target.matches('#picker-grid input[type="checkbox"]')) return;
+
+      // collect all checked file extensions
+      selectedExts.clear();
+      const checked = Array.from(document.querySelectorAll('#picker-grid input[type="checkbox"]:checked'));
+      checked.forEach(cb => {
+        if (cb.dataset.isdir === 'true') return; // skip folders
+        const name = cb.dataset.path.split('/').pop();
+        const parts = name.split('.');
+        if (parts.length > 1) selectedExts.add(parts.pop());
       });
 
-  } else {
-    messageBox.innerHTML = `<div style="color:red;">❌ ${data.message || 'Save failed'}</div>`;
-  }
-})
-.catch(() => { 
-  messageBox.innerHTML = `<div style="color:red;">❌ Save request failed</div>`; 
-});
-    });
-  });
-
-  // Initial counts
-  function refreshExclusionCount(){
-    fetch(`/plugins/automover/helpers/update_exclusions.php?action=get_exclusion_count&csrf_token=${encodeURIComponent(csrf_token)}`)
-      .then(r=>r.json())
-      .then(d=>{
-        if (d.ok){
-          exclCount.textContent = `${d.count} item${d.count===1?'':'s'}`;
-          exclField.value = d.count>0 ? `Click to open file picker` : 'Click to open file picker';
-        }
-      }).catch(()=>{});
-  }
-  refreshExclusionCount();
-});
-
-// Keep pool-usage warning + CA update check
-document.addEventListener("DOMContentLoaded", () => {
-  const poolSelect = document.getElementById('pool');
-  const poolWarning = document.getElementById('pool-warning');
-  function checkPoolUsage(poolName){
-    if (!poolName) { poolWarning.style.display='none'; return; }
-    fetch(`/plugins/automover/helpers/check_pool_usage.php?pool=${encodeURIComponent(poolName)}`)
-      .then(res=>res.json())
-      .then(data=>{ poolWarning.style.display = data.in_use ? 'none' : 'block'; })
-      .catch(()=>{ poolWarning.style.display = 'none'; });
-  }
-  poolSelect.addEventListener('change', () => checkPoolUsage(poolSelect.value));
-  setTimeout(() => { checkPoolUsage(poolSelect.value); }, 250);
-});
-if ( typeof caPluginUpdateCheck === "function" ) {
-  caPluginUpdateCheck("automover.plg",{name:"Automover"});
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const qbitToggle = document.getElementById('qbit_script');
-  const warning = document.getElementById('python-warning');
-  const pythonInstalled = warning.dataset.pythonInstalled === '1';
-
-  const updateWarningVisibility = () => {
-    if (qbitToggle.checked && !pythonInstalled) {
-      warning.style.display = 'block';
-    } else {
-      warning.style.display = 'none';
-    }
-  };
-
-  if (qbitToggle) {
-    qbitToggle.addEventListener('change', updateWarningVisibility);
-    updateWarningVisibility(); // Run on page load to reflect current state
-  }
-});
-
-   $('.automovertip').tooltipster({
-        maxWidth: 300
+      if (selectedExts.size > 0) {
+        const label = Array.from(selectedExts).map(e => `*.${e}`).join(', ');
+        addExtBtn.textContent = `Add extensions as wildcards`;
+        removeExtBtn.textContent = `Remove extensions as wildcards`;
+        addExtBtn.style.display = 'inline-block';
+        removeExtBtn.style.display = 'inline-block';
+      } else {
+        addExtBtn.style.display = 'none';
+        removeExtBtn.style.display = 'none';
+      }
     });
 
-function showToast(toastEl, message, type = "ok") {
-  if (!toastEl) return;
-  toastEl.textContent = message;
-  toastEl.style.color = type === "ok" ? "#00ffaa" : "#ff5555";
-  toastEl.classList.remove("hide");
-  void toastEl.offsetWidth;
-  toastEl.classList.add("show");
+    // ✅ Add extensions as wildcards
+    addExtBtn.addEventListener('click', () => {
+      if (selectedExts.size === 0) return;
 
-  clearTimeout(toastEl._timer);
-  toastEl._timer = setTimeout(() => {
-    toastEl.classList.remove("show");
-    toastEl.classList.add("hide");
-    // fully remove after fade to reclaim space
-    setTimeout(() => (toastEl.textContent = ""), 400);
-  }, 2000);
-}
+      const body = new URLSearchParams();
+      body.append('csrf_token', csrf_token);
+      Array.from(selectedExts).forEach(ext => body.append('paths[]', `*.${ext}`));
 
-// === Clear Log Buttons (toast feedback) ===
-const clearLastRunBtn = document.getElementById("clear-last-run-log");
-const clearMoverBtn   = document.getElementById("clear-mover-log");
-const toastLast       = document.getElementById("toast-last");
-const toastMover      = document.getElementById("toast-mover");
-
-if (clearLastRunBtn) {
-  clearLastRunBtn.addEventListener("click", function () {
-    if (confirm("Are you sure you want to clear the Last Run Log?")) {
-      fetch("/plugins/automover/helpers/clear_log.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-CSRF-TOKEN": csrfToken
-        },
-        body: "log=last&csrf_token=" + encodeURIComponent(csrfToken)
+      fetch('/plugins/automover/helpers/update_exclusions.php?action=add_exclusions', {
+        method: 'POST',
+        body
       })
-      .then(r => r.json())
-      .then(data => {
-        showToast(toastLast, data.message, data.ok ? "ok" : "err");
-        if (data.ok) document.getElementById("last-run-log").textContent = "";
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            let delay = 0;
+            Array.from(selectedExts).forEach(ext => {
+              setTimeout(() => showToast(`✅ Added *.${ext}`), delay);
+              delay += 350;
+            });
+          } else showToast('Failed to add wildcard(s)', 'err');
+        })
+        .catch(err => {
+          console.error('Add wildcard error:', err);
+          showToast('Error adding wildcard(s)', 'err');
+        });
+    });
+
+    // ✅ Remove extensions as wildcards
+    removeExtBtn.addEventListener('click', () => {
+      if (selectedExts.size === 0) return;
+
+      const body = new URLSearchParams();
+      body.append('csrf_token', csrf_token);
+      Array.from(selectedExts).forEach(ext => body.append('paths[]', `*.${ext}`));
+
+      fetch('/plugins/automover/helpers/update_exclusions.php?action=remove_exclusions', {
+        method: 'POST',
+        body
       })
-      .catch(() => showToast(toastLast, "Failed to clear log", "err"));
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            let delay = 0;
+            Array.from(selectedExts).forEach(ext => {
+              setTimeout(() => showToast(`✅ Removed *.${ext}`), delay);
+              delay += 350;
+            });
+          } else showToast('Failed to remove wildcard(s)', 'err');
+        })
+        .catch(err => {
+          console.error('Remove wildcard error:', err);
+          showToast('Error removing wildcard(s)', 'err');
+        });
+    });
+
+    // Save & Start
+    // === Save & Start Automover ===
+    saveBtn.addEventListener('click', function () {
+      const intervalInput = document.getElementById('interval');
+      const cronInput = document.getElementById('cron_expression');
+      const modeSelect = document.getElementById('interval_mode');
+      const thresholdInput = document.getElementById('threshold');
+      const form = document.getElementById('automover-settings');
+
+      const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+      const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+      const ageDaysInput = document.getElementById('age_days');
+      const sizeMbInput = document.getElementById('size_mb');
+
+      const ageDaysValid = !document.getElementById('age_based_filter').checked ||
+        validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
+      const sizeMbValid = !document.getElementById('size_based_filter').checked ||
+        validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
+      const qbitValid = validateQbitFields();
+
+      // --- Cron validation (only when mode = 'cron')
+      let cronValid = true;
+      if (modeSelect.value === 'cron') {
+        const cronParts = cronInput.value.trim().split(/\s+/);
+        cronValid = cronParts.length === 5;
+        document.getElementById('cron-warning').style.display = cronValid ? 'none' : 'block';
+        cronInput.classList.toggle('invalid', !cronValid);
+      }
+
+      // --- Final validation check ---
+      if (!(intervalValid && thresholdValid && ageDaysValid && sizeMbValid && qbitValid && cronValid)) {
+        form.classList.add('shake');
+        setTimeout(() => form.classList.remove('shake'), 300);
+        return;
+      }
+
+      // --- Build form data ---
+      const formData = new URLSearchParams();
+
+      formData.append('csrf_token', csrfToken);
+      formData.append('MODE', modeSelect.value);
+      formData.append('INTERVAL', intervalInput.value);
+      formData.append('CRON_EXPRESSION', cronInput.value);
+
+      // include other config fields already on page
+      const pool = document.getElementById('pool').value;
+      const threshold = document.getElementById('threshold').value;
+      const dryRun = document.getElementById('dry_run').checked ? 'yes' : 'no';
+      const autostart = document.getElementById('autostart').checked ? 'yes' : 'no';
+      const allowDuringParity = document.getElementById('allow_during_parity').checked ? 'yes' : 'no';
+      const ageFilter = document.getElementById('age_based_filter').checked ? 'yes' : 'no';
+      const sizeFilter = document.getElementById('size_based_filter').checked ? 'yes' : 'no';
+      const enableExcl = document.getElementById('enable_exclusions').checked ? 'yes' : 'no';
+      const qbitScript = document.getElementById('qbit_script').checked ? 'yes' : 'no';
+      const hiddenFilter = document.getElementById('hidden_filter').checked ? 'yes' : 'no';
+      const turboWrite = document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no';
+      const enableCleanup = document.getElementById('enable_cleanup').checked ? 'yes' : 'no';
+      const enableJdupes = document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no';
+      const hashPath = document.getElementById('HASH_PATH')?.value || '';
+      const containerNames = document.getElementById('container_names').value.trim();
+
+      formData.append('POOL_NAME', pool);
+      formData.append('THRESHOLD', threshold);
+      formData.append('DRY_RUN', dryRun);
+      formData.append('AUTOSTART', autostart);
+      formData.append('ALLOW_DURING_PARITY', allowDuringParity);
+      formData.append('AGE_BASED_FILTER', ageFilter);
+      formData.append('AGE_DAYS', ageDaysInput.value);
+      formData.append('SIZE_BASED_FILTER', sizeFilter);
+      formData.append('SIZE_MB', sizeMbInput.value);
+      formData.append('EXCLUSIONS_ENABLED', enableExcl);
+      formData.append('QBITTORRENT_SCRIPT', qbitScript);
+      formData.append('HIDDEN_FILTER', hiddenFilter);
+      formData.append('FORCE_RECONSTRUCTIVE_WRITE', turboWrite);
+      formData.append('ENABLE_CLEANUP', enableCleanup);
+      formData.append('ENABLE_JDUPES', enableJdupes);
+      formData.append('HASH_PATH', hashPath);
+      formData.append('CONTAINER_NAMES', containerNames);
+
+      // === qBittorrent fields ===
+      const qbitHost = document.getElementById('qbit_host').value.trim();
+      const qbitUser = document.getElementById('qbit_user').value.trim();
+      const qbitPass = document.getElementById('qbit_pass').value.trim();
+      const qbitDaysFrom = document.getElementById('qbit_days_from').value.trim();
+      const qbitDaysTo = document.getElementById('qbit_days_to').value.trim();
+      const qbitStatus = document.getElementById('qbit_status').value.trim();
+
+      formData.append('QBITTORRENT_HOST', qbitHost);
+      formData.append('QBITTORRENT_USERNAME', qbitUser);
+      formData.append('QBITTORRENT_PASSWORD', qbitPass);
+      formData.append('QBITTORRENT_DAYS_FROM', qbitDaysFrom);
+      formData.append('QBITTORRENT_DAYS_TO', qbitDaysTo);
+      formData.append('QBITTORRENT_STATUS', qbitStatus);
+
+      fetch('/plugins/automover/helpers/start_cron.php', {
+        method: 'POST',
+        body: formData
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            confirmBadge.style.display = 'block';
+            confirmBadge.style.opacity = '1';
+            confirmBadge.style.animation = 'flash 0.4s ease';
+
+            setTimeout(() => {
+              confirmBadge.style.opacity = '0';
+              confirmBadge.style.animation = '';
+              setTimeout(() => {
+                confirmBadge.style.display = 'none';
+              }, 400);
+            }, 2000);
+          } else {
+            alert('❌ Failed to update Automover schedule: ' + (data.message || 'Unknown error'));
+          }
+        })
+        .catch(err => {
+          console.error('Save error:', err);
+          alert('❌ Save failed — check console for details.');
+        });
+    });
+
+    // Initial counts
+    function refreshExclusionCount() {
+      fetch(`/plugins/automover/helpers/update_exclusions.php?action=get_exclusion_count&csrf_token=${encodeURIComponent(csrf_token)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            exclCount.textContent = `${d.count} item${d.count === 1 ? '' : 's'}`;
+            exclField.value = d.count > 0 ? `Click to open file picker` : 'Click to open file picker';
+          }
+        }).catch(() => { });
+    }
+    refreshExclusionCount();
+  });
+
+  // Keep pool-usage warning + CA update check
+  document.addEventListener("DOMContentLoaded", () => {
+    const poolSelect = document.getElementById('pool');
+    const poolWarning = document.getElementById('pool-warning');
+    function checkPoolUsage(poolName) {
+      if (!poolName) { poolWarning.style.display = 'none'; return; }
+      fetch(`/plugins/automover/helpers/check_pool_usage.php?pool=${encodeURIComponent(poolName)}`)
+        .then(res => res.json())
+        .then(data => { poolWarning.style.display = data.in_use ? 'none' : 'block'; })
+        .catch(() => { poolWarning.style.display = 'none'; });
+    }
+    poolSelect.addEventListener('change', () => checkPoolUsage(poolSelect.value));
+    setTimeout(() => { checkPoolUsage(poolSelect.value); }, 250);
+  });
+  if (typeof caPluginUpdateCheck === "function") {
+    caPluginUpdateCheck("automover.plg", { name: "Automover" });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const qbitToggle = document.getElementById('qbit_script');
+    const warning = document.getElementById('python-warning');
+    const pythonInstalled = warning.dataset.pythonInstalled === '1';
+
+    const updateWarningVisibility = () => {
+      if (qbitToggle.checked && !pythonInstalled) {
+        warning.style.display = 'block';
+      } else {
+        warning.style.display = 'none';
+      }
+    };
+
+    if (qbitToggle) {
+      qbitToggle.addEventListener('change', updateWarningVisibility);
+      updateWarningVisibility(); // Run on page load to reflect current state
     }
   });
-}
 
-if (clearMoverBtn) {
-  clearMoverBtn.addEventListener("click", function () {
-    if (confirm("Are you sure you want to clear the Mover Log?")) {
-      fetch("/plugins/automover/helpers/clear_log.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-CSRF-TOKEN": csrfToken
-        },
-        body: "log=mover&csrf_token=" + encodeURIComponent(csrfToken)
-      })
-      .then(r => r.json())
-      .then(data => {
-        showToast(toastMover, data.message, data.ok ? "ok" : "err");
-        if (data.ok) {
-          document.getElementById("automover-log").textContent = "";
-          document.getElementById("log-counts").textContent = "";
-        }
-      })
-      .catch(() => showToast(toastMover, "Failed to clear log", "err"));
-    }
+  $('.automovertip').tooltipster({
+    maxWidth: 300
   });
-}
+
+  function showToast(toastEl, message, type = "ok") {
+    if (!toastEl) return;
+    toastEl.textContent = message;
+    toastEl.style.color = type === "ok" ? "#00ffaa" : "#ff5555";
+    toastEl.classList.remove("hide");
+    void toastEl.offsetWidth;
+    toastEl.classList.add("show");
+
+    clearTimeout(toastEl._timer);
+    toastEl._timer = setTimeout(() => {
+      toastEl.classList.remove("show");
+      toastEl.classList.add("hide");
+      // fully remove after fade to reclaim space
+      setTimeout(() => (toastEl.textContent = ""), 400);
+    }, 2000);
+  }
+
+  // === Clear Log Buttons (toast feedback) ===
+  const clearLastRunBtn = document.getElementById("clear-last-run-log");
+  const clearMoverBtn = document.getElementById("clear-mover-log");
+  const toastLast = document.getElementById("toast-last");
+  const toastMover = document.getElementById("toast-mover");
+
+  if (clearLastRunBtn) {
+    clearLastRunBtn.addEventListener("click", function () {
+      if (confirm("Are you sure you want to clear the Last Run Log?")) {
+        fetch("/plugins/automover/helpers/clear_log.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRF-TOKEN": csrfToken
+          },
+          body: "log=last&csrf_token=" + encodeURIComponent(csrfToken)
+        })
+          .then(r => r.json())
+          .then(data => {
+            showToast(toastLast, data.message, data.ok ? "ok" : "err");
+            if (data.ok) document.getElementById("last-run-log").textContent = "";
+          })
+          .catch(() => showToast(toastLast, "Failed to clear log", "err"));
+      }
+    });
+  }
+
+  if (clearMoverBtn) {
+    clearMoverBtn.addEventListener("click", function () {
+      if (confirm("Are you sure you want to clear the Mover Log?")) {
+        fetch("/plugins/automover/helpers/clear_log.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRF-TOKEN": csrfToken
+          },
+          body: "log=mover&csrf_token=" + encodeURIComponent(csrfToken)
+        })
+          .then(r => r.json())
+          .then(data => {
+            showToast(toastMover, data.message, data.ok ? "ok" : "err");
+            if (data.ok) {
+              document.getElementById("automover-log").textContent = "";
+              document.getElementById("log-counts").textContent = "";
+            }
+          })
+          .catch(() => showToast(toastMover, "Failed to clear log", "err"));
+      }
+    });
+  }
 </script>
 <script>
-// === Disable buttons immediately after click ===
-document.addEventListener("DOMContentLoaded", () => {
-  const actionButtons = [
-    document.getElementById("save-settings"),
-    document.getElementById("stop-button"),
-    document.getElementById("moveNowBtn"),
-  ];
+  // === Disable buttons immediately after click ===
+  document.addEventListener("DOMContentLoaded", () => {
+    const actionButtons = [
+      document.getElementById("save-settings"),
+      document.getElementById("stop-button"),
+      document.getElementById("moveNowBtn"),
+    ];
 
-  actionButtons.forEach(btn => {
-    if (!btn) return;
+    actionButtons.forEach(btn => {
+      if (!btn) return;
 
-    btn.addEventListener("click", () => {
-      // Immediately disable the clicked button
-      btn.disabled = true;
-      btn.style.backgroundColor = "#000";
-      btn.style.opacity = "0.6";
-      btn.style.cursor = "not-allowed";
+      btn.addEventListener("click", () => {
+        // Immediately disable the clicked button
+        btn.disabled = true;
+        btn.style.backgroundColor = "#000";
+        btn.style.opacity = "0.6";
+        btn.style.cursor = "not-allowed";
 
-      // Optionally disable *all* other action buttons too
-      actionButtons.forEach(other => {
-        if (other && other !== btn) {
-          other.disabled = true;
-          other.style.backgroundColor = "#000";
-          other.style.opacity = "0.6";
-          other.style.cursor = "not-allowed";
-        }
+        // Optionally disable *all* other action buttons too
+        actionButtons.forEach(other => {
+          if (other && other !== btn) {
+            other.disabled = true;
+            other.style.backgroundColor = "#000";
+            other.style.opacity = "0.6";
+            other.style.cursor = "not-allowed";
+          }
+        });
+
+        // Optional: automatically re-enable after some time (e.g. 60s)
+        // setTimeout(() => {
+        //   actionButtons.forEach(b => {
+        //     if (b) {
+        //       b.disabled = false;
+        //       b.style.backgroundColor = "";
+        //       b.style.opacity = "1";
+        //       b.style.cursor = "pointer";
+        //     }
+        //   });
+        // }, 60000);
       });
-
-      // Optional: automatically re-enable after some time (e.g. 60s)
-      // setTimeout(() => {
-      //   actionButtons.forEach(b => {
-      //     if (b) {
-      //       b.disabled = false;
-      //       b.style.backgroundColor = "";
-      //       b.style.opacity = "1";
-      //       b.style.cursor = "pointer";
-      //     }
-      //   });
-      // }, 60000);
     });
   });
-});
 </script>
 <?php if (file_exists('/boot/config/plugins/ca.mover.tuning.plg')): ?>
-  <div id="mover-tuning-warning" style="
+<div id="mover-tuning-warning" style="
     position: fixed;
     bottom: 0%;
     left: 52%;
@@ -2457,12 +2577,12 @@ document.addEventListener("DOMContentLoaded", () => {
     max-width: 80%;
     text-align: center;
   ">
-    ⚠️ Mover Tuning plugin appears to be installed.<br>
-    Having both can result in conflicts between <b>Mover Tuning</b> and <b>Automover</b>.<br>
-    Consider uninstalling one to avoid incompatibility issues.
+  ⚠️ Mover Tuning plugin appears to be installed.<br>
+  Having both can result in conflicts between <b>Mover Tuning</b> and <b>Automover</b>.<br>
+  Consider uninstalling one to avoid incompatibility issues.
 
-    <!-- ✅ Close “X” -->
-    <button id="mover-tuning-close" style="
+  <!-- ✅ Close “X” -->
+  <button id="mover-tuning-close" style="
       position: absolute;
       top: -11px;
       right: -38px;
@@ -2474,20 +2594,20 @@ document.addEventListener("DOMContentLoaded", () => {
       cursor: pointer;
       line-height: 1;
     " title="Dismiss this warning">×</button>
-  </div>
+</div>
 
-  <script>
-    // Close handler
-    document.addEventListener('DOMContentLoaded', () => {
-      const closeBtn = document.getElementById('mover-tuning-close');
-      const popup = document.getElementById('mover-tuning-warning');
-      if (closeBtn && popup) {
-        closeBtn.addEventListener('click', () => {
-          popup.style.opacity = '0';
-          popup.style.transition = 'opacity 0.3s ease';
-          setTimeout(() => popup.remove(), 300);
-        });
-      }
-    });
-  </script>
+<script>
+  // Close handler
+  document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('mover-tuning-close');
+    const popup = document.getElementById('mover-tuning-warning');
+    if (closeBtn && popup) {
+      closeBtn.addEventListener('click', () => {
+        popup.style.opacity = '0';
+        popup.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => popup.remove(), 300);
+      });
+    }
+  });
+</script>
 <?php endif; ?>
