@@ -13,9 +13,6 @@ STATUS_FILE="/tmp/automover/automover_status.txt"
 mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover.lock"
 
-# Clear old in-use file list before each run
-> "$IN_USE_FILE"
-
 # Preserve whatever status was set before starting
 PREV_STATUS="Stopped"
 if [[ -f "$STATUS_FILE" ]]; then
@@ -24,7 +21,7 @@ fi
 
 if [ -f "$LOCK_FILE" ]; then
   if ps -p "$(cat "$LOCK_FILE")" > /dev/null 2>&1; then
-    echo "Another instance of $SCRIPT_NAME is already running exiting without running" >> "$LAST_RUN_FILE"
+    echo "Another instance of $SCRIPT_NAME is already running. Exiting." >> "$LAST_RUN_FILE"
     exit 0
   else
     rm -f "$LOCK_FILE"
@@ -112,7 +109,7 @@ for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
            QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
-           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP MODE CRON_EXPRESSION STOP_THRESHOLD; do
+           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP MODE CRON_EXPRESSION; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -166,6 +163,32 @@ log_session_end() {
 }
 
 # ==========================================================
+#  Generate In-Use File Exclusion List (skip in dry run)
+# ==========================================================
+> "$IN_USE_FILE"
+
+if [[ "$DRY_RUN" == "yes" ]]; then
+  echo "Dry run active — skipping in-use file scan" >> "$LAST_RUN_FILE"
+else
+  EXCLUDES=("user" "user0" "addons" "disks" "remotes" "rootshare")
+  for dir in /mnt/*; do
+    base="$(basename "$dir")"
+    [[ " ${EXCLUDES[*]} " =~ " $base " ]] && continue
+    [[ -d "$dir" ]] || continue
+    lsof +D "$dir" 2>/dev/null | awk -v path="$dir" '
+      $4 ~ /^[0-9]+[rwu]$/ && $9 ~ "^/mnt/" {
+        file=$9
+        if (file ~ "^/mnt/disk[0-9]+/") {
+          sub("^/mnt/disk[0-9]+", "/mnt/user0", file)
+        }
+        print file
+      }
+    ' >> "$IN_USE_FILE"
+  done
+  sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
+fi
+
+# ==========================================================
 #  Parity Check Guard (unless MOVE_NOW)
 # ==========================================================
 if [[ "$ALLOW_DURING_PARITY" == "no" && "$MOVE_NOW" == false ]]; then
@@ -199,7 +222,8 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 # ==========================================================
 #  Setup rsync options (handles dry-run mode)
 # ==========================================================
-RSYNC_OPTS=(-aiH --checksum)
+# OPTION 1: Enhanced rsync flags to preserve owner/group/perms/ACL/xattrs
+RSYNC_OPTS=(-aiHAX --numeric-ids --checksum --perms --owner --group)
 if [[ "$DRY_RUN" == "yes" ]]; then
   RSYNC_OPTS+=(--dry-run)
 else
@@ -291,13 +315,14 @@ if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
 fi
 
 # ==========================================================
-#  Movement Logic (now checks fuser per file dynamically)
+#  Movement Logic
 # ==========================================================
 dry_run_nothing=true
 moved_anything=false
 SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
 
+# Add dry run header message to Automover log (top of file)
 if [[ "$DRY_RUN" == "yes" ]]; then
   echo "Dry run active - the following files would have been moved" > "$AUTOMOVER_LOG"
   echo "" >> "$AUTOMOVER_LOG"
@@ -350,145 +375,131 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     continue
   fi
 
-  excludes=()
-  if [[ "$MOVE_NOW" == false && "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      [[ -z "$line" || "$line" =~ ^# ]] && continue
-      if [[ "$line" == *'*'* || "$line" != /* ]]; then
-        excludes+=("--exclude=$line")
-        continue
-      fi
-      abs_path=$(realpath -m "$line")
-      if [[ "$abs_path" == "$src"* ]]; then
-        rel_path="${abs_path#$src/}"
-        excludes+=("--exclude=$rel_path")
-      fi
-    done < "$EXCLUSIONS_FILE"
-  fi
+excludes=()
+if [[ "$MOVE_NOW" == false && "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" =~ ^# ]] && continue
 
-  # === Hidden filter ===
-  if [[ "$MOVE_NOW" == false && "$HIDDEN_FILTER" == "yes" ]]; then
-    cd "$src" || continue
-    while IFS= read -r hidden_dir; do
-      rel="${hidden_dir#./}"
-      excludes+=("--exclude=$rel" "--exclude=$rel/*" "--exclude=$rel/**")
-    done < <(find . -type d -name '.*' 2>/dev/null)
-    while IFS= read -r hidden_file; do
-      rel="${hidden_file#./}"
-      excludes+=("--exclude=$rel")
-    done < <(find . -type f -name '.*' 2>/dev/null)
-    cd - >/dev/null 2>&1 || true
-  fi
+    # Wildcard or relative pattern — pass as-is
+    if [[ "$line" == *'*'* || "$line" != /* ]]; then
+      excludes+=("--exclude=$line")
+      continue
+    fi
 
-  # === Dynamic fuser per-file exclusion integrated here ===
-  tmpfile=$(mktemp)
+    # Absolute path — convert to relative
+    abs_path=$(realpath -m "$line")
+    if [[ "$abs_path" == "$src"* ]]; then
+      rel_path="${abs_path#$src/}"
+      excludes+=("--exclude=$rel_path")
+    fi
+  done < "$EXCLUSIONS_FILE"
+fi
+
+# === Hidden file/folder filter (strict recursive for both files and directories) ===
+if [[ "$MOVE_NOW" == false && "$HIDDEN_FILTER" == "yes" ]]; then
+
   cd "$src" || continue
 
-  find . -type f -print0 |
-    while IFS= read -r -d '' f; do
-      abs="$src/${f#./}"
-      if ! fuser "$abs" >/dev/null 2>&1; then
-        printf '%s\0' "${f#./}"
-      else
-        echo "$abs" >> "$IN_USE_FILE"
-      fi
-    done > "$tmpfile"
+  # --- Exclude hidden directories (the folder itself and everything inside) ---
+  while IFS= read -r hidden_dir; do
+    rel="${hidden_dir#./}"
+    excludes+=("--exclude=$rel" "--exclude=$rel/*" "--exclude=$rel/**")
+  done < <(find . -type d -name '.*' 2>/dev/null)
 
-# Correctly sort null-delimited tmpfile contents alphabetically
-mapfile -d '' files < <(cat "$tmpfile" | LC_ALL=C sort -z)
+  # --- Exclude hidden files (not inside hidden dirs) ---
+  while IFS= read -r hidden_file; do
+    rel="${hidden_file#./}"
+    excludes+=("--exclude=$rel")
+  done < <(find . -type f -name '.*' 2>/dev/null)
 
-for relpath in "${files[@]}"; do
-  abs="$src/${relpath#./}"
-  rel="${relpath#./}"
-  dest_path="$dst/$rel"
+  cd - >/dev/null 2>&1 || true
+fi
 
-  # Skip in-use files if any slipped through
-  if fuser "$abs" >/dev/null 2>&1; then
-    echo "$abs" >> "$IN_USE_FILE"
-    continue
-  fi
-
-  # === Build destination directory tree and mirror owner/perms per level ===
-  rel_dir="$(dirname "$rel")"
-  [[ "$rel_dir" == "." ]] && rel_dir=""
-  if [[ -n "$rel_dir" && "$DRY_RUN" != "yes" ]]; then
-    IFS='/' read -ra PARTS <<< "$rel_dir"
-    accum=""
-    for part in "${PARTS[@]}"; do
-      [[ -z "$part" ]] && continue
-      accum="${accum:+$accum/}$part"
-      src_dir="$src/$accum"
-      dst_dir="$dst/$accum"
-
-      if [[ ! -d "$dst_dir" ]]; then
-        mkdir -p "$dst_dir"
-      fi
-      if [[ -d "$src_dir" ]]; then
-        chown --reference="$src_dir" "$dst_dir" 2>/dev/null
-        chmod --reference="$src_dir" "$dst_dir" 2>/dev/null
-      fi
-    done
-  fi
-
-  # === Move or simulate ===
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run: would move $abs -> $dest_path" >> "$AUTOMOVER_LOG"
+  # ==========================================================
+  #  Determine files before moving (for pre-move logging)
+  # ==========================================================
+  if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
+    if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
+      mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
+    elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
+      mapfile -t filtered_files < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' 2>/dev/null)
+    elif [[ "$SIZE_FILTER_ENABLED" == true ]]; then
+      mapfile -t filtered_files < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' 2>/dev/null)
+    fi
+    mapfile -t filtered_dirs < <(cd "$src" && find . -type d -empty -printf '%P/\n' 2>/dev/null)
+    all_filtered_items=("${filtered_files[@]}" "${filtered_dirs[@]}")
   else
-    # Ensure destination directory exists and matches source permissions
-    dest_dir="$(dirname "$dest_path")"
-    if [[ ! -d "$dest_dir" ]]; then
-      mkdir -p "$dest_dir"
-      chown --reference="$(dirname "$abs")" "$dest_dir" 2>/dev/null
-      chmod --reference="$(dirname "$abs")" "$dest_dir" 2>/dev/null
-    fi
-
-    # Use rsync with relative mode to correctly recreate structure
-    rsync "${RSYNC_OPTS[@]}" "${excludes[@]}" --relative "./$rel" "$dst/" 2>/dev/null
-
-    if [[ $? -eq 0 ]]; then
-      echo "$abs -> $dest_path" >> "$AUTOMOVER_LOG"
-      moved_anything=true
-    fi
+    mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n' 2>/dev/null)
   fi
 
-  # === Check stop threshold after each successful file ===
-  if [[ -n "$STOP_THRESHOLD" && "$STOP_THRESHOLD" =~ ^[0-9]+$ && "$DRY_RUN" != "yes" ]]; then
-    if zpool list -H -o name,cap 2>/dev/null | grep -q "^${POOL_NAME}"; then
-      USED_NOW=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1==pool {gsub("%","",$2); print $2}')
-    else
-      USED_NOW=$(df -h --output=pcent "$MOUNT_POINT" 2>/dev/null | awk 'NR==2 {gsub("%",""); print}')
-    fi
+  # If no files matched, skip
+  (( ${#all_filtered_items[@]} == 0 )) && { echo "No candidate files found for share: $share_name — skipping rsync" >> "$LAST_RUN_FILE"; continue; }
 
-    if [[ "$USED_NOW" -le "$STOP_THRESHOLD" ]]; then
-      echo "Usage dropped below stop threshold (${USED_NOW}% ≤ ${STOP_THRESHOLD}%) — stopping further transfers." >> "$LAST_RUN_FILE"
-      STOP_NOW=true
-      break
-    fi
+  file_count=${#all_filtered_items[@]}
+
+  # ==========================================================
+  #  Log BEFORE rsync actually starts
+  # ==========================================================
+  if [[ "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run active — $file_count files would have been moved for share: $share_name" >> "$LAST_RUN_FILE"
+  else
+    echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
   fi
-done
 
-# --- If threshold reached, stop processing additional shares ---
-if [[ "$STOP_NOW" == true ]]; then
-  echo "Stopped early because pool usage is now ${USED_NOW}% (below stop threshold of ${STOP_THRESHOLD}%)" >> "$LAST_RUN_FILE"
-  break
-fi
+  # Track if destination existed before rsync (for Option 2 root-dst handling)
+  dst_existed_before=false
+  [[ -d "$dst" ]] && dst_existed_before=true
 
-if [[ "$USED_NOW" -le "$STOP_THRESHOLD" ]]; then
-  echo "Stopped early because pool usage is now ${USED_NOW}% (below stop threshold of ${STOP_THRESHOLD}%)" >> "$LAST_RUN_FILE"
-fi
+  # ==========================================================
+  #  Now run rsync
+  # ==========================================================
+  output=$(printf '%s\n' "${all_filtered_items[@]}" | rsync "${RSYNC_OPTS[@]}" "${excludes[@]}" --files-from=- "$src/" "$dst/" 2>/dev/null)
 
+  # Extract moved file list and created directories from rsync -i output
   file_lines=$(echo "$output" | awk '$1 ~ /^>f/' | cut -c13-)
-  file_count=$(echo "$file_lines" | grep -c .)
+  file_count_moved=$(echo "$file_lines" | grep -c .)
 
-  if [[ "$file_count" -gt 0 ]]; then
-    if [[ "$DRY_RUN" == "yes" ]]; then
-      echo "Dry run active - $file_count files would have been moved for share: $share_name" >> "$LAST_RUN_FILE"
-    else
-      echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
-    fi
+  # Directories created by rsync show as "cd+++++++++ path/"
+  mapfile -t created_dirs < <(echo "$output" | awk '$1 ~ /^cd\+{9}$/ {print substr($0,13)}')
+
+  if [[ "$file_count_moved" -gt 0 ]]; then
     echo "$file_lines" | awk -v src="$src" -v dst="$dst" '{print src "/" $0 " -> " dst "/" $0}' >> "$AUTOMOVER_LOG"
+
+    # ======================================================
+    #  OPTION 2 (Mode A): Apply perms/owner to only new dirs
+    #  - If root $dst was newly created, mirror $src attrs
+    #  - For each created dir from rsync output, mirror attrs
+    # ======================================================
     if [[ "$DRY_RUN" != "yes" ]]; then
-      echo "Finished move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
+      # Capture source share attrs once
+      src_owner=$(stat -c "%u" "$src")
+      src_group=$(stat -c "%g" "$src")
+      src_perms=$(stat -c "%a" "$src")
+
+      # Root $dst created this run?
+      if [[ "$dst_existed_before" == false ]]; then
+        mkdir -p "$dst"
+        chown "$src_owner:$src_group" "$dst"
+        chmod "$src_perms" "$dst"
+      fi
+
+      # Apply to dirs rsync actually created
+      if (( ${#created_dirs[@]} > 0 )); then
+        for rel in "${created_dirs[@]}"; do
+          # Normalize trailing slash (rsync dirs end with '/')
+          rel="${rel%/}"
+          dpath="$dst/$rel"
+          if [[ -d "$dpath" ]]; then
+            chown "$src_owner:$src_group" "$dpath"
+            chmod "$src_perms" "$dpath"
+          fi
+        done
+        echo "Applied source ownership and permissions to ${#created_dirs[@]} newly created directories for $share_name" >> "$LAST_RUN_FILE"
+      fi
+    fi
+
+    if [[ "$DRY_RUN" != "yes" ]]; then
+      echo "Finished move of $file_count_moved files for share: $share_name" >> "$LAST_RUN_FILE"
     fi
     moved_anything=true
   fi

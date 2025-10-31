@@ -16,7 +16,7 @@ SIZE_BASED_FILTER="${9:-no}"
 SIZE_MB="${10:-1}"
 EXCLUSIONS_ENABLED="${11:-no}"
 QBITTORRENT_SCRIPT="${12:-no}"
-QBITTORRENT_HOST="${13:-yourip:port}"
+QBITTORRENT_HOST="${13:-}"
 QBITTORRENT_USERNAME="${14:-}"
 QBITTORRENT_PASSWORD="${15:-}"
 QBITTORRENT_DAYS_FROM="${16:-0}"
@@ -30,7 +30,6 @@ HASH_PATH="${23:-/mnt/user/appdata}"
 ENABLE_CLEANUP="${24:-no}"
 MODE="${25:-minutes}"
 CRON_EXPRESSION="${26:-}"
-STOP_THRESHOLD="${27:0}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -72,7 +71,6 @@ fi
   echo "ENABLE_CLEANUP=\"$ENABLE_CLEANUP\""
   echo "MODE=\"$MODE\""
   echo "CRON_EXPRESSION=\"$CRON_EXPRESSION\""
-  echo "STOP_THRESHOLD=\"$STOP_THRESHOLD\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'
