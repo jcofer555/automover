@@ -9,10 +9,11 @@
 - Selected pool's usage % is displayed
 - Only moves from pool -> array or pool -> pool and skips any shares set to array -> pool
 - Threshold setting to prevent moving unless pool is at least that % full
+- Stop threshold setting to stop the move when pool reaches that % or lower
 - Autostart at boot option
 - Move now button to bypass filters
 - Allow or deny moving when parity is checking
-- Interval setting to check threshold with a minimum of 1 minute
+- Two schedule modes interval and cron expression to choose from
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
 - Jdupes option built in to re-hardlink any files after every move
 - Option to stop containers before moves and start them back after finish
@@ -25,7 +26,9 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="462" alt="image thumb png de0c40f96c770341b4db0c6e79c5819b" src="https://github.com/user-attachments/assets/53e18fef-a134-4832-a9ca-4b16cd947c51" />
+<img width="1000" height="411" alt="image thumb png 45f00a77ec13dd5eff438ecb83139fbd" src="https://github.com/user-attachments/assets/738d1fa1-b250-4945-a58e-39fea6f9209a" />
+
+
 
 
 
