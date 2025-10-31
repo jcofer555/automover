@@ -112,7 +112,7 @@ for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
            QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
-           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP MODE CRON_EXPRESSION; do
+           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP MODE CRON_EXPRESSION STOP_THRESHOLD; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -394,8 +394,88 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       fi
     done > "$tmpfile"
 
-  output=$(rsync "${RSYNC_OPTS[@]}" "${excludes[@]}" --from0 --files-from="$tmpfile" "$src/" "$dst/" 2>/dev/null)
-  rm -f "$tmpfile"
+# Correctly sort null-delimited tmpfile contents alphabetically
+mapfile -d '' files < <(cat "$tmpfile" | LC_ALL=C sort -z)
+
+for relpath in "${files[@]}"; do
+  abs="$src/${relpath#./}"
+  rel="${relpath#./}"
+  dest_path="$dst/$rel"
+
+  # Skip in-use files if any slipped through
+  if fuser "$abs" >/dev/null 2>&1; then
+    echo "$abs" >> "$IN_USE_FILE"
+    continue
+  fi
+
+  # === Build destination directory tree and mirror owner/perms per level ===
+  rel_dir="$(dirname "$rel")"
+  [[ "$rel_dir" == "." ]] && rel_dir=""
+  if [[ -n "$rel_dir" && "$DRY_RUN" != "yes" ]]; then
+    IFS='/' read -ra PARTS <<< "$rel_dir"
+    accum=""
+    for part in "${PARTS[@]}"; do
+      [[ -z "$part" ]] && continue
+      accum="${accum:+$accum/}$part"
+      src_dir="$src/$accum"
+      dst_dir="$dst/$accum"
+
+      if [[ ! -d "$dst_dir" ]]; then
+        mkdir -p "$dst_dir"
+      fi
+      if [[ -d "$src_dir" ]]; then
+        chown --reference="$src_dir" "$dst_dir" 2>/dev/null
+        chmod --reference="$src_dir" "$dst_dir" 2>/dev/null
+      fi
+    done
+  fi
+
+  # === Move or simulate ===
+  if [[ "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run: would move $abs -> $dest_path" >> "$AUTOMOVER_LOG"
+  else
+    # Ensure destination directory exists and matches source permissions
+    dest_dir="$(dirname "$dest_path")"
+    if [[ ! -d "$dest_dir" ]]; then
+      mkdir -p "$dest_dir"
+      chown --reference="$(dirname "$abs")" "$dest_dir" 2>/dev/null
+      chmod --reference="$(dirname "$abs")" "$dest_dir" 2>/dev/null
+    fi
+
+    # Use rsync with relative mode to correctly recreate structure
+    rsync "${RSYNC_OPTS[@]}" "${excludes[@]}" --relative "./$rel" "$dst/" 2>/dev/null
+
+    if [[ $? -eq 0 ]]; then
+      echo "$abs -> $dest_path" >> "$AUTOMOVER_LOG"
+      moved_anything=true
+    fi
+  fi
+
+  # === Check stop threshold after each successful file ===
+  if [[ -n "$STOP_THRESHOLD" && "$STOP_THRESHOLD" =~ ^[0-9]+$ && "$DRY_RUN" != "yes" ]]; then
+    if zpool list -H -o name,cap 2>/dev/null | grep -q "^${POOL_NAME}"; then
+      USED_NOW=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1==pool {gsub("%","",$2); print $2}')
+    else
+      USED_NOW=$(df -h --output=pcent "$MOUNT_POINT" 2>/dev/null | awk 'NR==2 {gsub("%",""); print}')
+    fi
+
+    if [[ "$USED_NOW" -le "$STOP_THRESHOLD" ]]; then
+      echo "Usage dropped below stop threshold (${USED_NOW}% ≤ ${STOP_THRESHOLD}%) — stopping further transfers." >> "$LAST_RUN_FILE"
+      STOP_NOW=true
+      break
+    fi
+  fi
+done
+
+# --- If threshold reached, stop processing additional shares ---
+if [[ "$STOP_NOW" == true ]]; then
+  echo "Stopped early because pool usage is now ${USED_NOW}% (below stop threshold of ${STOP_THRESHOLD}%)" >> "$LAST_RUN_FILE"
+  break
+fi
+
+if [[ "$USED_NOW" -le "$STOP_THRESHOLD" ]]; then
+  echo "Stopped early because pool usage is now ${USED_NOW}% (below stop threshold of ${STOP_THRESHOLD}%)" >> "$LAST_RUN_FILE"
+fi
 
   file_lines=$(echo "$output" | awk '$1 ~ /^>f/' | cut -c13-)
   file_count=$(echo "$file_lines" | grep -c .)

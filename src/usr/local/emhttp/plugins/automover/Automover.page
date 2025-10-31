@@ -73,7 +73,8 @@ $defaults = [
     'HASH_PATH' => '/mnt/user/appdata',
     'ENABLE_CLEANUP' => 'no',
     'MODE' => 'minutes',
-    'CRON_EXPRESSION' => ''
+    'CRON_EXPRESSION' => '',
+    'STOP_THRESHOLD' => 0
 ];
 
 // Load existing config if present
@@ -430,13 +431,12 @@ $settings = $existing;
     color: #fff;
     display: block;
     font-weight: bold;
-    margin-top: 12px;
     opacity: 0;
     padding: 6px 12px;
     transition: opacity .4s ease;
     width: fit-content;
     display: inline-block;
-    margin-top: 10px;
+    margin-bottom: 10px;
   }
 
   @keyframes flash {
@@ -933,14 +933,13 @@ $settings = $existing;
       </span>
     </div>
 
-    <div id="move-now-confirmation" style="display:none;margin-top:10px;">✅ Moving Now</div>
-    <div id="save-confirmation" style="display:none;margin-top:10px;">✅ Saved & Started Automover</div>
-    <div id="stop-confirmation" style="display:none;margin-top:10px;">✅ Stopping Automover</div>
+    <div id="move-now-confirmation" style="display:none;">✅ Moving Now</div>
+    <div id="save-confirmation" style="display:none;">✅ Saved & Started Automover</div>
+    <div id="stop-confirmation" style="display:none;">✅ Stopping Automover</div>
 
     <div id="save-messages"
-      style="display:none;margin-top:10px;margin-bottom:20px;background:#111;border-radius:6px;font-family:monospace;color:red;">
+      style="display:none; margin-top:10px; margin-bottom:20px; background:#111; border-radius:6px; font-family:monospace; color:red;">
     </div>
-    <br><br>
 
     <!-- Pool -->
     <div class="form-pair">
@@ -968,6 +967,22 @@ $settings = $existing;
         <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
       </div>
     </div>
+
+    <!-- Stop Threshold -->
+<div class="form-pair">
+  <label for="stop_threshold">
+    <span title="Stop moving once the pool usage drops below this percentage" class="automovertip">
+      Stop Threshold (%):
+    </span>
+  </label>
+  <div class="input-wrapper">
+    <span title="Stop moving once the pool usage drops below this percentage" class="automovertip">
+      <input type="number" id="stop_threshold" class="short-input" min="0" max="100" step="1"
+        value="<?php echo htmlspecialchars($settings['STOP_THRESHOLD'] ?? '') ?>">
+    </span>
+    <div id="stop-threshold-warning" class="field-warning">Stop threshold must be between 0–100</div>
+  </div>
+</div>
 
     <!-- 🕒 Schedule Mode Toggle -->
     <div class="form-pair">
@@ -1113,10 +1128,10 @@ $settings = $existing;
         </label>
         <div class="input-wrapper">
           <span title="Torrents newer than this age (days) will be ignored" class="automovertip">
-            <input type="number" id="qbit_days_from" class="short-input" min="0" max="999" step="1"
+            <input type="number" id="qbit_days_from" class="short-input" min="0" step="1"
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_FROM'] ?? '') ?>">
           </span>
-          <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 999</div>
+          <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
         </div>
       </div>
 
@@ -1126,11 +1141,10 @@ $settings = $existing;
         </label>
         <div class="input-wrapper">
           <span title="Torrents older than this age (days) will be ignored" class="automovertip">
-            <input type="number" id="qbit_days_to" class="short-input" min="1" max="999" step="1"
+            <input type="number" id="qbit_days_to" class="short-input" min="1" step="1"
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
           </span>
-          <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 999</div>
-          <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
+          <div id="qbit-days-to-warning" class="field-warning">Days to must be at least 1</div>
         </div>
       </div>
 
@@ -1882,6 +1896,8 @@ $settings = $existing;
 
     intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 1 }, 'interval-warning'));
     thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
+    const stopThresholdInput = document.getElementById('stop_threshold');
+    stopThresholdInput.addEventListener('input', () => validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning'));
     const ageDaysInput = document.getElementById('age_days');
     ageDaysInput.addEventListener('input', () => validateField(ageDaysInput, { min: 1 }, 'age-days-warning'));
     const sizeMbInput = document.getElementById('size_mb');
@@ -1937,8 +1953,8 @@ $settings = $existing;
       const fromVal = parseInt(qbitDaysFromInput.value, 10);
       const toVal = parseInt(qbitDaysToInput.value, 10);
 
-      const validFrom = !isNaN(fromVal) && fromVal >= 0 && fromVal <= 999;
-      const validTo = !isNaN(toVal) && toVal >= 1 && toVal <= 999;
+      const validFrom = !isNaN(fromVal) && fromVal >= 0 && fromVal <= 9999999999999999999999;
+      const validTo = !isNaN(toVal) && toVal >= 1 && toVal <= 9999999999999999999999;
       const validOrder = validFrom && validTo && fromVal < toVal;
 
       qbitDaysFromInput.classList.toggle("invalid", !validFrom);
@@ -2272,137 +2288,151 @@ $settings = $existing;
     });
 
     // === Save & Start Automover ===
-    saveBtn.addEventListener('click', function () {
-      const intervalInput = document.getElementById('interval');
-      const cronInput = document.getElementById('cron_expression');
-      const modeSelect = document.getElementById('interval_mode');
-      const thresholdInput = document.getElementById('threshold');
-      const form = document.getElementById('automover-settings');
+saveBtn.addEventListener('click', function () {
+  const intervalInput = document.getElementById('interval');
+  const cronInput = document.getElementById('cron_expression');
+  const modeSelect = document.getElementById('interval_mode');
+  const thresholdInput = document.getElementById('threshold');
+  const stopThresholdInput = document.getElementById('stop_threshold'); // 🆕 new field
+  const form = document.getElementById('automover-settings');
 
-      const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
-      const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
-      const ageDaysInput = document.getElementById('age_days');
-      const sizeMbInput = document.getElementById('size_mb');
+  // === Validation ===
+  const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+  const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+  const stopThresholdValid = validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning'); // 🆕
 
-      const ageDaysValid = !document.getElementById('age_based_filter').checked ||
-        validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
-      const sizeMbValid = !document.getElementById('size_based_filter').checked ||
-        validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
-      const qbitValid = validateQbitFields();
+  const ageDaysInput = document.getElementById('age_days');
+  const sizeMbInput = document.getElementById('size_mb');
 
-      // --- Cron validation (only when mode = 'cron')
-      let cronValid = true;
-      if (modeSelect.value === 'cron') {
-        const cronParts = cronInput.value.trim().split(/\s+/);
-        cronValid = cronParts.length === 5;
-        document.getElementById('cron-warning').style.display = cronValid ? 'none' : 'block';
-        cronInput.classList.toggle('invalid', !cronValid);
-      }
+  const ageDaysValid =
+    !document.getElementById('age_based_filter').checked ||
+    validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
+  const sizeMbValid =
+    !document.getElementById('size_based_filter').checked ||
+    validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
+  const qbitValid = validateQbitFields();
 
-      // --- Final validation check ---
-      if (!(intervalValid && thresholdValid && ageDaysValid && sizeMbValid && qbitValid && cronValid)) {
-        form.classList.add('shake');
-        setTimeout(() => form.classList.remove('shake'), 300);
-        return;
-      }
+  // --- Cron validation (only when mode = 'cron')
+  let cronValid = true;
+  if (modeSelect.value === 'cron') {
+    const cronParts = cronInput.value.trim().split(/\s+/);
+    cronValid = cronParts.length === 5;
+    document.getElementById('cron-warning').style.display = cronValid ? 'none' : 'block';
+    cronInput.classList.toggle('invalid', !cronValid);
+  }
 
-      // --- Build form data ---
-      const formData = new URLSearchParams();
+  // --- Final validation check ---
+  if (
+    !intervalValid ||
+    !thresholdValid ||
+    !stopThresholdValid || // 🆕 include in validation check
+    !ageDaysValid ||
+    !sizeMbValid ||
+    !qbitValid
+  ) {
+    form.classList.add('shake');
+    setTimeout(() => form.classList.remove('shake'), 300);
+    return;
+  }
 
-      formData.append('csrf_token', csrfToken);
-      formData.append('MODE', modeSelect.value);
-      formData.append('INTERVAL', intervalInput.value);
-      formData.append('CRON_EXPRESSION', cronInput.value);
+  // --- Build form data ---
+  const formData = new URLSearchParams();
 
-      // include other config fields already on page
-      const pool = document.getElementById('pool').value;
-      const threshold = document.getElementById('threshold').value;
-      const dryRun = document.getElementById('dry_run').checked ? 'yes' : 'no';
-      const autostart = document.getElementById('autostart').checked ? 'yes' : 'no';
-      const allowDuringParity = document.getElementById('allow_during_parity').checked ? 'yes' : 'no';
-      const ageFilter = document.getElementById('age_based_filter').checked ? 'yes' : 'no';
-      const sizeFilter = document.getElementById('size_based_filter').checked ? 'yes' : 'no';
-      const enableExcl = document.getElementById('enable_exclusions').checked ? 'yes' : 'no';
-      const qbitScript = document.getElementById('qbit_script').checked ? 'yes' : 'no';
-      const hiddenFilter = document.getElementById('hidden_filter').checked ? 'yes' : 'no';
-      const turboWrite = document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no';
-      const enableCleanup = document.getElementById('enable_cleanup').checked ? 'yes' : 'no';
-      const enableJdupes = document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no';
-      const hashPath = document.getElementById('HASH_PATH')?.value || '';
-      const containerNames = document.getElementById('container_names').value.trim();
+  formData.append('csrf_token', csrfToken);
+  formData.append('MODE', modeSelect.value);
+  formData.append('INTERVAL', intervalInput.value);
+  formData.append('CRON_EXPRESSION', cronInput.value);
 
-      formData.append('POOL_NAME', pool);
-      formData.append('THRESHOLD', threshold);
-      formData.append('DRY_RUN', dryRun);
-      formData.append('AUTOSTART', autostart);
-      formData.append('ALLOW_DURING_PARITY', allowDuringParity);
-      formData.append('AGE_BASED_FILTER', ageFilter);
-      formData.append('AGE_DAYS', ageDaysInput.value);
-      formData.append('SIZE_BASED_FILTER', sizeFilter);
-      formData.append('SIZE_MB', sizeMbInput.value);
-      formData.append('EXCLUSIONS_ENABLED', enableExcl);
-      formData.append('QBITTORRENT_SCRIPT', qbitScript);
-      formData.append('HIDDEN_FILTER', hiddenFilter);
-      formData.append('FORCE_RECONSTRUCTIVE_WRITE', turboWrite);
-      formData.append('ENABLE_CLEANUP', enableCleanup);
-      formData.append('ENABLE_JDUPES', enableJdupes);
-      formData.append('HASH_PATH', hashPath);
-      formData.append('CONTAINER_NAMES', containerNames);
+  // include other config fields already on page
+  const pool = document.getElementById('pool').value;
+  const threshold = thresholdInput.value;
+  const stopThreshold = stopThresholdInput.value; // 🆕
+  const dryRun = document.getElementById('dry_run').checked ? 'yes' : 'no';
+  const autostart = document.getElementById('autostart').checked ? 'yes' : 'no';
+  const allowDuringParity = document.getElementById('allow_during_parity').checked ? 'yes' : 'no';
+  const ageFilter = document.getElementById('age_based_filter').checked ? 'yes' : 'no';
+  const sizeFilter = document.getElementById('size_based_filter').checked ? 'yes' : 'no';
+  const enableExcl = document.getElementById('enable_exclusions').checked ? 'yes' : 'no';
+  const qbitScript = document.getElementById('qbit_script').checked ? 'yes' : 'no';
+  const hiddenFilter = document.getElementById('hidden_filter').checked ? 'yes' : 'no';
+  const turboWrite = document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no';
+  const enableCleanup = document.getElementById('enable_cleanup').checked ? 'yes' : 'no';
+  const enableJdupes = document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no';
+  const hashPath = document.getElementById('HASH_PATH')?.value || '';
+  const containerNames = document.getElementById('container_names').value.trim();
 
-      // === qBittorrent fields ===
-      const qbitHost = document.getElementById('qbit_host').value.trim();
-      const qbitUser = document.getElementById('qbit_user').value.trim();
-      const qbitPass = document.getElementById('qbit_pass').value.trim();
-      const qbitDaysFrom = document.getElementById('qbit_days_from').value.trim();
-      const qbitDaysTo = document.getElementById('qbit_days_to').value.trim();
-      const qbitStatus = document.getElementById('qbit_status').value.trim();
+  formData.append('POOL_NAME', pool);
+  formData.append('THRESHOLD', threshold);
+  formData.append('STOP_THRESHOLD', stopThreshold); // 🆕 new setting
+  formData.append('DRY_RUN', dryRun);
+  formData.append('AUTOSTART', autostart);
+  formData.append('ALLOW_DURING_PARITY', allowDuringParity);
+  formData.append('AGE_BASED_FILTER', ageFilter);
+  formData.append('AGE_DAYS', ageDaysInput.value);
+  formData.append('SIZE_BASED_FILTER', sizeFilter);
+  formData.append('SIZE_MB', sizeMbInput.value);
+  formData.append('EXCLUSIONS_ENABLED', enableExcl);
+  formData.append('QBITTORRENT_SCRIPT', qbitScript);
+  formData.append('HIDDEN_FILTER', hiddenFilter);
+  formData.append('FORCE_RECONSTRUCTIVE_WRITE', turboWrite);
+  formData.append('ENABLE_CLEANUP', enableCleanup);
+  formData.append('ENABLE_JDUPES', enableJdupes);
+  formData.append('HASH_PATH', hashPath);
+  formData.append('CONTAINER_NAMES', containerNames);
 
-      formData.append('QBITTORRENT_HOST', qbitHost);
-      formData.append('QBITTORRENT_USERNAME', qbitUser);
-      formData.append('QBITTORRENT_PASSWORD', qbitPass);
-      formData.append('QBITTORRENT_DAYS_FROM', qbitDaysFrom);
-      formData.append('QBITTORRENT_DAYS_TO', qbitDaysTo);
-      formData.append('QBITTORRENT_STATUS', qbitStatus);
+  // === qBittorrent fields ===
+  const qbitHost = document.getElementById('qbit_host').value.trim();
+  const qbitUser = document.getElementById('qbit_user').value.trim();
+  const qbitPass = document.getElementById('qbit_pass').value.trim();
+  const qbitDaysFrom = document.getElementById('qbit_days_from').value.trim();
+  const qbitDaysTo = document.getElementById('qbit_days_to').value.trim();
+  const qbitStatus = document.getElementById('qbit_status').value.trim();
 
-// --- Save settings first ---
-fetch('/plugins/automover/helpers/save_settings.php?' + formData.toString(), {
-  method: 'GET'
-})
-  .then(r => r.json())
-  .then(data => {
-    if (data.status === 'ok') {
-      // ✅ Settings saved successfully — now start the cron
-      fetch('/plugins/automover/helpers/start_cron.php', {
-        method: 'POST',
-        body: formData
-      })
-        .then(r => r.json())
-        .then(data2 => {
-          if (data2.status === 'ok') {
-            confirmBadge.style.display = 'block';
-            confirmBadge.style.opacity = '1';
-            confirmBadge.style.animation = 'flash 0.4s ease';
+  formData.append('QBITTORRENT_HOST', qbitHost);
+  formData.append('QBITTORRENT_USERNAME', qbitUser);
+  formData.append('QBITTORRENT_PASSWORD', qbitPass);
+  formData.append('QBITTORRENT_DAYS_FROM', qbitDaysFrom);
+  formData.append('QBITTORRENT_DAYS_TO', qbitDaysTo);
+  formData.append('QBITTORRENT_STATUS', qbitStatus);
 
-            setTimeout(() => {
-              confirmBadge.style.opacity = '0';
-              confirmBadge.style.animation = '';
-              setTimeout(() => {
-                confirmBadge.style.display = 'none';
-              }, 400);
-            }, 2000);
-          } else {
-            alert('❌ Failed to start Automover cron: ' + (data2.message || 'Unknown error'));
-          }
-        });
-    } else {
-      alert('❌ Failed to save settings: ' + (data.message || 'Unknown error'));
-    }
+  // --- Save settings first ---
+  fetch('/plugins/automover/helpers/save_settings.php?' + formData.toString(), {
+    method: 'GET'
   })
-  .catch(err => {
-    console.error('Save error:', err);
-    alert('❌ Save failed — check console for details.');
-  });
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        // ✅ Settings saved successfully — now start the cron
+        fetch('/plugins/automover/helpers/start_cron.php', {
+          method: 'POST',
+          body: formData
+        })
+          .then(r => r.json())
+          .then(data2 => {
+            if (data2.status === 'ok') {
+              confirmBadge.style.display = 'block';
+              confirmBadge.style.opacity = '1';
+              confirmBadge.style.animation = 'flash 0.4s ease';
+              setTimeout(() => {
+                confirmBadge.style.opacity = '0';
+                confirmBadge.style.animation = '';
+                setTimeout(() => {
+                  confirmBadge.style.display = 'none';
+                }, 400);
+              }, 2000);
+            } else {
+              alert('❌ Failed to start Automover cron: ' + (data2.message || 'Unknown error'));
+            }
+          });
+      } else {
+        alert('❌ Failed to save settings: ' + (data.message || 'Unknown error'));
+      }
+    })
+    .catch(err => {
+      console.error('Save error:', err);
+      alert('❌ Save failed — check console for details.');
     });
+});
 
     // Initial counts
     function refreshExclusionCount() {

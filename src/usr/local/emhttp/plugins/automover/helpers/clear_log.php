@@ -42,10 +42,10 @@ if (file_exists($file)) {
 } else {
     echo json_encode([
         'ok' => false,
-        'message' => '❌ Log file not found.'
+        'message' => '❌ Log file not found'
     ]);
 }
 
 } else {
-    echo json_encode(['ok' => false, 'message' => 'Log file not found.']);
+    echo json_encode(['ok' => false, 'message' => 'Log file not found']);
 }
