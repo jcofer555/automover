@@ -9,7 +9,6 @@
 - Selected pool's usage % is displayed
 - Only moves from pool -> array or pool -> pool and skips any shares set to array -> pool
 - Threshold setting to prevent moving unless pool is at least that % full
-- Stop threshold setting to stop the move when pool reaches that % or lower
 - Autostart at boot option
 - Move now button to bypass filters
 - Allow or deny moving when parity is checking
@@ -26,7 +25,7 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="411" alt="image thumb png 45f00a77ec13dd5eff438ecb83139fbd" src="https://github.com/user-attachments/assets/738d1fa1-b250-4945-a58e-39fea6f9209a" />
+
 
 
 
