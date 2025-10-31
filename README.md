@@ -25,13 +25,4 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-
-
-
-
-
-
-
-
-
-
+<img width="1000" height="414" alt="image thumb png e453b3248ba962d12a534c7a942c3149" src="https://github.com/user-attachments/assets/1dc8f341-f519-41b0-8ebd-aadd6eacd5e7" />
