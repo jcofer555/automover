@@ -971,12 +971,12 @@ $settings = $existing;
     <!-- Stop Threshold -->
 <div class="form-pair">
   <label for="stop_threshold" 
-    <span title="Set the disk usage percentage where Automover stops moving (useful to stop before completely emptying the pool)" class="automovertip">
+    <span title="Set the disk usage percentage to stop moving" class="automovertip">
       Stop Threshold (%):
     </span>
   </label>
   <div class="input-wrapper">
-    <span title="Set the disk usage percentage where Automover stops moving (useful to stop before completely emptying the pool)" class="automovertip">
+    <span title="Set the disk usage percentage to stop moving" class="automovertip">
       <input type="number" id="stop_threshold" class="short-input" min="0" max="100" step="1"
         value="<?php echo htmlspecialchars($settings['STOP_THRESHOLD'] ?? ''); ?>">
     </span>

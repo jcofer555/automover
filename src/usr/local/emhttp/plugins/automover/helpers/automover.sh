@@ -35,7 +35,7 @@ cleanup() {
 }
 trap cleanup EXIT SIGINT SIGTERM SIGHUP SIGQUIT
 
-rm -f /tmp/automover/automover.done
+rm -f /tmp/automover/automover_done.txt
 
 # ==========================================================
 #  Load Settings
@@ -168,8 +168,7 @@ if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" ]]; then
   ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
   [[ -n "$ZFS_CAP" ]] && USED="$ZFS_CAP" || USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
   [[ -z "$USED" ]] && echo "$MOUNT_POINT usage not detected — nothing to do" >> "$LAST_RUN_FILE" && log_session_end && cleanup
-  echo "(Stop Threshold: $STOP_THRESHOLD%)" >> "$LAST_RUN_FILE"
-  echo "$POOL_NAME usage: ${USED}% (Threshold: $THRESHOLD%)" >> "$LAST_RUN_FILE"
+  echo "$POOL_NAME usage:${USED}% Threshold:${THRESHOLD}% Stop Threshold:${STOP_THRESHOLD}%" >> "$LAST_RUN_FILE"
   if [[ "$USED" -le "$THRESHOLD" ]]; then
     echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"; log_session_end; cleanup
   fi
@@ -187,6 +186,16 @@ fi
 #  Pause qBittorrent
 # ==========================================================
 [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]] && run_qbit_script pause
+
+# ==========================================================
+#  Update status to "Moving Files" (moved here to only run once)
+# ==========================================================
+if [[ "$DRY_RUN" == "yes" ]]; then
+  echo "Dry Run: Simulating Moves" > "$STATUS_FILE"
+else
+  echo "Starting move process" >> "$LAST_RUN_FILE"
+  echo "Moving Files" > "$STATUS_FILE"
+fi
 
 # ==========================================================
 #  Main move logic
@@ -244,17 +253,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
   echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
 
-# ==========================================================
-#  Update status to "Moving Files"
-# ==========================================================
-if [[ "$DRY_RUN" == "yes" ]]; then
-  echo ""
-  echo "Dry Run: Simulating Moves" > "$STATUS_FILE"
-else
-  echo "Starting move process" >> "$LAST_RUN_FILE"
-  echo "Moving Files" > "$STATUS_FILE"
-fi
-
   # ==========================================================
   #  File-by-file rsync loop with Stop Threshold
   # ==========================================================
@@ -264,17 +262,17 @@ fi
   src_owner=$(stat -c "%u" "$src"); src_group=$(stat -c "%g" "$src"); src_perms=$(stat -c "%a" "$src")
 
   while IFS= read -r relpath; do
-  [[ -z "$relpath" ]] && continue
-  srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
+    [[ -z "$relpath" ]] && continue
+    srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
 
-  # ==========================================================
-  #  Skip if file is currently in use (fuser check)
-  # ==========================================================
-  if fuser "$srcfile" >/dev/null 2>&1; then
-    echo "Skipping in-use file: $srcfile" >> "$LAST_RUN_FILE"
-    grep -qxF "$srcfile" "$IN_USE_FILE" || echo "$srcfile" >> "$IN_USE_FILE"
-    continue
-  fi
+    # ==========================================================
+    #  Skip if file is currently in use (fuser check)
+    # ==========================================================
+    if fuser "$srcfile" >/dev/null 2>&1; then
+      echo "Skipping in-use file: $srcfile" >> "$LAST_RUN_FILE"
+      grep -qxF "$srcfile" "$IN_USE_FILE" || echo "$srcfile" >> "$IN_USE_FILE"
+      continue
+    fi
 
     if [[ "$DRY_RUN" != "yes" ]]; then
       mkdir -p "$dstdir"
@@ -317,7 +315,7 @@ fi
 if [[ -s "$IN_USE_FILE" ]]; then
   sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
   count_inuse=$(wc -l < "$IN_USE_FILE")
-  echo "Skipped $count_inuse in-use files" >> "$LAST_RUN_FILE"
+  echo "Skipped $count_inuse in-use file(s)" >> "$LAST_RUN_FILE"
 else
   echo "No in-use files detected during move" >> "$LAST_RUN_FILE"
 fi
@@ -366,34 +364,25 @@ fi
 if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
-
   elif [[ "$moved_anything" == true ]]; then
     for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       [[ -f "$cfg" ]] || continue
       share_name="${cfg##*/}"
       share_name="${share_name%.cfg}"
-
       pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
       pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
       [[ -z "$pool1" && -z "$pool2" ]] && continue
-
       for pool in "$pool1" "$pool2"; do
         [[ -z "$pool" ]] && continue
         base_path="/mnt/$pool/$share_name"
         [[ ! -d "$base_path" ]] && continue
-
-        # Remove truly empty directories
         find "$base_path" -type d -empty -delete 2>/dev/null
-
-        # Detect and destroy empty ZFS datasets
         if command -v zfs >/dev/null 2>&1; then
           mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
           for ds in "${datasets[@]}"; do
             mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
-            if [[ -d "$mountpoint" ]]; then
-              if [[ -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
-                zfs destroy -f "$ds" >/dev/null 2>&1
-              fi
+            if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+              zfs destroy -f "$ds" >/dev/null 2>&1
             fi
           done
         fi
@@ -414,7 +403,6 @@ if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == t
     HASH_DIR="$HASH_PATH"
     HASH_DB="${HASH_DIR}/jdupes_hash_database.db"
 
-    # Ensure HASH_DIR exists
     if [[ ! -d "$HASH_DIR" ]]; then
       mkdir -p "$HASH_DIR"
       chmod 777 "$HASH_DIR"
@@ -422,64 +410,46 @@ if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == t
       echo "Using existing jdupes database: $HASH_DB" >> "$LAST_RUN_FILE"
     fi
 
-    # Ensure HASH_DB exists
     if [[ ! -f "$HASH_DB" ]]; then
       touch "$HASH_DB"
       chmod 666 "$HASH_DB"
       echo "Creating jdupes hash database at $HASH_DIR" >> "$LAST_RUN_FILE"
     fi
 
-    # Extract destination file paths from Automover log
     grep -E -- ' -> ' "$AUTOMOVER_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
 
     if [[ ! -s "$TEMP_LIST" ]]; then
       echo "No moved files found, skipping jdupes step" >> "$LAST_RUN_FILE"
     else
-      # Determine affected shares from destination paths (e.g., /mnt/user0/movies)
       mapfile -t SHARES < <(awk -F'/' '$2=="mnt" && $3=="user0" && $4!="" {print $4}' "$TEMP_LIST" | sort -u)
-
-      # Excluded shares
       EXCLUDES=("appdata" "system" "domains" "isos")
 
       for share in "${SHARES[@]}"; do
-        # Skip excluded shares
         skip=false
         for ex in "${EXCLUDES[@]}"; do
           [[ "$share" == "$ex" ]] && skip=true && break
         done
-        [[ "$skip" == true ]] && {
-          echo "Jdupes - Skipping excluded share: $share" >> "$LAST_RUN_FILE"
-          continue
-        }
+        [[ "$skip" == true ]] && { echo "Jdupes - Skipping excluded share: $share" >> "$LAST_RUN_FILE"; continue; }
 
         SHARE_PATH="/mnt/user/${share}"
-
-        [[ -d "$SHARE_PATH" ]] || {
-          echo "Jdupes - Skipping missing path: $SHARE_PATH" >> "$LAST_RUN_FILE"
-          continue
-        }
+        [[ -d "$SHARE_PATH" ]] || { echo "Jdupes - Skipping missing path: $SHARE_PATH" >> "$LAST_RUN_FILE"; continue; }
 
         echo "Jdupes processing share $share" >> "$LAST_RUN_FILE"
-
-        # Run jdupes on this share’s destination folder
         /usr/bin/jdupes -rLX onlyext:mp4,mkv,avi -y "$HASH_DB" "$SHARE_PATH" 2>&1 \
           | grep -v -E \
               -e "^Creating a new hash database " \
-              -e "^[[:space:]]*AT YOUR OWN RISK\. Report hashdb issues to jody@jodybruchon\.com" \
-              -e "^[[:space:]]*yet and basic .*" \
-              -e "^[[:space:]]*but there are LOTS OF QUIRKS.*" \
-              -e "^WARNING: THE HASH DATABASE FEATURE IS UNDER HEAVY DEVELOPMENT!.*" \
+              -e "^[[:space:]]*AT YOUR OWN RISK" \
+              -e "^[[:space:]]*yet and basic" \
+              -e "^[[:space:]]*but there are LOTS OF QUIRKS" \
+              -e "^WARNING: THE HASH DATABASE FEATURE IS UNDER HEAVY DEVELOPMENT" \
           >> "$LAST_RUN_FILE"
-
         echo "Completed jdupes step for $share" >> "$LAST_RUN_FILE"
       done
     fi
   else
     echo "Jdupes not installed, skipping jdupes step" >> "$LAST_RUN_FILE"
   fi
-
 elif [[ "$ENABLE_JDUPES" == "yes" ]]; then
-  # Only log skip reasons if jdupes is actually enabled
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping jdupes step" >> "$LAST_RUN_FILE"
   elif [[ "$moved_anything" == false ]]; then
@@ -508,6 +478,5 @@ log_session_end
 #  Signal completion to WebUI
 # ==========================================================
 mkdir -p /tmp/automover
-echo "done" > /tmp/automover/automover.done
-
+echo "done" > /tmp/automover/automover_done.txt
 echo "$PREV_STATUS" > "$STATUS_FILE"
