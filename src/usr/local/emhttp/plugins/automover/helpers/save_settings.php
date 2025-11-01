@@ -32,6 +32,7 @@ $args = [
     $_GET['ENABLE_CLEANUP'] ?? '',
     $_GET['MODE'] ?? '',
     $_GET['CRON_EXPRESSION'] ?? '',
+    $_GET['STOP_THRESHOLD'] ?? '',
 ];
 
 // Escape each argument for safety

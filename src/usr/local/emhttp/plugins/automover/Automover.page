@@ -73,7 +73,8 @@ $defaults = [
     'HASH_PATH' => '/mnt/user/appdata',
     'ENABLE_CLEANUP' => 'no',
     'MODE' => 'minutes',
-    'CRON_EXPRESSION' => ''
+    'CRON_EXPRESSION' => '',
+    'STOP_THRESHOLD' => 0
 ];
 
 // Load existing config if present
@@ -967,6 +968,22 @@ $settings = $existing;
       </div>
     </div>
 
+    <!-- Stop Threshold -->
+<div class="form-pair">
+  <label for="stop_threshold" 
+    <span title="Set the disk usage percentage where Automover stops moving (useful to stop before completely emptying the pool)" class="automovertip">
+      Stop Threshold (%):
+    </span>
+  </label>
+  <div class="input-wrapper">
+    <span title="Set the disk usage percentage where Automover stops moving (useful to stop before completely emptying the pool)" class="automovertip">
+      <input type="number" id="stop_threshold" class="short-input" min="0" max="100" step="1"
+        value="<?php echo htmlspecialchars($settings['STOP_THRESHOLD'] ?? ''); ?>">
+    </span>
+    <div id="stop-threshold-warning" class="field-warning">Stop threshold must be between 0–100</div>
+  </div>
+</div>
+
     <!-- 🕒 Schedule Mode Toggle -->
     <div class="form-pair">
       <label for="interval_mode">
@@ -1494,6 +1511,10 @@ $settings = $existing;
     const poolSelect = document.getElementById('pool');
     const intervalInput = document.getElementById('interval');
     const thresholdInput = document.getElementById('threshold');
+    const stopThresholdInput = document.getElementById('stop_threshold');
+    stopThresholdInput.addEventListener('input', () => 
+      validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning')
+    );
     const saveBtn = document.getElementById('save-settings');
     const confirmBadge = document.getElementById('save-confirmation');
     const moveNowBtn = document.getElementById('moveNowBtn');
@@ -2269,19 +2290,19 @@ $settings = $existing;
         });
     });
 
-    // Save & Start
-    // === Save & Start Automover ===
 // === Save & Start ===
 saveBtn.addEventListener('click', function () {
   const intervalInput  = document.getElementById('interval');
   const cronInput      = document.getElementById('cron_expression');
   const modeSelect     = document.getElementById('interval_mode');
   const thresholdInput = document.getElementById('threshold');
+  const stopThresholdInput = document.getElementById('stop_threshold');
   const form           = document.getElementById('automover-settings');
 
   // --- Validation ---
   const intervalValid  = validateField(intervalInput, { min: 1 }, 'interval-warning');
   const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+  const stopThresholdValid = validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning');
   const ageDaysInput   = document.getElementById('age_days');
   const sizeMbInput    = document.getElementById('size_mb');
   const ageDaysValid   = !document.getElementById('age_based_filter').checked ||
@@ -2300,7 +2321,7 @@ saveBtn.addEventListener('click', function () {
   }
 
   // --- Final validation check ---
-  if (!(intervalValid && thresholdValid && ageDaysValid && sizeMbValid && qbitValid && cronValid)) {
+  if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid && sizeMbValid && qbitValid && cronValid)) {
     form.classList.add('shake');
     setTimeout(() => form.classList.remove('shake'), 300);
     return;
@@ -2333,7 +2354,8 @@ saveBtn.addEventListener('click', function () {
     HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
     ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
     MODE: modeSelect.value,
-    CRON_EXPRESSION: cronInput.value
+    CRON_EXPRESSION: cronInput.value,
+    STOP_THRESHOLD: stopThresholdInput.value
   });
 
   // --- Step 1: Save settings ---
