@@ -183,6 +183,24 @@ if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 && 
 fi
 
 # ==========================================================
+#  Stop managed containers (optional, skip in dry run)
+# ==========================================================
+if [[ -n "$CONTAINER_NAMES" ]]; then
+  if [[ "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run active — skipping stopping of containers" >> "$LAST_RUN_FILE"
+  else
+    IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+    for container in "${CONTAINERS[@]}"; do
+      container=$(echo "$container" | xargs)
+      [[ -z "$container" ]] && continue
+      echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
+      docker stop "$container" || \
+        echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
+    done
+  fi
+fi
+
+# ==========================================================
 #  Pause qBittorrent
 # ==========================================================
 [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]] && run_qbit_script pause
@@ -326,7 +344,7 @@ if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
 fi
 
 # ==========================================================
-#  Restart managed containers (optional, skip in dry run)
+#  Start managed containers (optional, skip in dry run)
 # ==========================================================
 if [[ -n "$CONTAINER_NAMES" ]]; then
   if [[ "$DRY_RUN" == "yes" ]]; then
