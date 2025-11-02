@@ -188,7 +188,7 @@ fi
 [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]] && run_qbit_script pause
 
 # ==========================================================
-#  Update status to "Moving Files" (moved here to only run once)
+#  Update status to "Moving Files"
 # ==========================================================
 if [[ "$DRY_RUN" == "yes" ]]; then
   echo "Dry Run: Simulating Moves" > "$STATUS_FILE"
@@ -198,7 +198,7 @@ else
 fi
 
 # ==========================================================
-#  Main move logic
+#  Main move logic (alphabeticalized)
 # ==========================================================
 moved_anything=false
 STOP_TRIGGERED=false
@@ -234,18 +234,18 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   fi
 
   # ==========================================================
-  #  Determine candidate files
+  #  Determine candidate files (alphabetically)
   # ==========================================================
   if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
     if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
-      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n')
+      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' | LC_ALL=C sort)
     elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
-      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n')
+      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' | LC_ALL=C sort)
     else
-      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n')
+      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' | LC_ALL=C sort)
     fi
   else
-    mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n')
+    mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n' | LC_ALL=C sort)
   fi
 
   file_count=${#all_filtered_items[@]}
@@ -254,7 +254,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
 
   # ==========================================================
-  #  File-by-file rsync loop with Stop Threshold
+  #  File-by-file rsync loop (alphabetical order preserved)
   # ==========================================================
   tmpfile=$(mktemp)
   printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
@@ -265,9 +265,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     [[ -z "$relpath" ]] && continue
     srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
 
-    # ==========================================================
-    #  Skip if file is currently in use (fuser check)
-    # ==========================================================
+    # Skip if file is currently in use
     if fuser "$srcfile" >/dev/null 2>&1; then
       echo "Skipping in-use file: $srcfile" >> "$LAST_RUN_FILE"
       grep -qxF "$srcfile" "$IN_USE_FILE" || echo "$srcfile" >> "$IN_USE_FILE"
@@ -287,7 +285,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
     fi
 
-    # Stop Threshold check per file
+    # Stop threshold check per file
     if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]]; then
       FINAL_USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
       if [[ -n "$FINAL_USED" && "$FINAL_USED" -le "$STOP_THRESHOLD" ]]; then
@@ -304,10 +302,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
-
-if [[ "$STOP_TRIGGERED" == true ]]; then
-  moved_anything=true
-fi
 
 # ==========================================================
 #  In-use file summary

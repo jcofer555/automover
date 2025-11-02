@@ -937,8 +937,7 @@ $settings = $existing;
     <div id="save-confirmation" style="display:none;">✅ Saved & Started Automover</div>
     <div id="stop-confirmation" style="display:none;">✅ Stopping Automover</div>
 
-    <div id="save-messages"
-      style="display:none;background:#111;border-radius:6px;font-family:monospace;color:red;">
+    <div id="save-messages" style="display:none;background:#111;border-radius:6px;font-family:monospace;color:red;">
     </div>
 
     <!-- Pool -->
@@ -964,27 +963,26 @@ $settings = $existing;
           <input type="number" id="threshold" class="short-input" min="0" max="100" step="1"
             value="<?php echo htmlspecialchars($settings['THRESHOLD'] ?? '') ?>">
         </span>
-        <div id="threshold-warning" class="field-warning">Threshold must be between 0–100</div>
+        <div id="threshold-warning" class="field-warning">⚠️ Threshold must be between 0–100</div>
       </div>
     </div>
 
     <!-- Stop Threshold -->
-<div class="form-pair">
-  <label for="stop_threshold" 
-    <span title="Set the disk usage percentage to stop moving" class="automovertip">
-      Stop Threshold (%):
-    </span>
-  </label>
-  <div class="input-wrapper">
-    <span title="Set the disk usage percentage to stop moving" class="automovertip">
-      <input type="number" id="stop_threshold" class="short-input" min="0" max="100" step="1"
-        value="<?php echo htmlspecialchars($settings['STOP_THRESHOLD'] ?? ''); ?>">
-    </span>
-    <div id="stop-threshold-warning" class="field-warning">Stop threshold must be between 0–100</div>
-  </div>
-</div>
+    <div class="form-pair">
+      <label for="stop_threshold" <span title="Set the disk usage percentage to stop moving" class="automovertip">
+        Stop Threshold (%):
+        </span>
+      </label>
+      <div class="input-wrapper">
+        <span title="Set the disk usage percentage to stop moving" class="automovertip">
+          <input type="number" id="stop_threshold" class="short-input" min="0" max="100" step="1"
+            value="<?php echo htmlspecialchars($settings['STOP_THRESHOLD'] ?? ''); ?>">
+        </span>
+        <div id="stop-threshold-warning" class="field-warning">⚠️ Stop threshold must be between 0–100</div>
+      </div>
+    </div>
 
-    <!-- 🕒 Schedule Mode Toggle -->
+    <!-- Schedule Mode Toggle -->
     <div class="form-pair">
       <label for="interval_mode">
         <span title="Choose between interval-based scheduling or a cron expression" class="automovertip">
@@ -1003,7 +1001,7 @@ $settings = $existing;
       </div>
     </div>
 
-    <!-- ⏱️ Interval (Minutes) -->
+    <!-- ⏱Interval (Minutes) -->
     <div class="form-pair" id="interval-minutes-row"
       style="<?php echo (($settings['MODE'] ?? 'minutes') === 'minutes') ? '' : 'display:none;'; ?>">
       <label for="interval">
@@ -1018,11 +1016,11 @@ $settings = $existing;
           <input type="number" id="interval" class="short-input" min="1" step="1"
             value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? 60); ?>">
         </span>
-        <div id="interval-warning" class="field-warning">Interval must be at least 1 minute</div>
+        <div id="interval-warning" class="field-warning">⚠️ Interval must be at least 1 minute</div>
       </div>
     </div>
 
-    <!-- 🧭 Custom Cron Expression -->
+    <!-- Custom Cron Expression -->
     <div class="form-pair" id="cron-expression-row"
       style="<?php echo (($settings['MODE'] ?? 'minutes') === 'cron') ? '' : 'display:none;'; ?>">
       <label for="cron_expression">
@@ -1035,7 +1033,7 @@ $settings = $existing;
           <input type="text" id="cron_expression" class="short-input" placeholder="e.g. 0 3 * * *"
             value="<?php echo htmlspecialchars($settings['CRON_EXPRESSION'] ?? ''); ?>">
         </span>
-        <div id="cron-warning" class="field-warning">Enter a valid cron expression (5 fields required)</div>
+        <div id="cron-warning" class="field-warning">⚠️ Enter a valid cron expression (5 fields required)</div>
       </div>
     </div>
 
@@ -1065,7 +1063,7 @@ $settings = $existing;
           <input type="number" id="age_days" class="short-input" min="1" step="1"
             value="<?php echo htmlspecialchars($settings['AGE_DAYS'] ?? '') ?>">
         </span>
-        <div id="age-days-warning" class="field-warning">Age must be at least 1 days</div>
+        <div id="age-days-warning" class="field-warning">⚠️ Age must be at least 1 days</div>
       </div>
     </div>
 
@@ -1079,11 +1077,11 @@ $settings = $existing;
           <input type="number" id="size_mb" class="short-input" min="1" step="1"
             value="<?php echo htmlspecialchars($settings['SIZE_MB'] ?? '') ?>">
         </span>
-        <div id="size-mb-warning" class="field-warning">Size must be at least 1 MB</div>
+        <div id="size-mb-warning" class="field-warning">⚠️ Size must be at least 1 MB</div>
       </div>
     </div>
 
-    <!-- 🧩 Qbittorrent Configuration Fields -->
+    <!-- Qbittorrent Configuration Fields -->
     <div id="qbit-fields" style="display:none;">
 
       <div class="form-pair">
@@ -1094,7 +1092,7 @@ $settings = $existing;
             <input type="text" id="qbit_host" placeholder="e.g. 10.100.10.250:8080"
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_HOST'] ?? '') ?>">
           </span>
-          <div id="qbit-host-warning" class="field-warning">Host is required</div>
+          <div id="qbit-host-warning" class="field-warning">⚠️ Host is required</div>
         </div>
       </div>
 
@@ -1106,7 +1104,7 @@ $settings = $existing;
             <input type="text" id="qbit_user"
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_USERNAME'] ?? '') ?>">
           </span>
-          <div id="qbit-user-warning" class="field-warning">Username is required</div>
+          <div id="qbit-user-warning" class="field-warning">⚠️ Username is required</div>
         </div>
       </div>
 
@@ -1118,7 +1116,7 @@ $settings = $existing;
             <input type="password" id="qbit_pass"
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_PASSWORD'] ?? '') ?>">
           </span>
-          <div id="qbit-pass-warning" class="field-warning">Password is required</div>
+          <div id="qbit-pass-warning" class="field-warning">⚠️ Password is required</div>
         </div>
       </div>
 
@@ -1131,7 +1129,7 @@ $settings = $existing;
             <input type="number" id="qbit_days_from" class="short-input" min="0" max="999" step="1"
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_FROM'] ?? '') ?>">
           </span>
-          <div id="qbit-days-from-warning" class="field-warning">Must be a number between 0 and 999</div>
+          <div id="qbit-days-from-warning" class="field-warning">⚠️ Must be a number between 0 and 999</div>
         </div>
       </div>
 
@@ -1144,8 +1142,8 @@ $settings = $existing;
             <input type="number" id="qbit_days_to" class="short-input" min="1" max="999" step="1"
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
           </span>
-          <div id="qbit-days-to-warning" class="field-warning">Must be a number between 1 and 999</div>
-          <div id="qbit-days-order-warning" class="field-warning">Days From cannot be equal or lower than Days To</div>
+          <div id="qbit-days-to-warning" class="field-warning">⚠️ Must be a number between 1 and 999</div>
+          <div id="qbit-days-order-warning" class="field-warning">⚠️ Days From cannot be equal or lower than Days To</div>
         </div>
       </div>
 
@@ -1512,7 +1510,7 @@ $settings = $existing;
     const intervalInput = document.getElementById('interval');
     const thresholdInput = document.getElementById('threshold');
     const stopThresholdInput = document.getElementById('stop_threshold');
-    stopThresholdInput.addEventListener('input', () => 
+    stopThresholdInput.addEventListener('input', () =>
       validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning')
     );
     const saveBtn = document.getElementById('save-settings');
@@ -2290,120 +2288,120 @@ $settings = $existing;
         });
     });
 
-// === Save & Start ===
-saveBtn.addEventListener('click', function () {
-  const intervalInput  = document.getElementById('interval');
-  const cronInput      = document.getElementById('cron_expression');
-  const modeSelect     = document.getElementById('interval_mode');
-  const thresholdInput = document.getElementById('threshold');
-  const stopThresholdInput = document.getElementById('stop_threshold');
-  const form           = document.getElementById('automover-settings');
+    // === Save & Start ===
+    saveBtn.addEventListener('click', function () {
+      const intervalInput = document.getElementById('interval');
+      const cronInput = document.getElementById('cron_expression');
+      const modeSelect = document.getElementById('interval_mode');
+      const thresholdInput = document.getElementById('threshold');
+      const stopThresholdInput = document.getElementById('stop_threshold');
+      const form = document.getElementById('automover-settings');
 
-  // --- Validation ---
-  const intervalValid  = validateField(intervalInput, { min: 1 }, 'interval-warning');
-  const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
-  const stopThresholdValid = validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning');
-  const ageDaysInput   = document.getElementById('age_days');
-  const sizeMbInput    = document.getElementById('size_mb');
-  const ageDaysValid   = !document.getElementById('age_based_filter').checked ||
-                         validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
-  const sizeMbValid    = !document.getElementById('size_based_filter').checked ||
-                         validateField(sizeMbInput,  { min: 1 }, 'size-mb-warning');
-  const qbitValid      = validateQbitFields();
+      // --- Validation ---
+      const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+      const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+      const stopThresholdValid = validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning');
+      const ageDaysInput = document.getElementById('age_days');
+      const sizeMbInput = document.getElementById('size_mb');
+      const ageDaysValid = !document.getElementById('age_based_filter').checked ||
+        validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
+      const sizeMbValid = !document.getElementById('size_based_filter').checked ||
+        validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
+      const qbitValid = validateQbitFields();
 
-  // --- Cron validation ---
-  let cronValid = true;
-  if (modeSelect.value === 'cron') {
-    const cronParts = cronInput.value.trim().split(/\s+/);
-    cronValid = cronParts.length === 5;
-    document.getElementById('cron-warning').style.display = cronValid ? 'none' : 'block';
-    cronInput.classList.toggle('invalid', !cronValid);
-  }
-
-  // --- Final validation check ---
-  if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid && sizeMbValid && qbitValid && cronValid)) {
-    form.classList.add('shake');
-    setTimeout(() => form.classList.remove('shake'), 300);
-    return;
-  }
-
-  // --- Build parameters for save_settings.php ---
-  const params = new URLSearchParams({
-    POOL_NAME: document.getElementById('pool').value,
-    THRESHOLD: thresholdInput.value,
-    INTERVAL: intervalInput.value,
-    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-    ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-    AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
-    AGE_DAYS: ageDaysInput.value,
-    SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
-    SIZE_MB: sizeMbInput.value,
-    EXCLUSIONS_ENABLED: document.getElementById('enable_exclusions').checked ? 'yes' : 'no',
-    QBITTORRENT_SCRIPT: document.getElementById('qbit_script').checked ? 'yes' : 'no',
-    QBITTORRENT_HOST: document.getElementById('qbit_host').value.trim(),
-    QBITTORRENT_USERNAME: document.getElementById('qbit_user').value.trim(),
-    QBITTORRENT_PASSWORD: document.getElementById('qbit_pass').value.trim(),
-    QBITTORRENT_DAYS_FROM: document.getElementById('qbit_days_from').value.trim(),
-    QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value.trim(),
-    QBITTORRENT_STATUS: document.getElementById('qbit_status').value.trim(),
-    HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
-    FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
-    CONTAINER_NAMES: document.getElementById('container_names').value.trim(),
-    ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
-    HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
-    ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
-    MODE: modeSelect.value,
-    CRON_EXPRESSION: cronInput.value,
-    STOP_THRESHOLD: stopThresholdInput.value
-  });
-
-  // --- Step 1: Save settings ---
-  fetch('/plugins/automover/helpers/save_settings.php?' + params.toString(), { method: 'GET' })
-    .then(res => res.json())
-    .then(saveData => {
-      if (saveData.status === 'error') {
-        alert('❌ Save failed: ' + (saveData.message || 'Unknown error'));
-        throw new Error('Save failed');
+      // --- Cron validation ---
+      let cronValid = true;
+      if (modeSelect.value === 'cron') {
+        const cronParts = cronInput.value.trim().split(/\s+/);
+        cronValid = cronParts.length === 5;
+        document.getElementById('cron-warning').style.display = cronValid ? 'none' : 'block';
+        cronInput.classList.toggle('invalid', !cronValid);
       }
 
-      // --- Step 2: Start cron only if save succeeded ---
-      const startForm = new URLSearchParams({
-        csrf_token: csrfToken,
-        MODE: modeSelect.value,
-        INTERVAL: intervalInput.value,
-        CRON_EXPRESSION: cronInput.value
-      });
-
-      return fetch('/plugins/automover/helpers/start_cron.php', {
-        method: 'POST',
-        body: startForm
-      });
-    })
-    .then(res => res.json())
-    .then(cronData => {
-      if (!cronData || cronData.status !== 'ok') {
-        alert('⚠️ Settings saved, but failed to start schedule: ' + (cronData?.message || 'Unknown error'));
+      // --- Final validation check ---
+      if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid && sizeMbValid && qbitValid && cronValid)) {
+        form.classList.add('shake');
+        setTimeout(() => form.classList.remove('shake'), 300);
         return;
       }
 
-      // ✅ Success animation
-      confirmBadge.style.display  = 'block';
-      confirmBadge.style.opacity  = '1';
-      confirmBadge.style.animation = 'flash 0.4s ease';
-      setTimeout(() => {
-        confirmBadge.style.opacity = '0';
-        confirmBadge.style.animation = '';
-        setTimeout(() => {
-          confirmBadge.style.display = 'none';
-        }, 400);
-      }, 2000);
-    })
-    .catch(err => {
-      console.error('Save + Start error:', err);
-      alert('❌ Save or Start failed — check console for details.');
+      // --- Build parameters for save_settings.php ---
+      const params = new URLSearchParams({
+        POOL_NAME: document.getElementById('pool').value,
+        THRESHOLD: thresholdInput.value,
+        INTERVAL: intervalInput.value,
+        DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+        ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+        AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+        AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
+        AGE_DAYS: ageDaysInput.value,
+        SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
+        SIZE_MB: sizeMbInput.value,
+        EXCLUSIONS_ENABLED: document.getElementById('enable_exclusions').checked ? 'yes' : 'no',
+        QBITTORRENT_SCRIPT: document.getElementById('qbit_script').checked ? 'yes' : 'no',
+        QBITTORRENT_HOST: document.getElementById('qbit_host').value.trim(),
+        QBITTORRENT_USERNAME: document.getElementById('qbit_user').value.trim(),
+        QBITTORRENT_PASSWORD: document.getElementById('qbit_pass').value.trim(),
+        QBITTORRENT_DAYS_FROM: document.getElementById('qbit_days_from').value.trim(),
+        QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value.trim(),
+        QBITTORRENT_STATUS: document.getElementById('qbit_status').value.trim(),
+        HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
+        FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
+        CONTAINER_NAMES: document.getElementById('container_names').value.trim(),
+        ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
+        HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
+        ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
+        MODE: modeSelect.value,
+        CRON_EXPRESSION: cronInput.value,
+        STOP_THRESHOLD: stopThresholdInput.value
+      });
+
+      // --- Step 1: Save settings ---
+      fetch('/plugins/automover/helpers/save_settings.php?' + params.toString(), { method: 'GET' })
+        .then(res => res.json())
+        .then(saveData => {
+          if (saveData.status === 'error') {
+            alert('❌ Save failed: ' + (saveData.message || 'Unknown error'));
+            throw new Error('Save failed');
+          }
+
+          // --- Step 2: Start cron only if save succeeded ---
+          const startForm = new URLSearchParams({
+            csrf_token: csrfToken,
+            MODE: modeSelect.value,
+            INTERVAL: intervalInput.value,
+            CRON_EXPRESSION: cronInput.value
+          });
+
+          return fetch('/plugins/automover/helpers/start_cron.php', {
+            method: 'POST',
+            body: startForm
+          });
+        })
+        .then(res => res.json())
+        .then(cronData => {
+          if (!cronData || cronData.status !== 'ok') {
+            alert('⚠️ Settings saved, but failed to start schedule: ' + (cronData?.message || 'Unknown error'));
+            return;
+          }
+
+          // ✅ Success animation
+          confirmBadge.style.display = 'block';
+          confirmBadge.style.opacity = '1';
+          confirmBadge.style.animation = 'flash 0.4s ease';
+          setTimeout(() => {
+            confirmBadge.style.opacity = '0';
+            confirmBadge.style.animation = '';
+            setTimeout(() => {
+              confirmBadge.style.display = 'none';
+            }, 400);
+          }, 2000);
+        })
+        .catch(err => {
+          console.error('Save + Start error:', err);
+          alert('❌ Save or Start failed — check console for details.');
+        });
     });
-});
 
     // Initial counts
     function refreshExclusionCount() {
