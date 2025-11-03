@@ -178,7 +178,7 @@ fi
 #  Stop threshold pre-check
 # ==========================================================
 if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 && "$USED" -le "$STOP_THRESHOLD" ]]; then
-  echo "Usage already below stop threshold ($USED% ≤ $STOP_THRESHOLD%) — skipping moves" >> "$LAST_RUN_FILE"
+  echo "Usage already below stop threshold:$STOP_THRESHOLD% — skipping moves" >> "$LAST_RUN_FILE"
   log_session_end; cleanup
 fi
 
@@ -213,6 +213,37 @@ if [[ "$DRY_RUN" == "yes" ]]; then
 else
   echo "Starting move process" >> "$LAST_RUN_FILE"
   echo "Moving Files" > "$STATUS_FILE"
+fi
+
+# ==========================================================
+#  Log which filters are enabled
+# ==========================================================
+if [[ "$HIDDEN_FILTER" == "yes" ]]; then
+  echo "Hidden Filter Enabled" >> "$LAST_RUN_FILE"
+fi
+
+if [[ "$SIZE_BASED_FILTER" == "yes" ]]; then
+  echo "Size Based Filter Enabled (${SIZE_MB} MB)" >> "$LAST_RUN_FILE"
+fi
+
+if [[ "$AGE_BASED_FILTER" == "yes" ]]; then
+  echo "Age Based Filter Enabled (${AGE_DAYS} days)" >> "$LAST_RUN_FILE"
+fi
+
+if [[ "$EXCLUSIONS_ENABLED" == "yes" ]]; then
+  echo "Exclusions enabled" >> "$LAST_RUN_FILE"
+fi
+
+# ==========================================================
+#  Load exclusions if enabled
+# ==========================================================
+EXCLUDED_PATHS=()
+if [[ "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
+  while IFS= read -r line; do
+    line=$(echo "$line" | sed 's/\r//g' | xargs)
+    [[ -z "$line" || "$line" =~ ^# ]] && continue
+    EXCLUDED_PATHS+=("$line")
+  done < "$EXCLUSIONS_FILE"
 fi
 
 # ==========================================================
@@ -283,9 +314,21 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     [[ -z "$relpath" ]] && continue
     srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
 
+    # Skip if file matches any exclusion (file or folder)
+    if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+      skip_file=false
+      for ex in "${EXCLUDED_PATHS[@]}"; do
+        [[ -d "$ex" ]] && ex="${ex%/}/"
+        if [[ "$srcfile" == "$ex"* || "$srcfile" == "$src/$ex"* ]]; then
+          skip_file=true
+          break
+        fi
+      done
+      $skip_file && continue
+    fi
+
     # Skip if file is currently in use
     if fuser "$srcfile" >/dev/null 2>&1; then
-      echo "Skipping in-use file: $srcfile" >> "$LAST_RUN_FILE"
       grep -qxF "$srcfile" "$IN_USE_FILE" || echo "$srcfile" >> "$IN_USE_FILE"
       continue
     fi
@@ -307,7 +350,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]]; then
       FINAL_USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
       if [[ -n "$FINAL_USED" && "$FINAL_USED" -le "$STOP_THRESHOLD" ]]; then
-        echo "Pool usage reached stop threshold" >> "$LAST_RUN_FILE"
+        echo "Move stopped - pool usage reached stop threshold:$STOP_THRESHOLD%" >> "$LAST_RUN_FILE"
         STOP_TRIGGERED=true
         break
       fi
@@ -368,6 +411,7 @@ if [[ "$DRY_RUN" == "yes" ]]; then
   echo ""
 else
   echo "Finished move process" >> "$LAST_RUN_FILE"
+  echo "$PREV_STATUS" > "$STATUS_FILE"
 fi
 
 # ==========================================================
@@ -376,25 +420,34 @@ fi
 if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
+
   elif [[ "$moved_anything" == true ]]; then
     for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       [[ -f "$cfg" ]] || continue
       share_name="${cfg##*/}"
       share_name="${share_name%.cfg}"
+
       pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
       pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
       [[ -z "$pool1" && -z "$pool2" ]] && continue
+
       for pool in "$pool1" "$pool2"; do
         [[ -z "$pool" ]] && continue
         base_path="/mnt/$pool/$share_name"
         [[ ! -d "$base_path" ]] && continue
+
+        # Remove truly empty directories
         find "$base_path" -type d -empty -delete 2>/dev/null
+
+        # Detect and destroy empty ZFS datasets
         if command -v zfs >/dev/null 2>&1; then
           mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
           for ds in "${datasets[@]}"; do
             mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
-            if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
-              zfs destroy -f "$ds" >/dev/null 2>&1
+            if [[ -d "$mountpoint" ]]; then
+              if [[ -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+                zfs destroy -f "$ds" >/dev/null 2>&1
+              fi
             fi
           done
         fi
@@ -491,4 +544,3 @@ log_session_end
 # ==========================================================
 mkdir -p /tmp/automover
 echo "done" > /tmp/automover/automover_done.txt
-echo "$PREV_STATUS" > "$STATUS_FILE"
