@@ -13,10 +13,19 @@ STATUS_FILE="/tmp/automover/automover_status.txt"
 mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover.lock"
 
+# ==========================================================
+#  Status helper
+# ==========================================================
+set_status() {
+  local new_status="$1"
+  echo "$new_status" > "$STATUS_FILE"
+}
+
 PREV_STATUS="Stopped"
 if [[ -f "$STATUS_FILE" ]]; then
   PREV_STATUS=$(cat "$STATUS_FILE" | tr -d '\r\n')
 fi
+set_status "Starting Automover"
 
 if [ -f "$LOCK_FILE" ]; then
   if ps -p "$(cat "$LOCK_FILE")" > /dev/null 2>&1; then
@@ -29,7 +38,7 @@ fi
 echo $$ > "$LOCK_FILE"
 
 cleanup() {
-  echo "$PREV_STATUS" > "$STATUS_FILE"
+  set_status "$PREV_STATUS"
   rm -f "$LOCK_FILE"
   exit
 }
@@ -40,11 +49,12 @@ rm -f /tmp/automover/automover_done.txt
 # ==========================================================
 #  Load Settings
 # ==========================================================
+set_status "Loading Config"
 if [[ -f "$CFG_PATH" ]]; then
   source "$CFG_PATH"
 else
   echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
-  echo "$PREV_STATUS" > "$STATUS_FILE"
+  set_status "$PREV_STATUS"
   cleanup
 fi
 
@@ -52,6 +62,7 @@ fi
 #  qBittorrent dependency check
 # ==========================================================
 if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
+  set_status "Checking qbit dependencies"
   if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
     command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
   fi
@@ -94,7 +105,8 @@ for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB EXCLUSIONS_ENABLED \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
            QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
-           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP MODE CRON_EXPRESSION STOP_THRESHOLD; do
+           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP \
+           MODE CRON_EXPRESSION STOP_THRESHOLD ENABLE_NOTIFICATIONS; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -105,6 +117,12 @@ start_time=$(date +%s)
 {
   echo "------------------------------------------------"
   echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
+  if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
+  /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
+    -s "Automover session started" \
+    -d "Automover will start moving data based on your preferences selected" \
+    -i "normal"
+fi
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
 } >> "$LAST_RUN_FILE"
 
@@ -126,14 +144,33 @@ log_session_end() {
   fi
 
   echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
+  if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
+  /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
+    -s "Automover session finished" \
+    -d "Automover is done so nothing left to do for this session" \
+    -i "normal"
+fi
   echo "" >> "$LAST_RUN_FILE"
 }
+
+# ==========================================================
+#  Enable reconstructive write (Turbo Write)
+# ==========================================================
+if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
+  set_status "Enabling Turbo Write"
+  turbo_write_mode=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
+  echo "Previous md_write_method: $turbo_write_mode" >> "$LAST_RUN_FILE"
+  echo "$turbo_write_mode" > /tmp/automover_prev_write_method
+  /usr/local/sbin/mdcmd set md_write_method 1
+  echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
+fi
 
 # ==========================================================
 #  Parity guard
 # ==========================================================
 if [[ "$ALLOW_DURING_PARITY" == "no" && "$MOVE_NOW" == false ]]; then
   if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini; then
+    set_status "Check If Parity Is In Progress"
     echo "Parity check in progress — skipping" >> "$LAST_RUN_FILE"
     log_session_end; cleanup
   fi
@@ -143,6 +180,7 @@ fi
 #  Filters
 # ==========================================================
 if [[ "$MOVE_NOW" == false ]]; then
+  set_status "Applying Filters"
   AGE_FILTER_ENABLED=false; SIZE_FILTER_ENABLED=false
   if [[ "$AGE_BASED_FILTER" == "yes" && "$AGE_DAYS" -gt 0 ]]; then
     AGE_FILTER_ENABLED=true; MTIME_ARG="+$((AGE_DAYS - 1))"
@@ -157,12 +195,14 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 # ==========================================================
 #  Rsync setup
 # ==========================================================
+set_status "Prepping Rsync"
 RSYNC_OPTS=(-aiHAX --numeric-ids --checksum --perms --owner --group)
 [[ "$DRY_RUN" == "yes" ]] && RSYNC_OPTS+=(--dry-run) || RSYNC_OPTS+=(--remove-source-files)
 
 # ==========================================================
 #  Pool usage check
 # ==========================================================
+set_status "Checking Usage"
 if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" ]]; then
   POOL_NAME=$(basename "$MOUNT_POINT")
   ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
@@ -178,6 +218,7 @@ fi
 #  Stop threshold pre-check
 # ==========================================================
 if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 && "$USED" -le "$STOP_THRESHOLD" ]]; then
+  set_status "Checking Stop Threshold"
   echo "Usage already below stop threshold:$STOP_THRESHOLD% — skipping moves" >> "$LAST_RUN_FILE"
   log_session_end; cleanup
 fi
@@ -186,6 +227,7 @@ fi
 #  Stop managed containers (optional, skip in dry run)
 # ==========================================================
 if [[ -n "$CONTAINER_NAMES" ]]; then
+  set_status "Stopping Containers"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping stopping of containers" >> "$LAST_RUN_FILE"
   else
@@ -203,16 +245,20 @@ fi
 # ==========================================================
 #  Pause qBittorrent
 # ==========================================================
-[[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]] && run_qbit_script pause
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
+  set_status "Pausing Qbit"
+  run_qbit_script pause
+fi
 
 # ==========================================================
 #  Update status to "Moving Files"
 # ==========================================================
 if [[ "$DRY_RUN" == "yes" ]]; then
-  echo "Dry Run: Simulating Moves" > "$STATUS_FILE"
+  set_status "Dry Run: Simulating Moves"
+  echo "Dry Run: Simulating Moves" >> "$LAST_RUN_FILE"
 else
+  set_status "Starting Move Process"
   echo "Starting move process" >> "$LAST_RUN_FILE"
-  echo "Moving Files" > "$STATUS_FILE"
 fi
 
 # ==========================================================
@@ -282,9 +328,10 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     continue
   fi
 
-  # ==========================================================
-  #  Determine candidate files (alphabetically)
-  # ==========================================================
+  # per-share status
+  set_status "Moving Files For Share: $share_name"
+
+  # Determine candidate files (alphabetically)
   if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
     if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
       mapfile -t all_filtered_items < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' | LC_ALL=C sort)
@@ -302,9 +349,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
   echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
 
-  # ==========================================================
-  #  File-by-file rsync loop (alphabetical order preserved)
-  # ==========================================================
   tmpfile=$(mktemp)
   printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
   file_count_moved=0
@@ -314,7 +358,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     [[ -z "$relpath" ]] && continue
     srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
 
-    # Skip if file matches any exclusion (file or folder)
+    # Skip exclusions
     if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
       skip_file=false
       for ex in "${EXCLUDED_PATHS[@]}"; do
@@ -368,6 +412,7 @@ done
 #  In-use file summary
 # ==========================================================
 if [[ -s "$IN_USE_FILE" ]]; then
+  set_status "In-Use Summary"
   sort -u "$IN_USE_FILE" -o "$IN_USE_FILE"
   count_inuse=$(wc -l < "$IN_USE_FILE")
   echo "Skipped $count_inuse in-use file(s)" >> "$LAST_RUN_FILE"
@@ -379,6 +424,7 @@ fi
 #  Resume qBittorrent torrents if enabled
 # ==========================================================
 if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
+  set_status "Resuming Qbit"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping resuming of qBittorrent torrents" >> "$LAST_RUN_FILE"
   else
@@ -390,6 +436,7 @@ fi
 #  Start managed containers (optional, skip in dry run)
 # ==========================================================
 if [[ -n "$CONTAINER_NAMES" ]]; then
+  set_status "Starting Containers"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping starting of containers" >> "$LAST_RUN_FILE"
   else
@@ -405,22 +452,19 @@ if [[ -n "$CONTAINER_NAMES" ]]; then
 fi
 
 # ==========================================================
-#  Finish and restore previous status
+#  Finished move process (log only — status restored at end)
 # ==========================================================
-if [[ "$DRY_RUN" == "yes" ]]; then
-  echo ""
-else
+if [[ "$DRY_RUN" != "yes" ]]; then
   echo "Finished move process" >> "$LAST_RUN_FILE"
-  echo "$PREV_STATUS" > "$STATUS_FILE"
 fi
 
 # ==========================================================
 #  Cleanup Empty Folders (including ZFS datasets)
 # ==========================================================
 if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
+  set_status "Cleaning Up"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
-
   elif [[ "$moved_anything" == true ]]; then
     for cfg in "$SHARE_CFG_DIR"/*.cfg; do
       [[ -f "$cfg" ]] || continue
@@ -436,18 +480,16 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
         base_path="/mnt/$pool/$share_name"
         [[ ! -d "$base_path" ]] && continue
 
-        # Remove truly empty directories
+        # remove empty dirs
         find "$base_path" -type d -empty -delete 2>/dev/null
 
-        # Detect and destroy empty ZFS datasets
+        # zfs datasets
         if command -v zfs >/dev/null 2>&1; then
           mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
           for ds in "${datasets[@]}"; do
             mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
-            if [[ -d "$mountpoint" ]]; then
-              if [[ -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
-                zfs destroy -f "$ds" >/dev/null 2>&1
-              fi
+            if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+              zfs destroy -f "$ds" >/dev/null 2>&1
             fi
           done
         fi
@@ -463,6 +505,7 @@ fi
 #  Re-hardlink media duplicates using jdupes
 # ==========================================================
 if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == true ]]; then
+  set_status "Running Jdupes"
   if command -v jdupes >/dev/null 2>&1; then
     TEMP_LIST="/tmp/automover_jdupes_list.txt"
     HASH_DIR="$HASH_PATH"
@@ -481,11 +524,13 @@ if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == t
       echo "Creating jdupes hash database at $HASH_DIR" >> "$LAST_RUN_FILE"
     fi
 
+    # get list of moved files (dest side)
     grep -E -- ' -> ' "$AUTOMOVER_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
 
     if [[ ! -s "$TEMP_LIST" ]]; then
       echo "No moved files found, skipping jdupes step" >> "$LAST_RUN_FILE"
     else
+      # collect shares moved to /mnt/user0/{share}
       mapfile -t SHARES < <(awk -F'/' '$2=="mnt" && $3=="user0" && $4!="" {print $4}' "$TEMP_LIST" | sort -u)
       EXCLUDES=("appdata" "system" "domains" "isos")
 
@@ -526,6 +571,7 @@ fi
 #  Restore previous md_write_method if modified (skip in dry run)
 # ==========================================================
 if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
+  set_status "Restoring Turbo Write Setting"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping restoring md_write_method to previous value" >> "$LAST_RUN_FILE"
   else
@@ -537,10 +583,11 @@ if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
   fi
 fi
 
+# ==========================================================
+#  Finish and signal
+# ==========================================================
 log_session_end
 
-# ==========================================================
-#  Signal completion to WebUI
-# ==========================================================
 mkdir -p /tmp/automover
 echo "done" > /tmp/automover/automover_done.txt
+set_status "$PREV_STATUS"

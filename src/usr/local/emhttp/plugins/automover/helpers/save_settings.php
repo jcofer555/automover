@@ -33,6 +33,7 @@ $args = [
     $_GET['MODE'] ?? '',
     $_GET['CRON_EXPRESSION'] ?? '',
     $_GET['STOP_THRESHOLD'] ?? '',
+    $_GET['ENABLE_NOTIFICATIONS'] ?? '',
 ];
 
 // Escape each argument for safety

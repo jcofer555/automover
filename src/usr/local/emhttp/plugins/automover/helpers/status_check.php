@@ -62,8 +62,8 @@ if (file_exists($bootFail)) {
     // ✅ Check live "Moving" indicator (overrides above if active)
 if (file_exists($statusFile)) {
     $movingState = trim(file_get_contents($statusFile));
-    if (strcasecmp($movingState, 'moving') === 0 || strcasecmp($movingState, 'moving files') === 0) {
-        $status = 'Moving Files';   // 🚀 Will show live while rsync runs
+    if (!empty($movingState) && !in_array(strtolower($movingState), ['stopped','running'])) {
+        $status = ucfirst($movingState);
     }
 }
 

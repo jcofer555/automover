@@ -31,6 +31,7 @@ ENABLE_CLEANUP="${24:-no}"
 MODE="${25:-minutes}"
 CRON_EXPRESSION="${26:-}"
 STOP_THRESHOLD="${27:-0}"
+ENABLE_NOTIFICATIONS="${28:-0}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -73,6 +74,7 @@ fi
   echo "MODE=\"$MODE\""
   echo "CRON_EXPRESSION=\"$CRON_EXPRESSION\""
   echo "STOP_THRESHOLD=\"$STOP_THRESHOLD\""
+  echo "ENABLE_NOTIFICATIONS=\"$ENABLE_NOTIFICATIONS\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'
