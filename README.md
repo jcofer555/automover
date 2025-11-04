@@ -14,6 +14,7 @@
 - Move now button to bypass filters
 - Allow or deny moving when parity is checking
 - Two schedule modes interval and cron expression to choose from
+- Option to have start and finish notifications sent to unraid
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
 - Jdupes option built in to re-hardlink any files after every move
 - Option to stop containers before moves and start them back after finish
@@ -26,5 +27,4 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="415" alt="image thumb png c809123a9052d78a01830a95493533b8" src="https://github.com/user-attachments/assets/f35435e4-d795-4df6-a027-648ed752006b" />
-
+<img width="1000" height="411" alt="image thumb png f0eee4e72bc985e6d53e1856dd8b976a" src="https://github.com/user-attachments/assets/8b8297b5-b5f4-4218-8d30-061071a8fde7" />
