@@ -6,6 +6,7 @@ AUTOMOVER_LOG="/var/log/automover_files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
 IN_USE_FILE="/tmp/automover/in_use_files.txt"
 STATUS_FILE="/tmp/automover/automover_status.txt"
+MOVED_SHARES_FILE="/tmp/automover/moved_shares.txt"
 
 # ==========================================================
 #  Setup directories and lock
@@ -25,7 +26,6 @@ PREV_STATUS="Stopped"
 if [[ -f "$STATUS_FILE" ]]; then
   PREV_STATUS=$(cat "$STATUS_FILE" | tr -d '\r\n')
 fi
-set_status "Starting Automover"
 
 if [ -f "$LOCK_FILE" ]; then
   if ps -p "$(cat "$LOCK_FILE")" > /dev/null 2>&1; then
@@ -45,6 +45,8 @@ cleanup() {
 trap cleanup EXIT SIGINT SIGTERM SIGHUP SIGQUIT
 
 rm -f /tmp/automover/automover_done.txt
+# clear moved-shares list for this run
+> "$MOVED_SHARES_FILE"
 
 # ==========================================================
 #  Load Settings
@@ -118,11 +120,11 @@ start_time=$(date +%s)
   echo "------------------------------------------------"
   echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
   if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
-  /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
-    -s "Automover session started" \
-    -d "Automover will start moving data based on your preferences selected" \
-    -i "normal"
-fi
+    /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
+      -s "Automover session started" \
+      -d "Automover will start moving data based on your preferences selected" \
+      -i "normal"
+  fi
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
 } >> "$LAST_RUN_FILE"
 
@@ -145,11 +147,11 @@ log_session_end() {
 
   echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
   if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
-  /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
-    -s "Automover session finished" \
-    -d "Automover is done so nothing left to do for this session" \
-    -i "normal"
-fi
+    /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
+      -s "Automover session finished" \
+      -d "Automover is done so nothing left to do for this session" \
+      -i "normal"
+  fi
   echo "" >> "$LAST_RUN_FILE"
 }
 
@@ -159,7 +161,6 @@ fi
 if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
   set_status "Enabling Turbo Write"
   turbo_write_mode=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
-  echo "Previous md_write_method: $turbo_write_mode" >> "$LAST_RUN_FILE"
   echo "$turbo_write_mode" > /tmp/automover_prev_write_method
   /usr/local/sbin/mdcmd set md_write_method 1
   echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
@@ -373,7 +374,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 
     # Skip if file is currently in use
     if fuser "$srcfile" >/dev/null 2>&1; then
-      grep -qxF "$srcfile" "$IN_USE_FILE" || echo "$srcfile" >> "$IN_USE_FILE"
+      grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
       continue
     fi
 
@@ -403,7 +404,13 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   rm -f "$tmpfile"
 
   echo "Finished move of $file_count_moved files for share: $share_name" >> "$LAST_RUN_FILE"
-  moved_anything=true
+
+  if (( file_count_moved > 0 )); then
+    # mark that something moved
+    moved_anything=true
+    # remember this share for cleanup
+    echo "$share_name" >> "$MOVED_SHARES_FILE"
+  fi
 
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
@@ -459,43 +466,57 @@ if [[ "$DRY_RUN" != "yes" ]]; then
 fi
 
 # ==========================================================
-#  Cleanup Empty Folders (including ZFS datasets)
+#  Cleanup Empty Folders (including ZFS datasets) - ONLY moved shares
 # ==========================================================
 if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   set_status "Cleaning Up"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
   elif [[ "$moved_anything" == true ]]; then
-    for cfg in "$SHARE_CFG_DIR"/*.cfg; do
-      [[ -f "$cfg" ]] || continue
-      share_name="${cfg##*/}"
-      share_name="${share_name%.cfg}"
+    if [[ ! -s "$MOVED_SHARES_FILE" ]]; then
+      echo "No moved shares recorded — skipping cleanup" >> "$LAST_RUN_FILE"
+    else
+      # sort unique in case same share got added twice
+      while IFS= read -r share_name; do
+        [[ -z "$share_name" ]] && continue
 
-      pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
-      pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
-      [[ -z "$pool1" && -z "$pool2" ]] && continue
+        # force exclude these 4
+        case "$share_name" in
+          appdata|system|domains|isos)
+            echo "Skipping cleanup for excluded share: $share_name" >> "$LAST_RUN_FILE"
+            continue
+            ;;
+        esac
 
-      for pool in "$pool1" "$pool2"; do
-        [[ -z "$pool" ]] && continue
-        base_path="/mnt/$pool/$share_name"
-        [[ ! -d "$base_path" ]] && continue
+        cfg="$SHARE_CFG_DIR/$share_name.cfg"
+        [[ -f "$cfg" ]] || continue
 
-        # remove empty dirs
-        find "$base_path" -type d -empty -delete 2>/dev/null
+        pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
+        pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
+        [[ -z "$pool1" && -z "$pool2" ]] && continue
 
-        # zfs datasets
-        if command -v zfs >/dev/null 2>&1; then
-          mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
-          for ds in "${datasets[@]}"; do
-            mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
-            if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
-              zfs destroy -f "$ds" >/dev/null 2>&1
-            fi
-          done
-        fi
-      done
-    done
-    echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
+        for pool in "$pool1" "$pool2"; do
+          [[ -z "$pool" ]] && continue
+          base_path="/mnt/$pool/$share_name"
+          [[ ! -d "$base_path" ]] && continue
+
+          # remove empty dirs
+          find "$base_path" -type d -empty -delete 2>/dev/null
+
+          # zfs datasets
+          if command -v zfs >/dev/null 2>&1; then
+            mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
+            for ds in "${datasets[@]}"; do
+              mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
+              if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+                zfs destroy -f "$ds" >/dev/null 2>&1
+              fi
+            done
+          fi
+        done
+      done < <(sort -u "$MOVED_SHARES_FILE")
+      echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
+    fi
   else
     echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
   fi

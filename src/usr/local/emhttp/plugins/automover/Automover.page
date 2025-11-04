@@ -957,7 +957,7 @@ $settings = $existing;
     <!-- Threshold -->
     <div class="form-pair">
       <label for="threshold" <span title="Set the disk usage percentage threshold that triggers the mover"
-        class="automovertip">Threshole (%):</span>
+        class="automovertip">Threshold (%):</span>
       </label>
       <div class="input-wrapper">
         <span title="Set the disk usage percentage threshold that triggers the mover" class="automovertip">
