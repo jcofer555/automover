@@ -11,27 +11,37 @@ $CRON_EXPRESSION = trim($_POST['CRON_EXPRESSION'] ?? '');
 if ($MODE === 'cron' && !empty($CRON_EXPRESSION)) {
     $cronEntry = "$CRON_EXPRESSION /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
 } else {
-    // Use your existing interval-to-cron conversion logic here
+    // INTERVAL MODE: convert minutes to proper cron
     if ($INTERVAL < 60) {
+        // every X minutes
         $minutes = max(1, $INTERVAL);
         $cronEntry = "*/{$minutes} * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
     } elseif ($INTERVAL < 1440) {
-        $hours = round($INTERVAL / 60);
-        $hours = max(1, $hours);
-        $cronEntry = "0 */{$hours} * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
+        // every X hours
+        $hours = max(1, floor($INTERVAL / 60));
+        $minute = $INTERVAL % 60;
+        $cronEntry = sprintf("%d */%d * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n", $minute, $hours);
     } elseif ($INTERVAL < 10080) {
-        $days = round($INTERVAL / 1440);
-        $days = max(1, $days);
-        $cronEntry = "0 0 */{$days} * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
+        // every X days
+        $days = max(1, floor($INTERVAL / 1440));
+        $hour = floor(($INTERVAL % 1440) / 60);
+        $minute = $INTERVAL % 60;
+        $cronEntry = sprintf("%d %d */%d * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n", $minute, $hour, $days);
     } elseif ($INTERVAL < 43200) {
-        $weeks = round($INTERVAL / 10080);
-        $days = $weeks * 7;
-        $days = max(7, $days);
-        $cronEntry = "0 0 */{$days} * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
+        // every X weeks (7-day multiples)
+        $weeks = max(1, floor($INTERVAL / 10080));
+        $day = 0; // Sunday
+        $hour = floor(($INTERVAL % 1440) / 60);
+        $minute = $INTERVAL % 60;
+        $cronEntry = sprintf("%d %d * * %d /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n", $minute, $hour, $day);
     } else {
-        $months = round($INTERVAL / 43200);
-        $months = max(1, $months);
-        $cronEntry = "0 0 1 */{$months} * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
+        // every X months (approx 30-day multiples)
+        $months = max(1, floor($INTERVAL / 43200));
+        $day = 1;
+        $hour = 0;
+        $minute = 0;
+        $cronEntry = sprintf("%d %d %d */%d * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n",
+            $minute, $hour, $day, $months);
     }
 }
 
