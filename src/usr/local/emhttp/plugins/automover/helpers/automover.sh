@@ -13,6 +13,7 @@ MOVED_SHARES_FILE="/tmp/automover/moved_shares.txt"
 # ==========================================================
 mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover.lock"
+> "$IN_USE_FILE"
 
 # ==========================================================
 #  Status helper
@@ -149,7 +150,7 @@ log_session_end() {
   if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
     /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
       -s "Automover session finished" \
-      -d "Automover is done so nothing left to do for this session" \
+      -d "Automover is done. Check last run details" \
       -i "normal"
   fi
   echo "" >> "$LAST_RUN_FILE"
@@ -247,7 +248,7 @@ fi
 #  Pause qBittorrent
 # ==========================================================
 if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
-  set_status "Pausing Qbit"
+  set_status "Pausing Torrents"
   run_qbit_script pause
 fi
 
@@ -431,7 +432,7 @@ fi
 #  Resume qBittorrent torrents if enabled
 # ==========================================================
 if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
-  set_status "Resuming Qbit"
+  set_status "Resuming Torrents"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping resuming of qBittorrent torrents" >> "$LAST_RUN_FILE"
   else
