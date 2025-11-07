@@ -15,6 +15,13 @@ mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
 
+unraid_notify() {
+  local title="$1"
+  local message="$2"
+  local level="${3:-normal}"
+  echo "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s '$title' -d '$message' -i '$level'" | at now + 1 minute
+}
+
 # ==========================================================
 #  Status helper
 # ==========================================================
@@ -38,7 +45,56 @@ fi
 
 echo $$ > "$LOCK_FILE"
 
+# ==========================================================
+#  Always send finishing notification (with runtime + summary)
+# ==========================================================
+send_summary_notification() {
+  [[ "$ENABLE_NOTIFICATIONS" != "yes" ]] && return
+
+  declare -A SHARE_COUNTS
+  total_moved=0
+
+  if [[ -f "$AUTOMOVER_LOG" && -s "$AUTOMOVER_LOG" ]]; then
+    while IFS='>' read -r _ dst; do
+      dst=$(echo "$dst" | xargs)
+      [[ -z "$dst" ]] && continue
+      share=$(echo "$dst" | awk -F'/' '$3=="user0" {print $4}')
+      [[ -z "$share" ]] && continue
+      ((SHARE_COUNTS["$share"]++))
+      ((total_moved++))
+    done < <(grep -E ' -> ' "$AUTOMOVER_LOG")
+  fi
+
+  end_time=$(date +%s)
+  duration=$((end_time - start_time))
+  if (( duration < 60 )); then
+    runtime="${duration}s"
+  elif (( duration < 3600 )); then
+    mins=$((duration / 60)); secs=$((duration % 60))
+    runtime="${mins}m ${secs}s"
+  else
+    hours=$((duration / 3600)); mins=$(((duration % 3600) / 60))
+    runtime="${hours}h ${mins}m"
+  fi
+
+  if (( total_moved > 0 )); then
+    notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}.<br>Per-share summary:<br>"
+    for share in "${!SHARE_COUNTS[@]}"; do
+      notif_body+="• ${share}: ${SHARE_COUNTS[$share]}<br>"
+    done
+  else
+    notif_body="Automover session finished in ${runtime}.<br>No files were moved during this run."
+  fi
+
+  unraid_notify "Automover session finished" "$notif_body" "normal"
+
+}
+
+# ==========================================================
+#  Cleanup
+# ==========================================================
 cleanup() {
+  send_summary_notification
   set_status "$PREV_STATUS"
   rm -f "$LOCK_FILE"
   exit
@@ -147,12 +203,7 @@ log_session_end() {
   fi
 
   echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
-  if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
-    /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
-      -s "Automover session finished" \
-      -d "Automover is done. Check last run details" \
-      -i "normal"
-  fi
+
   echo "" >> "$LAST_RUN_FILE"
 }
 

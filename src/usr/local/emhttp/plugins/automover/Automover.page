@@ -330,6 +330,7 @@ $settings = $existing;
     justify-content: flex-start;
     gap: 10px;
     margin-bottom: 15px;
+    margin-top: 8px;
   }
 
   .input-wrapper {
