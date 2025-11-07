@@ -1,6 +1,12 @@
 <?php
-$logFile = '/var/log/automover_files_moved.log';
-$lastRunLog = '/var/log/automover_last_run.log';
+$logDir = '/tmp/automover';
+$logFile = "$logDir/automover_files_moved.log";
+$lastRunLog = "$logDir/automover_last_run.log";
+
+// ✅ Ensure the /tmp/automover directory exists
+if (!is_dir($logDir)) {
+    @mkdir($logDir, 0755, true);
+}
 
 $keyword = isset($_GET['filter']) ? strtolower(trim($_GET['filter'])) : null;
 
@@ -29,6 +35,9 @@ foreach ($lines as $line) {
     $movedCount++;
     $matched[] = $line;
 }
+
+// ✅ Reverse to show most recent moves at top
+$matched = array_reverse($matched);
 
 // 🔍 Check lastRunLog for dry run or no-op messages
 $lastMessage = "No files moved for this run";

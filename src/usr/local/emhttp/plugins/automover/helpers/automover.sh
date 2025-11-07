@@ -1,18 +1,18 @@
 #!/bin/bash
 SCRIPT_NAME="automover"
-LAST_RUN_FILE="/var/log/automover_last_run.log"
+LAST_RUN_FILE="/tmp/automover/automover_last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
-AUTOMOVER_LOG="/var/log/automover_files_moved.log"
-EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
-IN_USE_FILE="/tmp/automover/in_use_files.txt"
+AUTOMOVER_LOG="/tmp/automover/automover_files_moved.log"
+EXCLUSIONS_FILE="/boot/config/plugins/automover/automover_exclusions.txt"
+IN_USE_FILE="/tmp/automover/automover_in_use_files.txt"
 STATUS_FILE="/tmp/automover/automover_status.txt"
-MOVED_SHARES_FILE="/tmp/automover/moved_shares.txt"
+MOVED_SHARES_FILE="/tmp/automover/automover_moved_shares.txt"
 
 # ==========================================================
 #  Setup directories and lock
 # ==========================================================
 mkdir -p /tmp/automover
-LOCK_FILE="/tmp/automover/automover.lock"
+LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
 
 # ==========================================================
@@ -609,7 +609,6 @@ fi
 #  Finish and signal
 # ==========================================================
 log_session_end
-
 mkdir -p /tmp/automover
 echo "done" > /tmp/automover/automover_done.txt
 set_status "$PREV_STATUS"

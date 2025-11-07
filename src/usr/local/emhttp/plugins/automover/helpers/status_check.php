@@ -1,7 +1,7 @@
 <?php
 $cronFile   = '/boot/config/plugins/automover/automover.cron';
-$logFile    = '/var/log/automover_last_run.log';
-$bootFail   = '/var/tmp/automover_boot_failure';
+$logFile    = '/tmp/automover/automover_last_run.log';
+$bootFail   = '/tmp/automover/automover_boot_failure';
 $arrayStateFile = '/var/local/emhttp/var.ini';
 $statusFile = '/tmp/automover/automover_status.txt';
 
