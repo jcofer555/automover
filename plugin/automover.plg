@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.11.06.01"
+  version="2025.11.06.02"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.11.06.02
+
+- Fix for cron on install/update
+
 ### 2025.11.06.01
 
 - Change for all logging to go to /tmp/automover
@@ -23,10 +27,6 @@
 ### 2025.11.06
 
 - Fix to make sure in use file checks are cleared per run
-
-### 2025.11.04.02
-
-- Fixed cron when using interval mode
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -41,9 +41,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.11.06.01-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.11.06.01/unraid-automover-2025.11.06.01-noarch-1.txz</URL>
-<SHA256>e0088752fd687efb8f9a0fedc1a574bcd709bed7b74fad4174d87908a54f8a70</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.11.06.02-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.11.06.02/unraid-automover-2025.11.06.02-noarch-1.txz</URL>
+<SHA256>0937cb47ba01c8b7b607b0604417fbc8ed670ef2ee6727404678786144fed65c</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -56,7 +56,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.11.06.01-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.11.06.02-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -135,7 +135,6 @@ fi
 MOVER_TUNING="/boot/config/plugins/ca.mover.tuning.plg"
 MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
 
-# Verify using realpath and test existence explicitly
 if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
   if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
     echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover. \nConsider uninstalling one to avoid incompatibility issues."
@@ -143,29 +142,75 @@ if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.11.06.01-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.11.06.02-noarch-1.txz" -delete
 
-# Handle autostart
+# ==========================================================
+#  HANDLE AUTOSTART + CRON GENERATION
+# ==========================================================
 if [ "$AUTOSTART" == "no" ]; then
     rm -f "$CRON_FILE"
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.11.06.01"
+    echo " Version: 2025.11.06.02"
     echo "----------------------------------------------------"
     echo ""
 else
-    INTERVAL=$(grep -oP '(?<=INTERVAL=")[^"]*' "$SETTINGS" 2>/dev/null)
-    [ -z "$INTERVAL" ] && INTERVAL=60
-    echo "*/$INTERVAL * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1" > "$CRON_FILE"
+    MODE="${MODE:-minutes}"
+    INTERVAL=${INTERVAL:-60}
+    CRON_EXPRESSION="${CRON_EXPRESSION:-}"
+    CRON_CMD="/usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1"
+
+    # Build cron entry based on MODE
+    if [ "$MODE" = "cron" ] && [ -n "$CRON_EXPRESSION" ]; then
+        cronEntry="${CRON_EXPRESSION} ${CRON_CMD}"
+    else
+        # INTERVAL mode — convert minutes into cron schedule
+        if [ "$INTERVAL" -lt 60 ]; then
+            # every X minutes
+            minutes=$(( INTERVAL > 0 ? INTERVAL : 1 ))
+            cronEntry="*/${minutes} * * * * ${CRON_CMD}"
+        elif [ "$INTERVAL" -lt 1440 ]; then
+            # every X hours
+            hours=$(( INTERVAL / 60 ))
+            [ "$hours" -lt 1 ] && hours=1
+            minute=$(( INTERVAL % 60 ))
+            cronEntry="$(printf "%d */%d * * * %s" "$minute" "$hours" "$CRON_CMD")"
+        elif [ "$INTERVAL" -lt 10080 ]; then
+            # every X days
+            days=$(( INTERVAL / 1440 ))
+            [ "$days" -lt 1 ] && days=1
+            hour=$(( (INTERVAL % 1440) / 60 ))
+            minute=$(( INTERVAL % 60 ))
+            cronEntry="$(printf "%d %d */%d * * %s" "$minute" "$hour" "$days" "$CRON_CMD")"
+        elif [ "$INTERVAL" -lt 43200 ]; then
+            # every X weeks (7-day multiples)
+            weeks=$(( INTERVAL / 10080 ))
+            [ "$weeks" -lt 1 ] && weeks=1
+            day=0  # Sunday
+            hour=$(( (INTERVAL % 1440) / 60 ))
+            minute=$(( INTERVAL % 60 ))
+            cronEntry="$(printf "%d %d * * %d %s" "$minute" "$hour" "$day" "$CRON_CMD")"
+        else
+            # every X months (~30-day multiples)
+            months=$(( INTERVAL / 43200 ))
+            [ "$months" -lt 1 ] && months=1
+            cronEntry="$(printf "0 0 1 */%d * %s" "$months" "$CRON_CMD")"
+        fi
+    fi
+
+    # Write to cron file and apply
+    echo "$cronEntry" > "$CRON_FILE"
     update_cron
+
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.11.06.01"
+    echo " Version: 2025.11.06.02"
     echo "----------------------------------------------------"
     echo ""
 fi
+
 ]]>
 </INLINE>
 </FILE>
