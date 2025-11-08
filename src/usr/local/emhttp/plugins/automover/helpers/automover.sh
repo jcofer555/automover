@@ -265,25 +265,6 @@ if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 && 
 fi
 
 # ==========================================================
-#  Stop managed containers (optional, skip in dry run)
-# ==========================================================
-if [[ -n "$CONTAINER_NAMES" ]]; then
-  set_status "Stopping Containers"
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run active — skipping stopping of containers" >> "$LAST_RUN_FILE"
-  else
-    IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-    for container in "${CONTAINERS[@]}"; do
-      container=$(echo "$container" | xargs)
-      [[ -z "$container" ]] && continue
-      echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
-      docker stop "$container" || \
-        echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
-    done
-  fi
-fi
-
-# ==========================================================
 #  Pause qBittorrent
 # ==========================================================
 if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
@@ -403,6 +384,22 @@ if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" && -z "$turb
   turbo_write_enabled=true
 fi
 
+# ==========================================================
+#  Stop managed containers (optional, skip in dry run)
+# ==========================================================
+if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" && -z "$containers_stopped" ]]; then
+  set_status "Stopping Containers"
+  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+  for container in "${CONTAINERS[@]}"; do
+    container=$(echo "$container" | xargs)
+    [[ -z "$container" ]] && continue
+    echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
+    docker stop "$container" || \
+      echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
+  done
+  containers_stopped=true
+fi
+
   tmpfile=$(mktemp)
   printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
   file_count_moved=0
@@ -493,22 +490,18 @@ if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
 fi
 
 # ==========================================================
-#  Start managed containers (optional, skip in dry run)
+#  Start managed containers (only if they were stopped)
 # ==========================================================
-if [[ -n "$CONTAINER_NAMES" ]]; then
+if [[ "$containers_stopped" == true && -n "$CONTAINER_NAMES" ]]; then
   set_status "Starting Containers"
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run active — skipping starting of containers" >> "$LAST_RUN_FILE"
-  else
-    IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-    for container in "${CONTAINERS[@]}"; do
-      container=$(echo "$container" | xargs)
-      [[ -z "$container" ]] && continue
-      echo "Starting Docker container: $container" >> "$LAST_RUN_FILE"
-      docker start "$container" || \
-        echo "Failed to start container: $container" >> "$LAST_RUN_FILE"
-    done
-  fi
+  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+  for container in "${CONTAINERS[@]}"; do
+    container=$(echo "$container" | xargs)
+    [[ -z "$container" ]] && continue
+    echo "Starting Docker container: $container" >> "$LAST_RUN_FILE"
+    docker start "$container" || \
+      echo "Failed to start container: $container" >> "$LAST_RUN_FILE"
+  done
 fi
 
 # ==========================================================
