@@ -87,7 +87,6 @@ send_summary_notification() {
   fi
 
   unraid_notify "Automover session finished" "$notif_body" "normal"
-
 }
 
 # ==========================================================
@@ -206,17 +205,6 @@ log_session_end() {
 
   echo "" >> "$LAST_RUN_FILE"
 }
-
-# ==========================================================
-#  Enable reconstructive write (Turbo Write)
-# ==========================================================
-if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
-  set_status "Enabling Turbo Write"
-  turbo_write_mode=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
-  echo "$turbo_write_mode" > /tmp/automover_prev_write_method
-  /usr/local/sbin/mdcmd set md_write_method 1
-  echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
-fi
 
 # ==========================================================
 #  Parity guard
@@ -401,6 +389,19 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   (( file_count == 0 )) && { continue; }
 
   echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
+
+# ==========================================================
+#  Enable turbo write if files are going to be moved
+# ==========================================================
+if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" && -z "$turbo_write_enabled" ]]; then
+  set_status "Enabling Turbo Write"
+  turbo_write_prev=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
+  echo "$turbo_write_prev" > /tmp/automover_prev_write_method
+  logger "Force turbo write on"
+  /usr/local/sbin/mdcmd set md_write_method 1
+  echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
+  turbo_write_enabled=true
+fi
 
   tmpfile=$(mktemp)
   printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
@@ -643,15 +644,24 @@ fi
 # ==========================================================
 #  Restore previous md_write_method if modified (skip in dry run)
 # ==========================================================
-if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
+if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$moved_anything" == true ]]; then
   set_status "Restoring Turbo Write Setting"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping restoring md_write_method to previous value" >> "$LAST_RUN_FILE"
   else
     turbo_write_mode=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
     if [[ -n "$turbo_write_mode" ]]; then
+      # Translate numeric mode to human-readable text
+      case "$turbo_write_mode" in
+        0) mode_name="read/modify/write" ;;
+        1) mode_name="reconstruct write" ;;
+        auto) mode_name="auto" ;;
+        *) mode_name="unknown ($turbo_write_mode)" ;;
+      esac
+
+      logger "Restoring md_write_method to previous value: $mode_name"
       /usr/local/sbin/mdcmd set md_write_method "$turbo_write_mode"
-      echo "Restored md_write_method to previous value: $turbo_write_mode" >> "$LAST_RUN_FILE"
+      echo "Restored md_write_method to previous value: $mode_name" >> "$LAST_RUN_FILE"
     fi
   fi
 fi
