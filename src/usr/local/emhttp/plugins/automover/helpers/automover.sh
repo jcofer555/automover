@@ -265,14 +265,6 @@ if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 && 
 fi
 
 # ==========================================================
-#  Pause qBittorrent
-# ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
-  set_status "Pausing Torrents"
-  run_qbit_script pause
-fi
-
-# ==========================================================
 #  Update status to "Moving Files"
 # ==========================================================
 if [[ "$DRY_RUN" == "yes" ]]; then
@@ -400,6 +392,16 @@ if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" && -z "$containers_stopped" ]
   containers_stopped=true
 fi
 
+# ==========================================================
+#  Pause qBittorrent
+# ==========================================================
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && -z "$qbit_paused" ]]; then
+  set_status "Pausing Torrents"
+  echo "Pausing qBittorrent before moving files" >> "$LAST_RUN_FILE"
+  run_qbit_script pause
+  qbit_paused=true
+fi
+
   tmpfile=$(mktemp)
   printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
   file_count_moved=0
@@ -478,15 +480,12 @@ else
 fi
 
 # ==========================================================
-#  Resume qBittorrent torrents if enabled
+#  Resume qBittorrent torrents (only if paused)
 # ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
+if [[ "$qbit_paused" == true && "$QBITTORRENT_SCRIPT" == "yes" ]]; then
   set_status "Resuming Torrents"
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run active — skipping resuming of qBittorrent torrents" >> "$LAST_RUN_FILE"
-  else
-    run_qbit_script resume
-  fi
+  echo "Resuming qBittorrent after move process" >> "$LAST_RUN_FILE"
+  run_qbit_script resume
 fi
 
 # ==========================================================
