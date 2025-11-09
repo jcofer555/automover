@@ -278,20 +278,32 @@ fi
 # ==========================================================
 #  Log which filters are enabled
 # ==========================================================
-if [[ "$HIDDEN_FILTER" == "yes" ]]; then
-  echo "Hidden Filter Enabled" >> "$LAST_RUN_FILE"
-fi
+if [[ "$MOVE_NOW" == false ]]; then
+  filters_active=false
 
-if [[ "$SIZE_BASED_FILTER" == "yes" ]]; then
-  echo "Size Based Filter Enabled (${SIZE_MB} MB)" >> "$LAST_RUN_FILE"
-fi
+  # detect if any filters are actually on
+  if [[ "$HIDDEN_FILTER" == "yes" || "$SIZE_BASED_FILTER" == "yes" || "$AGE_BASED_FILTER" == "yes" || "$EXCLUSIONS_ENABLED" == "yes" ]]; then
+    filters_active=true
+  fi
 
-if [[ "$AGE_BASED_FILTER" == "yes" ]]; then
-  echo "Age Based Filter Enabled (${AGE_DAYS} days)" >> "$LAST_RUN_FILE"
-fi
-
-if [[ "$EXCLUSIONS_ENABLED" == "yes" ]]; then
-  echo "Exclusions enabled" >> "$LAST_RUN_FILE"
+  if [[ "$filters_active" == true ]]; then
+    {
+      echo "***************** Filters Used *****************"
+      if [[ "$HIDDEN_FILTER" == "yes" ]]; then
+        echo "Hidden Filter Enabled"
+      fi
+      if [[ "$SIZE_BASED_FILTER" == "yes" ]]; then
+        echo "Size Based Filter Enabled (${SIZE_MB} MB)"
+      fi
+      if [[ "$AGE_BASED_FILTER" == "yes" ]]; then
+        echo "Age Based Filter Enabled (${AGE_DAYS} days)"
+      fi
+      if [[ "$EXCLUSIONS_ENABLED" == "yes" ]]; then
+        echo "Exclusions Enabled"
+      fi
+      echo "***************** Filters Used *****************"
+    } >> "$LAST_RUN_FILE"
+  fi
 fi
 
 # ==========================================================
@@ -374,7 +386,7 @@ if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" && -z "$turb
 fi
 
 # ==========================================================
-#  Stop managed containers (optional, skip in dry run)
+#  Stop managed containers
 # ==========================================================
 if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" && -z "$containers_stopped" ]]; then
   set_status "Stopping Containers"
@@ -387,6 +399,18 @@ if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" && -z "$containers_stopped" ]
       echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
   done
   containers_stopped=true
+fi
+
+# ==========================================================
+#  qBittorrent dependency check
+# ==========================================================
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && -z "$qbit_checked" ]]; then
+  set_status "Checking qbit dependencies"
+  if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
+    echo "Installing qbittorrent-api dependency" >> "$LAST_RUN_FILE"
+    command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
+  fi
+  qbit_checked=true
 fi
 
 # ==========================================================
@@ -479,16 +503,15 @@ else
 fi
 
 # ==========================================================
-#  Resume qBittorrent torrents (only if paused)
+#  Resume qBittorrent torrents
 # ==========================================================
 if [[ "$qbit_paused" == true && "$QBITTORRENT_SCRIPT" == "yes" ]]; then
   set_status "Resuming Torrents"
-  echo "Resuming qBittorrent after move process" >> "$LAST_RUN_FILE"
   run_qbit_script resume
 fi
 
 # ==========================================================
-#  Start managed containers (only if they were stopped)
+#  Start managed containers
 # ==========================================================
 if [[ "$containers_stopped" == true && -n "$CONTAINER_NAMES" ]]; then
   set_status "Starting Containers"
