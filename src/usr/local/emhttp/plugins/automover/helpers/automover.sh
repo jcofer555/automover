@@ -133,7 +133,7 @@ run_qbit_script() {
   local action="$1"
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
-  echo "Running qbittorrent $action" >> "$LAST_RUN_FILE"
+  echo "Running qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
   python3 "$python_script" \
     --host "$QBITTORRENT_HOST" \
     --user "$QBITTORRENT_USERNAME" \
@@ -342,9 +342,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     continue
   fi
 
-  # per-share status
-  set_status "Moving Files For Share: $share_name"
-
   # Determine candidate files (alphabetically)
   if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
     if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
@@ -397,10 +394,12 @@ fi
 # ==========================================================
 if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && -z "$qbit_paused" ]]; then
   set_status "Pausing Torrents"
-  echo "Pausing qBittorrent before moving files" >> "$LAST_RUN_FILE"
   run_qbit_script pause
   qbit_paused=true
 fi
+
+  # per-share status
+  set_status "Moving Files For Share: $share_name"
 
   tmpfile=$(mktemp)
   printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
