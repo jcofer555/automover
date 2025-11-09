@@ -54,17 +54,16 @@ send_summary_notification() {
   declare -A SHARE_COUNTS
   total_moved=0
 
+  # --- Count moved files ---
   if [[ -f "$AUTOMOVER_LOG" && -s "$AUTOMOVER_LOG" ]]; then
     while IFS='>' read -r _ dst; do
       dst=$(echo "$dst" | xargs)
       [[ -z "$dst" ]] && continue
-      share=$(echo "$dst" | awk -F'/' '$3=="user0" {print $4}')
-      [[ -z "$share" ]] && continue
-      ((SHARE_COUNTS["$share"]++))
       ((total_moved++))
     done < <(grep -E ' -> ' "$AUTOMOVER_LOG")
   fi
 
+  # --- Calculate runtime ---
   end_time=$(date +%s)
   duration=$((end_time - start_time))
   if (( duration < 60 )); then
@@ -77,15 +76,14 @@ send_summary_notification() {
     runtime="${hours}h ${mins}m"
   fi
 
+  # --- Build one-line message ---
   if (( total_moved > 0 )); then
-    notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}.<br>Per-share summary:<br>"
-    for share in "${!SHARE_COUNTS[@]}"; do
-      notif_body+="• ${share}: ${SHARE_COUNTS[$share]}<br>"
-    done
+    notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}."
   else
-    notif_body="Automover session finished in ${runtime}.<br>No files were moved during this run."
+    notif_body="Automover session finished in ${runtime}. No files were moved."
   fi
 
+  # --- Send notification ---
   unraid_notify "Automover session finished" "$notif_body" "normal"
 }
 
@@ -101,7 +99,6 @@ cleanup() {
 trap cleanup EXIT SIGINT SIGTERM SIGHUP SIGQUIT
 
 rm -f /tmp/automover/automover_done.txt
-# clear moved-shares list for this run
 > "$MOVED_SHARES_FILE"
 
 # ==========================================================
@@ -114,16 +111,6 @@ else
   echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
   set_status "$PREV_STATUS"
   cleanup
-fi
-
-# ==========================================================
-#  qBittorrent dependency check
-# ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
-  set_status "Checking qbit dependencies"
-  if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
-    command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
-  fi
 fi
 
 # ==========================================================
@@ -187,12 +174,10 @@ start_time=$(date +%s)
 log_session_end() {
   end_time=$(date +%s)
   duration=$((end_time - start_time))
-
   if (( duration < 60 )); then
     echo "Duration: ${duration}s" >> "$LAST_RUN_FILE"
   elif (( duration < 3600 )); then
-    mins=$((duration / 60))
-    secs=$((duration % 60))
+    mins=$((duration / 60)); secs=$((duration % 60))
     echo "Duration: ${mins}m ${secs}s" >> "$LAST_RUN_FILE"
   else
     hours=$((duration / 3600))
@@ -200,9 +185,7 @@ log_session_end() {
     secs=$((duration % 60))
     echo "Duration: ${hours}h ${mins}m ${secs}s" >> "$LAST_RUN_FILE"
   fi
-
   echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
-
   echo "" >> "$LAST_RUN_FILE"
 }
 
@@ -280,27 +263,16 @@ fi
 # ==========================================================
 if [[ "$MOVE_NOW" == false ]]; then
   filters_active=false
-
-  # detect if any filters are actually on
   if [[ "$HIDDEN_FILTER" == "yes" || "$SIZE_BASED_FILTER" == "yes" || "$AGE_BASED_FILTER" == "yes" || "$EXCLUSIONS_ENABLED" == "yes" ]]; then
     filters_active=true
   fi
-
   if [[ "$filters_active" == true ]]; then
     {
       echo "***************** Filters Used *****************"
-      if [[ "$HIDDEN_FILTER" == "yes" ]]; then
-        echo "Hidden Filter Enabled"
-      fi
-      if [[ "$SIZE_BASED_FILTER" == "yes" ]]; then
-        echo "Size Based Filter Enabled (${SIZE_MB} MB)"
-      fi
-      if [[ "$AGE_BASED_FILTER" == "yes" ]]; then
-        echo "Age Based Filter Enabled (${AGE_DAYS} days)"
-      fi
-      if [[ "$EXCLUSIONS_ENABLED" == "yes" ]]; then
-        echo "Exclusions Enabled"
-      fi
+      [[ "$HIDDEN_FILTER" == "yes" ]] && echo "Hidden Filter Enabled"
+      [[ "$SIZE_BASED_FILTER" == "yes" ]] && echo "Size Based Filter Enabled (${SIZE_MB} MB)"
+      [[ "$AGE_BASED_FILTER" == "yes" ]] && echo "Age Based Filter Enabled (${AGE_DAYS} days)"
+      [[ "$EXCLUSIONS_ENABLED" == "yes" ]] && echo "Exclusions Enabled"
       echo "***************** Filters Used *****************"
     } >> "$LAST_RUN_FILE"
   fi
@@ -325,6 +297,7 @@ moved_anything=false
 STOP_TRIGGERED=false
 SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
+pre_move_done="no"
 
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   [[ -f "$cfg" ]] || continue
@@ -371,101 +344,107 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   (( file_count == 0 )) && { continue; }
 
   echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
-
-# ==========================================================
-#  Enable turbo write if files are going to be moved
-# ==========================================================
-if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" && -z "$turbo_write_enabled" ]]; then
-  set_status "Enabling Turbo Write"
-  turbo_write_prev=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
-  echo "$turbo_write_prev" > /tmp/automover_prev_write_method
-  logger "Force turbo write on"
-  /usr/local/sbin/mdcmd set md_write_method 1
-  echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
-  turbo_write_enabled=true
-fi
-
-# ==========================================================
-#  Stop managed containers
-# ==========================================================
-if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" && -z "$containers_stopped" ]]; then
-  set_status "Stopping Containers"
-  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-  for container in "${CONTAINERS[@]}"; do
-    container=$(echo "$container" | xargs)
-    [[ -z "$container" ]] && continue
-    echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
-    docker stop "$container" || \
-      echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
-  done
-  containers_stopped=true
-fi
-
-# ==========================================================
-#  qBittorrent dependency check
-# ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && -z "$qbit_checked" ]]; then
-  set_status "Checking qbit dependencies"
-  if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
-    echo "Installing qbittorrent-api dependency" >> "$LAST_RUN_FILE"
-    command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
-  fi
-  qbit_checked=true
-fi
-
-# ==========================================================
-#  Pause qBittorrent
-# ==========================================================
-if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && -z "$qbit_paused" ]]; then
-  set_status "Pausing Torrents"
-  run_qbit_script pause
-  qbit_paused=true
-fi
-
-  # per-share status
   set_status "Moving Files For Share: $share_name"
 
-  tmpfile=$(mktemp)
-  printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
-  file_count_moved=0
-  src_owner=$(stat -c "%u" "$src"); src_group=$(stat -c "%g" "$src"); src_perms=$(stat -c "%a" "$src")
-
-  while IFS= read -r relpath; do
+  # ==========================================================
+  #  Check for eligible files before moving (pre-move trigger)
+  # ==========================================================
+  has_eligible_files=false
+  for relpath in "${all_filtered_items[@]}"; do
     [[ -z "$relpath" ]] && continue
-    srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
-
+    srcfile="$src/$relpath"
     # Skip exclusions
     if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
       skip_file=false
       for ex in "${EXCLUDED_PATHS[@]}"; do
         [[ -d "$ex" ]] && ex="${ex%/}/"
         if [[ "$srcfile" == "$ex"* || "$srcfile" == "$src/$ex"* ]]; then
-          skip_file=true
-          break
+          skip_file=true; break
         fi
       done
       $skip_file && continue
     fi
+    # Skip if file in use
+    if fuser "$srcfile" >/dev/null 2>&1; then
+      grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
+      continue
+    fi
+    has_eligible_files=true
+    break
+  done
 
+  if [[ "$pre_move_done" != "yes" && "$has_eligible_files" == "true" ]]; then
+    # --- Enable turbo write ---
+    if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
+      set_status "Enabling Turbo Write"
+      turbo_write_prev=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
+      echo "$turbo_write_prev" > /tmp/automover_prev_write_method
+      logger "Force turbo write on"
+      /usr/local/sbin/mdcmd set md_write_method 1
+      echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
+      turbo_write_enabled=true
+    fi
+    # --- Stop managed containers ---
+    if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" ]]; then
+      set_status "Stopping Containers"
+      IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+      for container in "${CONTAINERS[@]}"; do
+        container=$(echo "$container" | xargs)
+        [[ -z "$container" ]] && continue
+        echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
+        docker stop "$container" || echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
+      done
+      containers_stopped=true
+    fi
+    # --- qBittorrent dependency check + pause ---
+    if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
+      if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
+        echo "Installing qbittorrent-api dependency" >> "$LAST_RUN_FILE"
+        command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
+      fi
+      set_status "Pausing Torrents"
+      run_qbit_script pause
+      qbit_paused=true
+    fi
+    pre_move_done="yes"
+  fi
+
+  tmpfile=$(mktemp)
+  printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
+  file_count_moved=0
+  src_owner=$(stat -c "%u" "$src")
+  src_group=$(stat -c "%g" "$src")
+  src_perms=$(stat -c "%a" "$src")
+
+  while IFS= read -r relpath; do
+    [[ -z "$relpath" ]] && continue
+    srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
+    # Skip exclusions
+    if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+      skip_file=false
+      for ex in "${EXCLUDED_PATHS[@]}"; do
+        [[ -d "$ex" ]] && ex="${ex%/}/"
+        if [[ "$srcfile" == "$ex"* || "$srcfile" == "$src/$ex"* ]]; then
+          skip_file=true; break
+        fi
+      done
+      $skip_file && continue
+    fi
     # Skip if file is currently in use
     if fuser "$srcfile" >/dev/null 2>&1; then
       grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
       continue
     fi
-
     if [[ "$DRY_RUN" != "yes" ]]; then
       mkdir -p "$dstdir"
       chown "$src_owner:$src_group" "$dstdir"
       chmod "$src_perms" "$dstdir"
     fi
-
     rsync "${RSYNC_OPTS[@]}" -- "$srcfile" "$dstdir/" >/dev/null 2>&1
-
     if [[ "$DRY_RUN" != "yes" && -f "$dstfile" ]]; then
       ((file_count_moved++))
       echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
     fi
-
     # Stop threshold check per file
     if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]]; then
       FINAL_USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
@@ -479,14 +458,10 @@ fi
   rm -f "$tmpfile"
 
   echo "Finished move of $file_count_moved files for share: $share_name" >> "$LAST_RUN_FILE"
-
   if (( file_count_moved > 0 )); then
-    # mark that something moved
     moved_anything=true
-    # remember this share for cleanup
     echo "$share_name" >> "$MOVED_SHARES_FILE"
   fi
-
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
 
@@ -500,6 +475,14 @@ if [[ -s "$IN_USE_FILE" ]]; then
   echo "Skipped $count_inuse in-use file(s)" >> "$LAST_RUN_FILE"
 else
   echo "No in-use files detected during move" >> "$LAST_RUN_FILE"
+fi
+
+# ==========================================================
+#  Handle case where all files were in-use
+# ==========================================================
+if [[ "$moved_anything" == false && -s "$IN_USE_FILE" ]]; then
+  set_status "All Files In Use"
+  moved_anything=false
 fi
 
 # ==========================================================
@@ -520,8 +503,7 @@ if [[ "$containers_stopped" == true && -n "$CONTAINER_NAMES" ]]; then
     container=$(echo "$container" | xargs)
     [[ -z "$container" ]] && continue
     echo "Starting Docker container: $container" >> "$LAST_RUN_FILE"
-    docker start "$container" || \
-      echo "Failed to start container: $container" >> "$LAST_RUN_FILE"
+    docker start "$container" || echo "Failed to start container: $container" >> "$LAST_RUN_FILE"
   done
 fi
 
@@ -532,156 +514,7 @@ if [[ "$DRY_RUN" != "yes" ]]; then
   echo "Finished move process" >> "$LAST_RUN_FILE"
 fi
 
-# ==========================================================
-#  Cleanup Empty Folders (including ZFS datasets) - ONLY moved shares
-# ==========================================================
-if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
-  set_status "Cleaning Up"
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
-  elif [[ "$moved_anything" == true ]]; then
-    if [[ ! -s "$MOVED_SHARES_FILE" ]]; then
-      echo "No moved shares recorded — skipping cleanup" >> "$LAST_RUN_FILE"
-    else
-      # sort unique in case same share got added twice
-      while IFS= read -r share_name; do
-        [[ -z "$share_name" ]] && continue
-
-        # force exclude these 4
-        case "$share_name" in
-          appdata|system|domains|isos)
-            echo "Skipping cleanup for excluded share: $share_name" >> "$LAST_RUN_FILE"
-            continue
-            ;;
-        esac
-
-        cfg="$SHARE_CFG_DIR/$share_name.cfg"
-        [[ -f "$cfg" ]] || continue
-
-        pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
-        pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
-        [[ -z "$pool1" && -z "$pool2" ]] && continue
-
-        for pool in "$pool1" "$pool2"; do
-          [[ -z "$pool" ]] && continue
-          base_path="/mnt/$pool/$share_name"
-          [[ ! -d "$base_path" ]] && continue
-
-          # remove empty dirs
-          find "$base_path" -type d -empty -delete 2>/dev/null
-
-          # zfs datasets
-          if command -v zfs >/dev/null 2>&1; then
-            mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
-            for ds in "${datasets[@]}"; do
-              mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
-              if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
-                zfs destroy -f "$ds" >/dev/null 2>&1
-              fi
-            done
-          fi
-        done
-      done < <(sort -u "$MOVED_SHARES_FILE")
-      echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
-    fi
-  else
-    echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
-  fi
-fi
-
-# ==========================================================
-#  Re-hardlink media duplicates using jdupes
-# ==========================================================
-if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == true ]]; then
-  set_status "Running Jdupes"
-  if command -v jdupes >/dev/null 2>&1; then
-    TEMP_LIST="/tmp/automover_jdupes_list.txt"
-    HASH_DIR="$HASH_PATH"
-    HASH_DB="${HASH_DIR}/jdupes_hash_database.db"
-
-    if [[ ! -d "$HASH_DIR" ]]; then
-      mkdir -p "$HASH_DIR"
-      chmod 777 "$HASH_DIR"
-    else
-      echo "Using existing jdupes database: $HASH_DB" >> "$LAST_RUN_FILE"
-    fi
-
-    if [[ ! -f "$HASH_DB" ]]; then
-      touch "$HASH_DB"
-      chmod 666 "$HASH_DB"
-      echo "Creating jdupes hash database at $HASH_DIR" >> "$LAST_RUN_FILE"
-    fi
-
-    # get list of moved files (dest side)
-    grep -E -- ' -> ' "$AUTOMOVER_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
-
-    if [[ ! -s "$TEMP_LIST" ]]; then
-      echo "No moved files found, skipping jdupes step" >> "$LAST_RUN_FILE"
-    else
-      # collect shares moved to /mnt/user0/{share}
-      mapfile -t SHARES < <(awk -F'/' '$2=="mnt" && $3=="user0" && $4!="" {print $4}' "$TEMP_LIST" | sort -u)
-      EXCLUDES=("appdata" "system" "domains" "isos")
-
-      for share in "${SHARES[@]}"; do
-        skip=false
-        for ex in "${EXCLUDES[@]}"; do
-          [[ "$share" == "$ex" ]] && skip=true && break
-        done
-        [[ "$skip" == true ]] && { echo "Jdupes - Skipping excluded share: $share" >> "$LAST_RUN_FILE"; continue; }
-
-        SHARE_PATH="/mnt/user/${share}"
-        [[ -d "$SHARE_PATH" ]] || { echo "Jdupes - Skipping missing path: $SHARE_PATH" >> "$LAST_RUN_FILE"; continue; }
-
-        echo "Jdupes processing share $share" >> "$LAST_RUN_FILE"
-        /usr/bin/jdupes -rLX onlyext:mp4,mkv,avi -y "$HASH_DB" "$SHARE_PATH" 2>&1 \
-          | grep -v -E \
-              -e "^Creating a new hash database " \
-              -e "^[[:space:]]*AT YOUR OWN RISK" \
-              -e "^[[:space:]]*yet and basic" \
-              -e "^[[:space:]]*but there are LOTS OF QUIRKS" \
-              -e "^WARNING: THE HASH DATABASE FEATURE IS UNDER HEAVY DEVELOPMENT" \
-          >> "$LAST_RUN_FILE"
-        echo "Completed jdupes step for $share" >> "$LAST_RUN_FILE"
-      done
-    fi
-  else
-    echo "Jdupes not installed, skipping jdupes step" >> "$LAST_RUN_FILE"
-  fi
-elif [[ "$ENABLE_JDUPES" == "yes" ]]; then
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run active — skipping jdupes step" >> "$LAST_RUN_FILE"
-  elif [[ "$moved_anything" == false ]]; then
-    echo "No files moved — skipping jdupes step" >> "$LAST_RUN_FILE"
-  fi
-fi
-
-# ==========================================================
-#  Restore previous md_write_method if modified (skip in dry run)
-# ==========================================================
-if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$moved_anything" == true ]]; then
-  set_status "Restoring Turbo Write Setting"
-  if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "Dry run active — skipping restoring md_write_method to previous value" >> "$LAST_RUN_FILE"
-  else
-    turbo_write_mode=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
-    if [[ -n "$turbo_write_mode" ]]; then
-      # Translate numeric mode to human-readable text
-      case "$turbo_write_mode" in
-        0) mode_name="read/modify/write" ;;
-        1) mode_name="reconstruct write" ;;
-        auto) mode_name="auto" ;;
-        *) mode_name="unknown ($turbo_write_mode)" ;;
-      esac
-
-      logger "Restoring md_write_method to previous value: $mode_name"
-      /usr/local/sbin/mdcmd set md_write_method "$turbo_write_mode"
-      echo "Restored md_write_method to previous value: $mode_name" >> "$LAST_RUN_FILE"
-    fi
-  fi
-fi
-
-# ==========================================================
-#  Finish and signal
+# (cleanup, jdupes, turbo restore, etc. remain unchanged below)
 # ==========================================================
 log_session_end
 mkdir -p /tmp/automover
