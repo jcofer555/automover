@@ -50,6 +50,7 @@ echo $$ > "$LOCK_FILE"
 # ==========================================================
 send_summary_notification() {
   [[ "$ENABLE_NOTIFICATIONS" != "yes" ]] && return
+  [[ "$PREV_STATUS" == "Stopped" ]] && return
 
   declare -A SHARE_COUNTS
   total_moved=0
@@ -508,13 +509,162 @@ if [[ "$containers_stopped" == true && -n "$CONTAINER_NAMES" ]]; then
 fi
 
 # ==========================================================
-#  Finished move process (log only — status restored at end)
+#  Finished move process
 # ==========================================================
 if [[ "$DRY_RUN" != "yes" ]]; then
   echo "Finished move process" >> "$LAST_RUN_FILE"
 fi
 
-# (cleanup, jdupes, turbo restore, etc. remain unchanged below)
+# ==========================================================
+#  Cleanup Empty Folders (including ZFS datasets) - ONLY moved shares
+# ==========================================================
+if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
+  set_status "Cleaning Up"
+  if [[ "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
+  elif [[ "$moved_anything" == true ]]; then
+    if [[ ! -s "$MOVED_SHARES_FILE" ]]; then
+      echo "No moved shares recorded — skipping cleanup" >> "$LAST_RUN_FILE"
+    else
+      # sort unique in case same share got added twice
+      while IFS= read -r share_name; do
+        [[ -z "$share_name" ]] && continue
+
+        # force exclude these 4
+        case "$share_name" in
+          appdata|system|domains|isos)
+            echo "Skipping cleanup for excluded share: $share_name" >> "$LAST_RUN_FILE"
+            continue
+            ;;
+        esac
+
+        cfg="$SHARE_CFG_DIR/$share_name.cfg"
+        [[ -f "$cfg" ]] || continue
+
+        pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
+        pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
+        [[ -z "$pool1" && -z "$pool2" ]] && continue
+
+        for pool in "$pool1" "$pool2"; do
+          [[ -z "$pool" ]] && continue
+          base_path="/mnt/$pool/$share_name"
+          [[ ! -d "$base_path" ]] && continue
+
+          # remove empty dirs
+          find "$base_path" -type d -empty -delete 2>/dev/null
+
+          # zfs datasets
+          if command -v zfs >/dev/null 2>&1; then
+            mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
+            for ds in "${datasets[@]}"; do
+              mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
+              if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+                zfs destroy -f "$ds" >/dev/null 2>&1
+              fi
+            done
+          fi
+        done
+      done < <(sort -u "$MOVED_SHARES_FILE")
+      echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
+    fi
+  else
+    echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
+  fi
+fi
+
+# ==========================================================
+#  Re-hardlink media duplicates using jdupes
+# ==========================================================
+if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == true ]]; then
+  set_status "Running Jdupes"
+  if command -v jdupes >/dev/null 2>&1; then
+    TEMP_LIST="/tmp/automover_jdupes_list.txt"
+    HASH_DIR="$HASH_PATH"
+    HASH_DB="${HASH_DIR}/jdupes_hash_database.db"
+
+    if [[ ! -d "$HASH_DIR" ]]; then
+      mkdir -p "$HASH_DIR"
+      chmod 777 "$HASH_DIR"
+    else
+      echo "Using existing jdupes database: $HASH_DB" >> "$LAST_RUN_FILE"
+    fi
+
+    if [[ ! -f "$HASH_DB" ]]; then
+      touch "$HASH_DB"
+      chmod 666 "$HASH_DB"
+      echo "Creating jdupes hash database at $HASH_DIR" >> "$LAST_RUN_FILE"
+    fi
+
+    # get list of moved files (dest side)
+    grep -E -- ' -> ' "$AUTOMOVER_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
+
+    if [[ ! -s "$TEMP_LIST" ]]; then
+      echo "No moved files found, skipping jdupes step" >> "$LAST_RUN_FILE"
+    else
+      # collect shares moved to /mnt/user0/{share}
+      mapfile -t SHARES < <(awk -F'/' '$2=="mnt" && $3=="user0" && $4!="" {print $4}' "$TEMP_LIST" | sort -u)
+      EXCLUDES=("appdata" "system" "domains" "isos")
+
+      for share in "${SHARES[@]}"; do
+        skip=false
+        for ex in "${EXCLUDES[@]}"; do
+          [[ "$share" == "$ex" ]] && skip=true && break
+        done
+        [[ "$skip" == true ]] && { echo "Jdupes - Skipping excluded share: $share" >> "$LAST_RUN_FILE"; continue; }
+
+        SHARE_PATH="/mnt/user/${share}"
+        [[ -d "$SHARE_PATH" ]] || { echo "Jdupes - Skipping missing path: $SHARE_PATH" >> "$LAST_RUN_FILE"; continue; }
+
+        echo "Jdupes processing share $share" >> "$LAST_RUN_FILE"
+        /usr/bin/jdupes -rLX onlyext:mp4,mkv,avi -y "$HASH_DB" "$SHARE_PATH" 2>&1 \
+          | grep -v -E \
+              -e "^Creating a new hash database " \
+              -e "^[[:space:]]*AT YOUR OWN RISK" \
+              -e "^[[:space:]]*yet and basic" \
+              -e "^[[:space:]]*but there are LOTS OF QUIRKS" \
+              -e "^WARNING: THE HASH DATABASE FEATURE IS UNDER HEAVY DEVELOPMENT" \
+          >> "$LAST_RUN_FILE"
+        echo "Completed jdupes step for $share" >> "$LAST_RUN_FILE"
+      done
+    fi
+  else
+    echo "Jdupes not installed, skipping jdupes step" >> "$LAST_RUN_FILE"
+  fi
+elif [[ "$ENABLE_JDUPES" == "yes" ]]; then
+  if [[ "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run active — skipping jdupes step" >> "$LAST_RUN_FILE"
+  elif [[ "$moved_anything" == false ]]; then
+    echo "No files moved — skipping jdupes step" >> "$LAST_RUN_FILE"
+  fi
+fi
+
+# ==========================================================
+#  Restore previous md_write_method if modified (skip in dry run)
+# ==========================================================
+if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$moved_anything" == true ]]; then
+  set_status "Restoring Turbo Write Setting"
+  if [[ "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run active — skipping restoring md_write_method to previous value" >> "$LAST_RUN_FILE"
+  else
+    turbo_write_mode=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
+    if [[ -n "$turbo_write_mode" ]]; then
+      # Translate numeric mode to human-readable text
+      case "$turbo_write_mode" in
+        0) mode_name="read/modify/write" ;;
+        1) mode_name="reconstruct write" ;;
+        auto) mode_name="auto" ;;
+        *) mode_name="unknown ($turbo_write_mode)" ;;
+      esac
+
+      logger "Restoring md_write_method to previous value: $mode_name"
+      /usr/local/sbin/mdcmd set md_write_method "$turbo_write_mode"
+      echo "Restored md_write_method to previous value: $mode_name" >> "$LAST_RUN_FILE"
+    fi
+  fi
+fi
+
+# ==========================================================
+#  Finish and signal
 # ==========================================================
 log_session_end
 mkdir -p /tmp/automover
