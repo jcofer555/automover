@@ -344,9 +344,6 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   file_count=${#all_filtered_items[@]}
   (( file_count == 0 )) && { continue; }
 
-  echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
-  set_status "Moving Files For Share: $share_name"
-
   # ==========================================================
   #  Check for eligible files before moving (pre-move trigger)
   # ==========================================================
@@ -409,6 +406,9 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     fi
     pre_move_done="yes"
   fi
+
+  echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
+  set_status "Moving Files For Share: $share_name"
 
   tmpfile=$(mktemp)
   printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
@@ -482,7 +482,6 @@ fi
 #  Handle case where all files were in-use
 # ==========================================================
 if [[ "$moved_anything" == false && -s "$IN_USE_FILE" ]]; then
-  set_status "All Files In Use"
   moved_anything=false
 fi
 
