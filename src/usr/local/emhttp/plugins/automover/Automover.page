@@ -1392,7 +1392,7 @@ $settings = $existing;
 
   <div id="moved-log-container">
     <div class="log-header-row">
-      <h3>Mover Log For Last Run</h3>
+      <h3>Files Moved</h3>
       <div class="toast-wrapper">
         <span title="Clear the mover log for last run log" class="automovertip">
           <button id="clear-mover-log">Clear Log</button>
