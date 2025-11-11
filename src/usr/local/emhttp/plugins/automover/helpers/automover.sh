@@ -34,7 +34,7 @@ unraid_notify() {
   local title="$1"
   local message="$2"
   local level="${3:-normal}"
-  echo "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s '$title' -d '$message' -i '$level'" | at now + 1 minute
+  /usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s "$title" -d "$message" -i "$level"
 }
 
 # ==========================================================
@@ -93,20 +93,20 @@ echo $$ > "$LOCK_FILE"
 # ==========================================================
 send_summary_notification() {
   [[ "$ENABLE_NOTIFICATIONS" != "yes" ]] && return
-if [[ "$PREV_STATUS" == "Stopped" && "$MOVE_NOW" == false ]]; then
+  if [[ "$PREV_STATUS" == "Stopped" && "$MOVE_NOW" == false ]]; then
   return
 fi
 
-  declare -A SHARE_COUNTS
-  total_moved=0
+  # --- Prefer moved_anything flag for primary logic ---
+  if [[ "$moved_anything" != "true" ]]; then
+    echo "No files moved - skipping sending notifications" >> "$LAST_RUN_FILE"
+    return
+  fi
 
-  # --- Count moved files ---
+  # --- Fallback counter in case variable is unset ---
+  total_moved=0
   if [[ -f "$AUTOMOVER_LOG" && -s "$AUTOMOVER_LOG" ]]; then
-    while IFS='>' read -r _ dst; do
-      dst=$(echo "$dst" | xargs)
-      [[ -z "$dst" ]] && continue
-      ((total_moved++))
-    done < <(grep -E ' -> ' "$AUTOMOVER_LOG")
+    total_moved=$(grep -cE ' -> ' "$AUTOMOVER_LOG" || echo 0)
   fi
 
   # --- Calculate runtime ---
@@ -122,21 +122,15 @@ fi
     runtime="${hours}h ${mins}m"
   fi
 
-  # --- Build one-line message ---
-  if (( total_moved > 0 )); then
-    notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}."
-  else
-    notif_body="Automover session finished in ${runtime}. No files were moved."
-  fi
+  # --- Build message ---
+  notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}."
 
   # --- Send notification ---
-  if [[ -n "$WEBHOOK_URL" ]]; then
-    # Discord webhook notification
-    send_discord_message "Automover session finished" "$notif_body" 65280
-  else
-    # Normal Unraid GUI notification
-    unraid_notify "Automover session finished" "$notif_body" "normal"
-  fi
+if [[ -n "$WEBHOOK_URL" ]]; then
+  send_discord_message "Automover session finished" "$notif_body" 65280
+else
+  unraid_notify "Automover session finished" "$notif_body" "normal"
+fi
 }
 
 # ==========================================================
@@ -204,18 +198,6 @@ start_time=$(date +%s)
   echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
 } >> "$LAST_RUN_FILE"
-
-# --- Send start notification (outside subshell) ---
-if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
-  title="Automover session started"
-  message="Automover will start moving data based on your selected preferences."
-
-  if [[ -n "$WEBHOOK_URL" ]]; then
-    send_discord_message "$title" "$message" 16776960  # yellow/orange color
-  else
-    unraid_notify "$title" "$message" "normal"
-  fi
-fi
 
 log_session_end() {
   end_time=$(date +%s)
@@ -344,6 +326,7 @@ STOP_TRIGGERED=false
 SHARE_CFG_DIR="/boot/config/shares"
 rm -f "$AUTOMOVER_LOG"
 pre_move_done="no"
+sent_start_notification="no"
 
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   [[ -f "$cfg" ]] || continue
@@ -417,6 +400,20 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   done
 
   if [[ "$pre_move_done" != "yes" && "$has_eligible_files" == "true" ]]; then
+  # --- Send start notification only once when actual move begins ---
+if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" && "$has_eligible_files" == "true" ]]; then
+  title="Automover session started"
+  message="Automover is beginning to move eligible files."
+
+  if [[ -n "$WEBHOOK_URL" ]]; then
+    send_discord_message "$title" "$message" 16776960  # yellow/orange color
+  else
+    unraid_notify "$title" "$message" "normal"
+  fi
+
+  sent_start_notification="yes"
+fi
+
     # --- Enable turbo write ---
     if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
       set_status "Enabling Turbo Write"
@@ -725,12 +722,10 @@ fi
 # ==========================================================
 #  Finish and signal
 # ==========================================================
+send_summary_notification
 log_session_end
 mkdir -p /tmp/automover
 echo "done" > /tmp/automover/automover_done.txt
-
-# Always send summary notification, including Move Now runs
-send_summary_notification
 
 # Reset status and release lock
 set_status "$PREV_STATUS"
