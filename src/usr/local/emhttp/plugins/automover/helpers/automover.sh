@@ -375,33 +375,36 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   # ==========================================================
   #  Check for eligible files before moving (pre-move trigger)
   # ==========================================================
-  has_eligible_files=false
-  for relpath in "${all_filtered_items[@]}"; do
-    [[ -z "$relpath" ]] && continue
-    srcfile="$src/$relpath"
-    # Skip exclusions
-    if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
-      skip_file=false
-      for ex in "${EXCLUDED_PATHS[@]}"; do
-        [[ -d "$ex" ]] && ex="${ex%/}/"
-        if [[ "$srcfile" == "$ex"* || "$srcfile" == "$src/$ex"* ]]; then
-          skip_file=true; break
-        fi
-      done
-      $skip_file && continue
-    fi
-    # Skip if file in use
-    if fuser "$srcfile" >/dev/null 2>&1; then
-      grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
-      continue
-    fi
-    has_eligible_files=true
-    break
-  done
+eligible_count=0
+for relpath in "${all_filtered_items[@]}"; do
+  [[ -z "$relpath" ]] && continue
+  srcfile="$src/$relpath"
 
-  if [[ "$pre_move_done" != "yes" && "$has_eligible_files" == "true" ]]; then
+  # Skip exclusions
+  if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+    skip_file=false
+    for ex in "${EXCLUDED_PATHS[@]}"; do
+      [[ -d "$ex" ]] && ex="${ex%/}/"
+      if [[ "$srcfile" == "$ex"* || "$srcfile" == "$src/$ex"* ]]; then
+        skip_file=true; break
+      fi
+    done
+    $skip_file && continue
+  fi
+
+  # Skip if file in use
+  if fuser "$srcfile" >/dev/null 2>&1; then
+    grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
+    continue
+  fi
+
+  ((eligible_count++))
+  # No need to break; we’ll just count them all
+done
+
+if [[ "$pre_move_done" != "yes" && "$eligible_count" -ge 1 ]]; then
   # --- Send start notification only once when actual move begins ---
-if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" && "$has_eligible_files" == "true" ]]; then
+if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" && "$eligible_count" -ge 1 ]]; then
   title="Automover session started"
   message="Automover is beginning to move eligible files."
 
