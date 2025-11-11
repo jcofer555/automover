@@ -34,6 +34,7 @@ $args = [
     $_GET['CRON_EXPRESSION'] ?? '',
     $_GET['STOP_THRESHOLD'] ?? '',
     $_GET['ENABLE_NOTIFICATIONS'] ?? '',
+    $_GET['WEBHOOK_URL'] ?? '',
 ];
 
 // Escape each argument for safety

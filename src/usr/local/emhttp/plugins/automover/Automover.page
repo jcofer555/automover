@@ -75,7 +75,8 @@ $defaults = [
     'MODE' => 'minutes',
     'CRON_EXPRESSION' => '',
     'STOP_THRESHOLD' => 0,
-    'ENABLE_NOTIFICATIONS' => 'no'
+    'ENABLE_NOTIFICATIONS' => 'no',
+    'WEBHOOK_URL' => ''
 ];
 
 // Load existing config if present
@@ -1039,6 +1040,23 @@ $settings = $existing;
       </div>
     </div>
 
+<!-- Webhook URL -->
+<div class="form-pair" id="webhook_row" style="display:none;">
+  <label for="webhook_url">
+    <span title="Optional: Discord Webhook URL for notifications" class="automovertip">Discord Webhook:</span>
+  </label>
+  <div class="input-wrapper">
+    <span title="Optional: Discord Webhook URL for notifications" class="automovertip">
+    <input type="text" id="webhook_url"
+      placeholder="https://discord.com/api/webhooks/yourwebhookid"
+      value="<?php echo htmlspecialchars($settings['WEBHOOK_URL'] ?? '') ?>">
+    </span>
+    <div id="webhook-warning" class="field-warning">
+      ⚠️ Needs entered like this https://discord.com/api/webhooks/yourwebhookid
+    </div>
+  </div>
+</div>
+
     <!-- Container Names -->
     <div class="form-pair">
       <label for="container_names" <span
@@ -1533,6 +1551,57 @@ $settings = $existing;
     const sizeFilterCheckbox = document.getElementById('size_based_filter');
     const sizeMbContainer = document.getElementById('size-mb-container');
 
+// === Live validation for Discord Webhook URL (prefix-based) ===
+const webhookInput = document.getElementById('webhook_url');
+const webhookWarning = document.getElementById('webhook-warning');
+
+if (webhookInput && webhookWarning) {
+  webhookInput.addEventListener('input', function () {
+    const value = this.value.trim();
+
+    // empty is allowed
+    let valid = (value === '');
+
+    // allow either discord.com or discordapp.com prefix
+    if (value.startsWith('https://discord.com/api/webhooks/') ||
+        value.startsWith('https://discordapp.com/api/webhooks/')) {
+      valid = true;
+    }
+
+    if (!valid) {
+      this.classList.add('invalid');
+      webhookWarning.style.display = 'block';
+      webhookWarning.style.opacity = '1';
+    } else {
+      this.classList.remove('invalid');
+      webhookWarning.style.opacity = '0';
+      setTimeout(() => {
+        webhookWarning.style.display = 'none';
+      }, 200);
+    }
+  });
+}
+
+  // === Discord Webhook visibility control (safe) ===
+  const enableNotificationsCheckbox = document.getElementById('enable_notifications');
+
+  // try both dash and underscore, in case HTML used one or the other
+  const webhookRow =
+    document.getElementById('webhook-row') ||
+    document.getElementById('webhook_row');
+
+  if (enableNotificationsCheckbox && webhookRow) {
+    // set initial state on load
+    webhookRow.style.display = enableNotificationsCheckbox.checked ? 'flex' : 'none';
+
+    // update on change
+    enableNotificationsCheckbox.addEventListener('change', function () {
+      webhookRow.style.display = this.checked ? 'flex' : 'none';
+    });
+  }
+
+
+
     moveNowBtn.addEventListener('click', () => {
       // Trigger the move action (you may already have this logic elsewhere)
       fetch('/plugins/automover/helpers/run_manual_move.php', {
@@ -2004,6 +2073,33 @@ $settings = $existing;
       }
     });
 
+function validateWebhook() {
+  const enableNotifications = document.getElementById('enable_notifications');
+  const webhookRow = document.getElementById('webhook-row');
+  const webhookInput = document.getElementById('webhook_url');
+  const webhookWarning = document.getElementById('webhook-warning');
+
+  // Show/hide field depending on notifications
+  if (enableNotifications && webhookRow) {
+    webhookRow.style.display = enableNotifications.checked ? 'flex' : 'none';
+  }
+
+  if (!enableNotifications.checked) return true; // skip validation if notifications disabled
+  if (!webhookInput) return true;
+
+  const val = webhookInput.value.trim();
+  if (val === '') {
+    webhookInput.classList.remove('invalid');
+    webhookWarning.style.display = 'none';
+    return true; // empty is allowed
+  }
+
+  const valid = val.startsWith('https://discord.com/api/webhooks/');
+  webhookInput.classList.toggle('invalid', !valid);
+  webhookWarning.style.display = valid ? 'none' : 'block';
+  return valid;
+}
+
     // ===== Exclusions picker (helper + csrf_token) =====
     const modal = document.getElementById('exclusion-modal');
     const grid = document.getElementById('picker-grid');
@@ -2318,6 +2414,7 @@ $settings = $existing;
       const sizeMbValid = !document.getElementById('size_based_filter').checked ||
         validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
       const qbitValid = validateQbitFields();
+      const webhookValid = validateWebhook();
 
       // --- Cron validation ---
       let cronValid = true;
@@ -2329,11 +2426,12 @@ $settings = $existing;
       }
 
       // --- Final validation check ---
-      if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid && sizeMbValid && qbitValid && cronValid)) {
-        form.classList.add('shake');
-        setTimeout(() => form.classList.remove('shake'), 300);
-        return;
-      }
+if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
+      sizeMbValid && qbitValid && cronValid && webhookValid)) {
+  form.classList.add('shake');
+  setTimeout(() => form.classList.remove('shake'), 300);
+  return;
+}
 
       // --- Build parameters for save_settings.php ---
       const params = new URLSearchParams({
@@ -2364,7 +2462,8 @@ $settings = $existing;
         MODE: modeSelect.value,
         CRON_EXPRESSION: cronInput.value,
         STOP_THRESHOLD: stopThresholdInput.value,
-        ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no'
+        ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
+        WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || ''
       });
 
       // --- Step 1: Save settings ---

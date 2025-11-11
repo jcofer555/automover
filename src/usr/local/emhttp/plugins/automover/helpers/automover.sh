@@ -15,11 +15,54 @@ mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
 
+# ==========================================================
+#  Load Settings
+# ==========================================================
+set_status "Loading Config"
+if [[ -f "$CFG_PATH" ]]; then
+  source "$CFG_PATH"
+else
+  echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
+  set_status "$PREV_STATUS"
+  cleanup
+fi
+
+# ==========================================================
+#  Unraid notifications helper
+# ==========================================================
 unraid_notify() {
   local title="$1"
   local message="$2"
   local level="${3:-normal}"
   echo "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s '$title' -d '$message' -i '$level'" | at now + 1 minute
+}
+
+# ==========================================================
+#  Discord webhook helper
+# ==========================================================
+send_discord_message() {
+  local title="$1"
+  local message="$2"
+  local color="${3:-65280}" # default = green
+  local webhook="${WEBHOOK_URL:-}"
+
+  # Only run if webhook is set and not empty
+  [[ -z "$webhook" ]] && return
+
+  # Ensure jq exists (for JSON encoding)
+  if ! command -v jq >/dev/null 2>&1; then
+    logger "jq not found; skipping Discord webhook notification"
+    return
+  fi
+
+  local json
+  json=$(jq -n \
+    --arg title "$title" \
+    --arg message "$message" \
+    --argjson color "$color" \
+    '{embeds: [{title: $title, description: $message, color: $color}]}')
+
+  curl -s -X POST -H "Content-Type: application/json" -d "$json" "$webhook" >/dev/null 2>&1
 }
 
 # ==========================================================
@@ -50,7 +93,9 @@ echo $$ > "$LOCK_FILE"
 # ==========================================================
 send_summary_notification() {
   [[ "$ENABLE_NOTIFICATIONS" != "yes" ]] && return
-  [[ "$PREV_STATUS" == "Stopped" ]] && return
+if [[ "$PREV_STATUS" == "Stopped" && "$MOVE_NOW" == false ]]; then
+  return
+fi
 
   declare -A SHARE_COUNTS
   total_moved=0
@@ -85,34 +130,27 @@ send_summary_notification() {
   fi
 
   # --- Send notification ---
-  unraid_notify "Automover session finished" "$notif_body" "normal"
+  if [[ -n "$WEBHOOK_URL" ]]; then
+    # Discord webhook notification
+    send_discord_message "Automover session finished" "$notif_body" 65280
+  else
+    # Normal Unraid GUI notification
+    unraid_notify "Automover session finished" "$notif_body" "normal"
+  fi
 }
 
 # ==========================================================
 #  Cleanup
 # ==========================================================
 cleanup() {
-  send_summary_notification
+  # Called when interrupted (SIGINT, SIGTERM, etc.)
   set_status "$PREV_STATUS"
   rm -f "$LOCK_FILE"
-  exit
 }
-trap cleanup EXIT SIGINT SIGTERM SIGHUP SIGQUIT
+trap cleanup SIGINT SIGTERM SIGHUP SIGQUIT
 
 rm -f /tmp/automover/automover_done.txt
 > "$MOVED_SHARES_FILE"
-
-# ==========================================================
-#  Load Settings
-# ==========================================================
-set_status "Loading Config"
-if [[ -f "$CFG_PATH" ]]; then
-  source "$CFG_PATH"
-else
-  echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
-  set_status "$PREV_STATUS"
-  cleanup
-fi
 
 # ==========================================================
 #  qBittorrent helper
@@ -121,7 +159,7 @@ run_qbit_script() {
   local action="$1"
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
-  echo "Running qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
+  echo "Starting qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
   python3 "$python_script" \
     --host "$QBITTORRENT_HOST" \
     --user "$QBITTORRENT_USERNAME" \
@@ -131,7 +169,7 @@ run_qbit_script() {
     --days_to "$QBITTORRENT_DAYS_TO" \
     --status-filter "$QBITTORRENT_STATUS" \
     "--$action" 2>&1 | grep -E '^(Running qBittorrent|Paused|Resumed|qBittorrent)' >> "$LAST_RUN_FILE"
-  echo "Qbittorrent $action completed" >> "$LAST_RUN_FILE"
+  echo "Finished qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
 }
 
 # ==========================================================
@@ -160,17 +198,24 @@ done
 #  Header
 # ==========================================================
 start_time=$(date +%s)
+
 {
   echo "------------------------------------------------"
   echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
-  if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
-    /usr/local/emhttp/webGui/scripts/notify -e "Automover" \
-      -s "Automover session started" \
-      -d "Automover will start moving data based on your preferences selected" \
-      -i "normal"
-  fi
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
 } >> "$LAST_RUN_FILE"
+
+# --- Send start notification (outside subshell) ---
+if [[ "$ENABLE_NOTIFICATIONS" == "yes" ]]; then
+  title="Automover session started"
+  message="Automover will start moving data based on your selected preferences."
+
+  if [[ -n "$WEBHOOK_URL" ]]; then
+    send_discord_message "$title" "$message" 16776960  # yellow/orange color
+  else
+    unraid_notify "$title" "$message" "normal"
+  fi
+fi
 
 log_session_end() {
   end_time=$(date +%s)
@@ -397,7 +442,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     # --- qBittorrent dependency check + pause ---
     if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
       if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
-        echo "Installing qbittorrent-api dependency" >> "$LAST_RUN_FILE"
+        echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
         command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
       fi
       set_status "Pausing Torrents"
@@ -465,6 +510,21 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   fi
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
+
+# ==========================================================
+#  If no shares had eligible files — log skipped pre-move actions
+# ==========================================================
+if [[ "$pre_move_done" != "yes" ]]; then
+  if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" ]]; then
+    echo "No files moved - skipping enabling reconstructive write (turbo write)" >> "$LAST_RUN_FILE"
+  fi
+  if [[ -n "$CONTAINER_NAMES" ]]; then
+    echo "No files moved - skipping stopping of containers" >> "$LAST_RUN_FILE"
+  fi
+  if [[ "$QBITTORRENT_SCRIPT" == "yes" ]]; then
+    echo "No files moved - skipping pausing of qbittorrent torrents" >> "$LAST_RUN_FILE"
+  fi
+fi
 
 # ==========================================================
 #  In-use file summary
@@ -668,4 +728,10 @@ fi
 log_session_end
 mkdir -p /tmp/automover
 echo "done" > /tmp/automover/automover_done.txt
+
+# Always send summary notification, including Move Now runs
+send_summary_notification
+
+# Reset status and release lock
 set_status "$PREV_STATUS"
+rm -f "$LOCK_FILE"
