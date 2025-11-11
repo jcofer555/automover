@@ -34,7 +34,15 @@ unraid_notify() {
   local title="$1"
   local message="$2"
   local level="${3:-normal}"
-  /usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s "$title" -d "$message" -i "$level"
+  local delay="${4:-0}"
+
+  if (( delay > 0 )); then
+    # Delay in minutes (for finish notifications)
+    echo "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s '$title' -d '$message' -i '$level'" | at now + "$delay" minutes
+  else
+    # Instant (for start notifications)
+    /usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s "$title" -d "$message" -i "$level"
+  fi
 }
 
 # ==========================================================
@@ -94,19 +102,27 @@ echo $$ > "$LOCK_FILE"
 send_summary_notification() {
   [[ "$ENABLE_NOTIFICATIONS" != "yes" ]] && return
   if [[ "$PREV_STATUS" == "Stopped" && "$MOVE_NOW" == false ]]; then
-  return
-fi
+    return
+  fi
 
-  # --- Prefer moved_anything flag for primary logic ---
+  # --- Skip if nothing moved ---
   if [[ "$moved_anything" != "true" ]]; then
     echo "No files moved - skipping sending notifications" >> "$LAST_RUN_FILE"
     return
   fi
 
-  # --- Fallback counter in case variable is unset ---
+  # --- Build per-share counts ---
+  declare -A SHARE_COUNTS
   total_moved=0
   if [[ -f "$AUTOMOVER_LOG" && -s "$AUTOMOVER_LOG" ]]; then
-    total_moved=$(grep -cE ' -> ' "$AUTOMOVER_LOG" || echo 0)
+    while IFS='>' read -r _ dst; do
+      dst=$(echo "$dst" | xargs)
+      [[ -z "$dst" ]] && continue
+      share=$(echo "$dst" | awk -F'/' '$3=="user0"{print $4}')
+      [[ -z "$share" ]] && continue
+      ((SHARE_COUNTS["$share"]++))
+      ((total_moved++))
+    done < <(grep -E ' -> ' "$AUTOMOVER_LOG")
   fi
 
   # --- Calculate runtime ---
@@ -122,15 +138,28 @@ fi
     runtime="${hours}h ${mins}m"
   fi
 
-  # --- Build message ---
+  # --- Base message ---
   notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}."
 
-  # --- Send notification ---
-if [[ -n "$WEBHOOK_URL" ]]; then
-  send_discord_message "Automover session finished" "$notif_body" 65280
-else
-  unraid_notify "Automover session finished" "$notif_body" "normal"
-fi
+  # --- Discord: add per-share summary (alphabetical) ---
+  if [[ -n "$WEBHOOK_URL" ]]; then
+    if (( ${#SHARE_COUNTS[@]} > 0 )); then
+      notif_body+="
+
+Per share summary:"
+      while IFS= read -r share; do
+        notif_body+="
+• ${share}: ${SHARE_COUNTS[$share]} file(s)"
+      done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+    fi
+
+    # Send with real newlines preserved
+    send_discord_message "Automover session finished" "$notif_body" 65280
+
+  else
+    # --- Unraid notify: old simple format ---
+    unraid_notify "Automover session finished" "$notif_body" "normal" 1
+  fi
 }
 
 # ==========================================================
@@ -177,6 +206,15 @@ fi
 if [[ "$1" == "--pool" && -n "$2" ]]; then
   POOL_NAME="$2"
   shift 2
+fi
+
+# ==========================================================
+#  Skip scheduled runs if Automover is stopped (unless Move Now)
+# ==========================================================
+if [[ "$MOVE_NOW" != true ]]; then
+  if [[ -f "$STATUS_FILE" && "$(cat "$STATUS_FILE")" == "Stopped" ]]; then
+    exit 0
+  fi
 fi
 
 for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
@@ -411,7 +449,7 @@ if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" &&
   if [[ -n "$WEBHOOK_URL" ]]; then
     send_discord_message "$title" "$message" 16776960  # yellow/orange color
   else
-    unraid_notify "$title" "$message" "normal"
+    unraid_notify "$title" "$message" "normal" 0
   fi
 
   sent_start_notification="yes"
