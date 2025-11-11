@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.11.10.03"
+  version="2025.11.10.04"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.11.10.04
+
+- Better finishing notification if using discord webhook
+
 ### 2025.11.10.03
 
 - Fix so stop containers, enable turbo write, and qbittorrent pause if any/all are enabled happen even if there is only 1 file to move
@@ -23,10 +27,6 @@
 ### 2025.11.10.02
 
 - Changed notifications to only occur when files are actually moved otherwise it will log to last run details with "No files moved - skipping sending notifications"
-
-### 2025.11.10.01
-
-- Added option to set a discord webhook when enable notifications is selected, if blank the notifications will get sent to unraid
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -41,9 +41,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.11.10.03-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.11.10.03/unraid-automover-2025.11.10.03-noarch-1.txz</URL>
-<SHA256>e03c36c7af2e6be69e5069592ce44e459f75c39f6a647a9a0ca8c6ecb84953f4</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.11.10.04-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.11.10.04/unraid-automover-2025.11.10.04-noarch-1.txz</URL>
+<SHA256>cac3e7c1a0739fd7a0e752191a3fb9d28c0be16653f9f3d29ab453b03415fc30</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -56,7 +56,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.11.10.03-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.11.10.04-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -143,7 +143,7 @@ if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.11.10.03-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.11.10.04-noarch-1.txz" -delete
 
 # ==========================================================
 #  HANDLE AUTOSTART + CRON GENERATION
@@ -153,7 +153,7 @@ if [ "$AUTOSTART" == "no" ]; then
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.11.10.03"
+    echo " Version: 2025.11.10.04"
     echo "----------------------------------------------------"
     echo ""
 else
@@ -207,7 +207,7 @@ else
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.11.10.03"
+    echo " Version: 2025.11.10.04"
     echo "----------------------------------------------------"
     echo ""
 fi
