@@ -33,6 +33,7 @@ CRON_EXPRESSION="${26:-}"
 STOP_THRESHOLD="${27:-0}"
 ENABLE_NOTIFICATIONS="${28:-no}"
 WEBHOOK_URL="${29:-}"
+FILES_MOVED_COPIES_SAVED="${29:-5}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -77,6 +78,7 @@ fi
   echo "STOP_THRESHOLD=\"$STOP_THRESHOLD\""
   echo "ENABLE_NOTIFICATIONS=\"$ENABLE_NOTIFICATIONS\""
   echo "WEBHOOK_URL=\"$WEBHOOK_URL\""
+  echo "FILES_MOVED_COPIES_SAVED=\"$FILES_MOVED_COPIES_SAVED\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

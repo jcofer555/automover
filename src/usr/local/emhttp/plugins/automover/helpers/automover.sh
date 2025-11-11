@@ -157,16 +157,32 @@ Per share summary:"
     send_discord_message "Automover session finished" "$notif_body" 65280
 
   else
-    # --- Unraid notify: add per-share summary with <br> ---
+    # --- Unraid notify section ---
     notif_body_html="$notif_body"
 
-    if (( ${#SHARE_COUNTS[@]} > 0 )); then
-      notif_body_html+="<br><br>Per share summary:<br>"
-      while IFS= read -r share; do
-        notif_body_html+="• ${share}: ${SHARE_COUNTS[$share]} file(s)<br>"
-      done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+    if [[ -f "/boot/config/plugins/dynamix/notifications/agents/Discord.sh" ]]; then
+      # Discord agent installed: include per-share summary with " - " separator
+      if (( ${#SHARE_COUNTS[@]} > 0 )); then
+        notif_body_html+=" - Per share summary: "
+        first=true
+        while IFS= read -r share; do
+          if [[ "$first" == true ]]; then
+            notif_body_html+="${share}: ${SHARE_COUNTS[$share]} file(s)"
+            first=false
+          else
+            notif_body_html+=" - ${share}: ${SHARE_COUNTS[$share]} file(s)"
+          fi
+        done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+      fi
+    else
+      # Discord agent not installed: keep HTML <br> layout
+      if (( ${#SHARE_COUNTS[@]} > 0 )); then
+        notif_body_html+="<br><br>Per share summary:<br>"
+        while IFS= read -r share; do
+          notif_body_html+="• ${share}: ${SHARE_COUNTS[$share]} file(s)<br>"
+        done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+      fi
     fi
-
     unraid_notify "Automover session finished" "$notif_body_html" "normal" 1
   fi
 }
