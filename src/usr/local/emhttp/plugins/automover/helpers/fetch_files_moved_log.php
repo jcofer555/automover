@@ -1,6 +1,7 @@
 <?php
 $logDir = '/tmp/automover';
 $logFile = "$logDir/automover_files_moved.log";
+$prevLog = "$logDir/automover_files_moved_prev.log";
 $lastRunLog = "$logDir/automover_last_run.log";
 
 // ✅ Ensure the /tmp/automover directory exists
@@ -16,8 +17,9 @@ $lines = file_exists($logFile)
 
 $matched = [];
 $movedCount = 0;
+$noMoveDetected = false;
 
-// 🔍 Filter and count moved lines (excluding summary messages)
+// 🔍 Filter and count moved lines
 foreach ($lines as $line) {
     $lower = strtolower($line);
 
@@ -25,19 +27,40 @@ foreach ($lines as $line) {
         continue;
     }
 
-    if (
-        strpos($lower, 'no files moved for this run') !== false ||
-        strpos($lower, 'dry run: no files would have been moved') !== false
-    ) {
+    // Preserve "no files moved" and "dry run" lines for display
+    if (strpos($lower, 'no files moved for this run') !== false) {
+        $matched[] = $line;
+        $noMoveDetected = true;
+        continue;
+    }
+    if (strpos($lower, 'dry run: no files would have been moved') !== false) {
+        $matched[] = $line;
+        $noMoveDetected = true;
         continue;
     }
 
-    $movedCount++;
-    $matched[] = $line;
+    if (strpos($line, '->') !== false) {
+        $movedCount++;
+        $matched[] = $line;
+    }
 }
 
-// ✅ Reverse to show most recent moves at top
+// ✅ Reverse to show newest first
 $matched = array_reverse($matched);
+
+// ==========================================================
+// 🧩 Append previous run’s moved file list if no files moved
+// ==========================================================
+if ($noMoveDetected && file_exists($prevLog)) {
+    $matched[] = "";
+    $matched[] = "----- Previous Run Moved Files -----";
+    $prevLines = file($prevLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach (array_reverse($prevLines) as $pline) {
+        if (strpos($pline, '->') !== false) {
+            $matched[] = $pline;
+        }
+    }
+}
 
 // 🔍 Check lastRunLog for dry run or no-op messages
 $lastMessage = "No files moved for this run";
@@ -104,3 +127,4 @@ echo json_encode([
     'duration' => $duration,
     'total' => count($matched)
 ]);
+?>

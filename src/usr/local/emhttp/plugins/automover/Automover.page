@@ -1016,10 +1016,10 @@ $settings = $existing;
       <div class="input-wrapper">
         <span title="Interval in minutes. Anything over 60 will be rounded to the nearest hour, day, week, or month"
           class="automovertip">
-          <input type="number" id="interval" class="short-input" min="1" step="1"
+          <input type="number" id="interval" class="short-input" min="2" step="1"
             value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? 60); ?>">
         </span>
-        <div id="interval-warning" class="field-warning">⚠️ Interval must be at least 1 minute</div>
+        <div id="interval-warning" class="field-warning">⚠️ Interval must be at least 2 minute</div>
       </div>
     </div>
 
@@ -1976,7 +1976,7 @@ if (webhookInput && webhookWarning) {
     const qbitDaysFromInput = document.getElementById('qbit_days_from');
     const qbitDaysToInput = document.getElementById('qbit_days_to');
 
-    intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 1 }, 'interval-warning'));
+    intervalInput.addEventListener('input', () => validateField(intervalInput, { min: 2 }, 'interval-warning'));
     thresholdInput.addEventListener('input', () => validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning'));
     const ageDaysInput = document.getElementById('age_days');
     ageDaysInput.addEventListener('input', () => validateField(ageDaysInput, { min: 1 }, 'age-days-warning'));
@@ -2404,7 +2404,7 @@ function validateWebhook() {
       const form = document.getElementById('automover-settings');
 
       // --- Validation ---
-      const intervalValid = validateField(intervalInput, { min: 1 }, 'interval-warning');
+      const intervalValid = validateField(intervalInput, { min: 2 }, 'interval-warning');
       const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
       const stopThresholdValid = validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning');
       const ageDaysInput = document.getElementById('age_days');

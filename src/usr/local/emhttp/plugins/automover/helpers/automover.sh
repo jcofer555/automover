@@ -157,8 +157,17 @@ Per share summary:"
     send_discord_message "Automover session finished" "$notif_body" 65280
 
   else
-    # --- Unraid notify: old simple format ---
-    unraid_notify "Automover session finished" "$notif_body" "normal" 1
+    # --- Unraid notify: add per-share summary with <br> ---
+    notif_body_html="$notif_body"
+
+    if (( ${#SHARE_COUNTS[@]} > 0 )); then
+      notif_body_html+="<br><br>Per share summary:<br>"
+      while IFS= read -r share; do
+        notif_body_html+="• ${share}: ${SHARE_COUNTS[$share]} file(s)<br>"
+      done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+    fi
+
+    unraid_notify "Automover session finished" "$notif_body_html" "normal" 1
   fi
 }
 
@@ -362,7 +371,6 @@ fi
 moved_anything=false
 STOP_TRIGGERED=false
 SHARE_CFG_DIR="/boot/config/shares"
-rm -f "$AUTOMOVER_LOG"
 pre_move_done="no"
 sent_start_notification="no"
 
@@ -477,20 +485,27 @@ fi
       done
       containers_stopped=true
     fi
-    # --- qBittorrent dependency check + pause ---
-    if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
-      if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
-        echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
-        command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
-      fi
-      set_status "Pausing Torrents"
-      run_qbit_script pause
-      qbit_paused=true
-    fi
-    pre_move_done="yes"
+# --- qBittorrent dependency check + pause ---
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
+  if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
+    echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
+    command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
+  fi
+  set_status "Pausing Torrents"
+  run_qbit_script pause
+  qbit_paused=true
+fi
+
+# --- Clear mover log only once when the first move begins ---
+if [[ "$pre_move_done" != "yes" && "$eligible_count" -ge 1 ]]; then
+  if [[ -f "$AUTOMOVER_LOG" ]]; then
+    rm -f "$AUTOMOVER_LOG"
+  fi
+fi
+pre_move_done="yes"
   fi
 
-  echo "Starting move of $file_count files for share: $share_name" >> "$LAST_RUN_FILE"
+  echo "Starting move of $file_count file(s) for share: $share_name" >> "$LAST_RUN_FILE"
   set_status "Moving Files For Share: $share_name"
 
   tmpfile=$(mktemp)
@@ -541,7 +556,7 @@ fi
   done < "$tmpfile"
   rm -f "$tmpfile"
 
-  echo "Finished move of $file_count_moved files for share: $share_name" >> "$LAST_RUN_FILE"
+  echo "Finished move of $file_count_moved file(s) for share: $share_name" >> "$LAST_RUN_FILE"
   if (( file_count_moved > 0 )); then
     moved_anything=true
     echo "$share_name" >> "$MOVED_SHARES_FILE"
@@ -758,6 +773,21 @@ if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$moved_anything" == true ]]; th
       echo "Restored md_write_method to previous value: $mode_name" >> "$LAST_RUN_FILE"
     fi
   fi
+fi
+
+# ==========================================================
+#  Final check and backup handling
+# ==========================================================
+mkdir -p "$(dirname "$AUTOMOVER_LOG")"
+
+if [[ "$moved_anything" == "true" && -s "$AUTOMOVER_LOG" ]]; then
+  # Actual files were moved → update the "previous" log for next run
+  cp -f "$AUTOMOVER_LOG" "${AUTOMOVER_LOG%/*}/automover_files_moved_prev.log"
+
+else
+  # Nothing moved → keep previous log intact, just mark the current one
+  : > "$AUTOMOVER_LOG"
+  echo "No files moved for this run - displaying the prior run moved files below" >> "$AUTOMOVER_LOG"
 fi
 
 # ==========================================================
