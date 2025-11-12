@@ -2681,53 +2681,133 @@ if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
   });
 </script>
 <?php if (file_exists('/boot/config/plugins/ca.mover.tuning.plg')): ?>
+<!-- ⚠️ Bottom-fixed Mover Tuning Warning -->
 <div id="mover-tuning-warning" style="
-    position: fixed;
-    bottom: 0%;
-    left: 52%;
-    transform: translateX(-50%);
-    background: #222;
-    color: #ffcc00;
-    padding: 14px 45px 14px 20px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    box-shadow: 0 0 10px rgba(255,255,0,0.4);
-    z-index: 999999;
-    max-width: 80%;
-    text-align: center;
-  ">
-  ⚠️ Mover Tuning plugin appears to be installed.<br>
-  Having both can result in conflicts between <b>Mover Tuning</b> and <b>Automover</b>.<br>
+  display:none; /* Hidden until JS confirms it should be shown */
+  position: fixed;
+  bottom: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111;
+  color: #ffcc00;
+  border: 1px solid var(--primary-blue);
+  border-radius: 10px;
+  padding: 14px 22px;
+  width: 480px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 0 12px rgba(0, 128, 128, .3);
+  z-index: 9999;
+  font-size: 15px;
+  line-height: 1.4;
+">
+  ⚠️ Mover Tuning plugin appears to be installed<br>
+  Having both can result in conflicts<br>
   Consider uninstalling one to avoid incompatibility issues.
 
-  <!-- ✅ Close “X” -->
+  <!-- close “X” -->
   <button id="mover-tuning-close" style="
-      position: absolute;
-      top: -11px;
-      right: -38px;
-      background: transparent;
-      border: none;
-      color: #ffcc00;
-      font-size: 18px;
-      font-weight: bold;
+    position: absolute;
+    top: -10px;
+    right: -28px;
+    background: transparent;
+    border: none;
+    color: #ffcc00;
+    font-size: 22px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+  " title="Close warning">×</button>
+
+  <!-- dismiss permanently row -->
+  <div style="text-align:center; margin-top:1px; margin-bottom:1px;">
+    <button id="dismiss-mover-warning" style="
+      background: #000;
+      color: #ffa500;
+      border: 2px solid #ffa500;
+      border-radius: 6px;
       cursor: pointer;
-      line-height: 1;
-    " title="Dismiss this warning">×</button>
+      padding: 8px 16px;
+      font-weight: 600;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 10px rgba(255,165,0,0.2);
+    "
+    onmouseover="this.style.background='#ffa500';this.style.color='#fff';"
+    onmouseout="this.style.background='#000';this.style.color='#ffa500';">
+      Dismiss Permanently
+    </button>
+    <div style="
+      color: #999;
+      font-size: 11px;
+      margin-top: 2px;
+    ">
+      *To re-enable after disabling permanently, delete <b>mover_warning_dismissed.txt</b><br>
+      from <i>/boot/config/plugins/automover</i> on the flash drive.
+    </div>
+    <div id="dismiss-status" style="
+      display:none;
+      margin-top:1px;
+      color:#00ffaa;
+      font-weight:bold;
+    ">✅ Warning dismissed permanently</div>
+  </div>
 </div>
 
 <script>
-  // Close handler
-  document.addEventListener('DOMContentLoaded', () => {
-    const closeBtn = document.getElementById('mover-tuning-close');
-    const popup = document.getElementById('mover-tuning-warning');
-    if (closeBtn && popup) {
-      closeBtn.addEventListener('click', () => {
-        popup.style.opacity = '0';
-        popup.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => popup.remove(), 300);
-      });
+// === Mover Tuning Warning Dismiss ===
+const warningBox = document.getElementById('mover-tuning-warning');
+const closeBtn = document.getElementById('mover-tuning-close');
+const dismissBtn = document.getElementById('dismiss-mover-warning');
+const dismissStatus = document.getElementById('dismiss-status');
+
+// Check dismissal state before showing to prevent flash
+fetch('/plugins/automover/helpers/mover_warning_state.php')
+  .then(res => res.json())
+  .then(data => {
+    if (!data.dismissed && warningBox) {
+      warningBox.style.display = 'block'; // Only show if NOT dismissed
     }
+  })
+  .catch(() => {
+    // fallback: show warning if fetch fails (for safety)
+    if (warningBox) warningBox.style.display = 'block';
   });
+
+// Close "×" (temporary hide)
+if (closeBtn && warningBox) {
+  closeBtn.addEventListener('click', () => {
+    warningBox.style.transition = 'opacity 0.3s ease';
+    warningBox.style.opacity = '0';
+    setTimeout(() => warningBox.remove(), 300);
+  });
+}
+
+// Dismiss Permanently
+if (dismissBtn && warningBox) {
+  dismissBtn.addEventListener('click', () => {
+    fetch('/plugins/automover/helpers/mover_warning_state.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': csrfToken
+      },
+      body: new URLSearchParams({ csrf_token: csrfToken })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          dismissBtn.style.display = 'none';
+          dismissStatus.style.display = 'block';
+          setTimeout(() => { warningBox.style.display = 'none'; }, 1500);
+        } else {
+          alert('Failed to dismiss warning: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(err => {
+        console.error('Dismiss fetch error:', err);
+        alert('Dismiss request failed — check console for details.');
+      });
+  });
+}
 </script>
 <?php endif; ?>

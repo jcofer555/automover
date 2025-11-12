@@ -6,7 +6,7 @@ $arrayStateFile = '/var/local/emhttp/var.ini';
 $statusFile = '/tmp/automover/automover_status.txt';
 
 $status     = 'Stopped';
-$lastRun    = 'Cannot find last run';
+$lastRun    = 'None';
 $lastRunTs  = '';
 
 // ✅ Ensure status directory exists
