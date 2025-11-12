@@ -148,29 +148,42 @@ Per share summary:"
     # --- Unraid notify section ---
     notif_body_html="$notif_body"
 
-    if [[ -f "/boot/config/plugins/dynamix/notifications/agents/Discord.sh" ]]; then
-      # Discord agent installed: include per-share summary with " - " separator
-      if (( ${#SHARE_COUNTS[@]} > 0 )); then
-        notif_body_html+=" - Per share summary: "
-        first=true
-        while IFS= read -r share; do
-          if [[ "$first" == true ]]; then
-            notif_body_html+="${share}: ${SHARE_COUNTS[$share]} file(s)"
-            first=false
-          else
-            notif_body_html+=" - ${share}: ${SHARE_COUNTS[$share]} file(s)"
-          fi
-        done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+# --- Check Unraid notification normal ---
+notif_cfg="/boot/config/plugins/dynamix/dynamix.cfg"
+agent_active=false
+
+if [[ -f "$notif_cfg" ]]; then
+  normal_val=$(grep -Po 'normal="\K[0-9]+' "$notif_cfg" 2>/dev/null)
+  if [[ "$normal_val" =~ ^(4|5|6|7)$ ]]; then
+    agent_active=true
+  elif [[ "$normal_val" == "0" ]]; then
+    echo "Unraid's notice notifications are disabled at Settings > Notifications" >> "$LAST_RUN_FILE"
+  fi
+fi
+
+if [[ "$agent_active" == true ]]; then
+  # Agent (e.g., Discord or another service) enabled for normal notifications: use " - " separator
+  if (( ${#SHARE_COUNTS[@]} > 0 )); then
+    notif_body_html+=" - Per share summary: "
+    first=true
+    while IFS= read -r share; do
+      if [[ "$first" == true ]]; then
+        notif_body_html+="${share}: ${SHARE_COUNTS[$share]} file(s)"
+        first=false
+      else
+        notif_body_html+=" - ${share}: ${SHARE_COUNTS[$share]} file(s)"
       fi
-    else
-      # Discord agent not installed: keep HTML <br> layout
-      if (( ${#SHARE_COUNTS[@]} > 0 )); then
-        notif_body_html+="<br><br>Per share summary:<br>"
-        while IFS= read -r share; do
-          notif_body_html+="• ${share}: ${SHARE_COUNTS[$share]} file(s)<br>"
-        done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
-      fi
-    fi
+    done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+  fi
+else
+  # Normal entity not set to agent: use HTML <br> formatting for UI/browser notifications
+  if (( ${#SHARE_COUNTS[@]} > 0 )); then
+    notif_body_html+="<br><br>Per share summary:<br>"
+    while IFS= read -r share; do
+      notif_body_html+="• ${share}: ${SHARE_COUNTS[$share]} file(s)<br>"
+    done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+  fi
+fi
     unraid_notify "Automover session finished" "$notif_body_html" "normal" 1
   fi
 }
@@ -803,7 +816,7 @@ if [[ "$moved_anything" == "true" && -s "$AUTOMOVER_LOG" ]]; then
 else
   # Nothing moved → keep previous log intact, just mark the current one
   : > "$AUTOMOVER_LOG"
-  echo "No files moved for this run - displaying the prior run moved files below" >> "$AUTOMOVER_LOG"
+  echo "No files moved for this run" >> "$AUTOMOVER_LOG"
 fi
 
 # ==========================================================
