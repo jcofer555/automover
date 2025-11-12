@@ -16,18 +16,6 @@ LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
 
 # ==========================================================
-#  Load Settings
-# ==========================================================
-set_status "Loading Config"
-if [[ -f "$CFG_PATH" ]]; then
-  source "$CFG_PATH"
-else
-  echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
-  set_status "$PREV_STATUS"
-  cleanup
-fi
-
-# ==========================================================
 #  Unraid notifications helper
 # ==========================================================
 unraid_notify() {
@@ -191,11 +179,11 @@ Per share summary:"
 #  Cleanup
 # ==========================================================
 cleanup() {
-  # Called when interrupted (SIGINT, SIGTERM, etc.)
   set_status "$PREV_STATUS"
   rm -f "$LOCK_FILE"
+  exit "${1:-0}"
 }
-trap cleanup SIGINT SIGTERM SIGHUP SIGQUIT
+trap 'cleanup 0' SIGINT SIGTERM SIGHUP SIGQUIT
 
 rm -f /tmp/automover/automover_done.txt
 > "$MOVED_SHARES_FILE"
@@ -219,6 +207,18 @@ run_qbit_script() {
     "--$action" 2>&1 | grep -E '^(Running qBittorrent|Paused|Resumed|qBittorrent)' >> "$LAST_RUN_FILE"
   echo "Finished qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
 }
+
+# ==========================================================
+#  Load Settings
+# ==========================================================
+set_status "Loading Config"
+if [[ -f "$CFG_PATH" ]]; then
+  source "$CFG_PATH"
+else
+  echo "Config file not found: $CFG_PATH" >> "$LAST_RUN_FILE"
+  set_status "$PREV_STATUS"
+  cleanup 0
+fi
 
 # ==========================================================
 #  Move Now override
@@ -287,7 +287,7 @@ if [[ "$ALLOW_DURING_PARITY" == "no" && "$MOVE_NOW" == false ]]; then
   if grep -Eq 'mdResync="([1-9][0-9]*)"' /var/local/emhttp/var.ini; then
     set_status "Check If Parity Is In Progress"
     echo "Parity check in progress — skipping" >> "$LAST_RUN_FILE"
-    log_session_end; cleanup
+    log_session_end; cleanup 0
   fi
 fi
 
@@ -322,10 +322,10 @@ if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" ]]; then
   POOL_NAME=$(basename "$MOUNT_POINT")
   ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
   [[ -n "$ZFS_CAP" ]] && USED="$ZFS_CAP" || USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
-  [[ -z "$USED" ]] && echo "$MOUNT_POINT usage not detected — nothing to do" >> "$LAST_RUN_FILE" && log_session_end && cleanup
+  [[ -z "$USED" ]] && echo "$MOUNT_POINT usage not detected — nothing to do" >> "$LAST_RUN_FILE" && log_session_end && cleanup 0
   echo "$POOL_NAME usage:${USED}% Threshold:${THRESHOLD}% Stop Threshold:${STOP_THRESHOLD}%" >> "$LAST_RUN_FILE"
   if [[ "$USED" -le "$THRESHOLD" ]]; then
-    echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"; log_session_end; cleanup
+    echo "Usage below threshold — nothing to do" >> "$LAST_RUN_FILE"; log_session_end; cleanup 0
   fi
 fi
 
@@ -335,7 +335,7 @@ fi
 if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 && "$USED" -le "$STOP_THRESHOLD" ]]; then
   set_status "Checking Stop Threshold"
   echo "Usage already below stop threshold:$STOP_THRESHOLD% — skipping moves" >> "$LAST_RUN_FILE"
-  log_session_end; cleanup
+  log_session_end; cleanup 0
 fi
 
 # ==========================================================
