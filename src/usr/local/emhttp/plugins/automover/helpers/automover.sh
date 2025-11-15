@@ -233,6 +233,11 @@ else
   cleanup 0
 fi
 
+# Disable notifications completely when dry run is active
+if [[ "$DRY_RUN" == "yes" ]]; then
+  ENABLE_NOTIFICATIONS="no"
+fi
+
 # ==========================================================
 #  Move Now override
 # ==========================================================
@@ -569,10 +574,16 @@ pre_move_done="yes"
       chmod "$src_perms" "$dstdir"
     fi
     rsync "${RSYNC_OPTS[@]}" -- "$srcfile" "$dstdir/" >/dev/null 2>&1
-    if [[ "$DRY_RUN" != "yes" && -f "$dstfile" ]]; then
-      ((file_count_moved++))
-      echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
-    fi
+if [[ "$DRY_RUN" == "yes" ]]; then
+  # Log what WOULD be moved
+  echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
+else
+  # Real move
+  if [[ -f "$dstfile" ]]; then
+    ((file_count_moved++))
+    echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
+  fi
+fi
     # Stop threshold check per file
     if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]]; then
       FINAL_USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
@@ -592,6 +603,13 @@ pre_move_done="yes"
   fi
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
+
+# ==========================================================
+#  No shares had any eligible files
+# ==========================================================
+if [[ "$pre_move_done" != "yes" && "$moved_anything" == false ]]; then
+  echo "No shares had files to move" >> "$LAST_RUN_FILE"
+fi
 
 # ==========================================================
 #  If no shares had eligible files — log skipped pre-move actions
@@ -779,6 +797,11 @@ elif [[ "$ENABLE_JDUPES" == "yes" ]]; then
   fi
 fi
 
+# Add dry run notification for skipping notifications
+if [[ "$DRY_RUN" == "yes" ]]; then
+  echo "Dry run active — skipping sending notifications" >> "$LAST_RUN_FILE"
+fi
+
 # ==========================================================
 #  Restore previous md_write_method if modified (skip in dry run)
 # ==========================================================
@@ -809,14 +832,19 @@ fi
 # ==========================================================
 mkdir -p "$(dirname "$AUTOMOVER_LOG")"
 
-if [[ "$moved_anything" == "true" && -s "$AUTOMOVER_LOG" ]]; then
-  # Actual files were moved → update the "previous" log for next run
-  cp -f "$AUTOMOVER_LOG" "${AUTOMOVER_LOG%/*}/automover_files_moved_prev.log"
+# ==========================================================
+# Final automover_log handling with proper DRY RUN behavior
+# ==========================================================
 
+if [[ "$DRY_RUN" == "yes" ]]; then
+  :
 else
-  # Nothing moved → keep previous log intact, just mark the current one
-  : > "$AUTOMOVER_LOG"
-  echo "No files moved for this run" >> "$AUTOMOVER_LOG"
+  if [[ "$moved_anything" == "true" && -s "$AUTOMOVER_LOG" ]]; then
+    cp -f "$AUTOMOVER_LOG" "${AUTOMOVER_LOG%/*}/automover_files_moved_prev.log"
+  else
+    : > "$AUTOMOVER_LOG"
+    echo "No files moved for this run" >> "$AUTOMOVER_LOG"
+  fi
 fi
 
 # ==========================================================

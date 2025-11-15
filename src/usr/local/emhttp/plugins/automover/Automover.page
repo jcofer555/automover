@@ -5,6 +5,74 @@ Icon="icon.png"
 Tag="icon.png"
 Markdown="false"
 ---
+<?php
+$cfgPath = '/boot/config/plugins/automover/settings.cfg';
+
+// Define all default keys and their order
+$defaults = [
+    'POOL_NAME' => 'cache',
+    'THRESHOLD' => 0,
+    'INTERVAL' => 60,
+    'DRY_RUN' => 'no',
+    'ALLOW_DURING_PARITY' => 'no',
+    'AUTOSTART' => 'no',
+    'AGE_BASED_FILTER' => 'no',
+    'AGE_DAYS' => 1,
+    'SIZE_BASED_FILTER' => 'no',
+    'SIZE_MB' => 1,
+    'EXCLUSIONS_ENABLED' => 'no',
+    'QBITTORRENT_SCRIPT' => 'no',
+    'QBITTORRENT_HOST' => '',
+    'QBITTORRENT_USERNAME' => '',
+    'QBITTORRENT_PASSWORD' => '',
+    'QBITTORRENT_DAYS_FROM' => '0',
+    'QBITTORRENT_DAYS_TO' => '2',
+    'QBITTORRENT_STATUS' => 'completed',
+    'HIDDEN_FILTER' => 'no',
+    'FORCE_RECONSTRUCTIVE_WRITE' => 'no',
+    'CONTAINER_NAMES' => '',
+    'ENABLE_JDUPES' => 'no',
+    'HASH_PATH' => '/mnt/user/appdata',
+    'ENABLE_CLEANUP' => 'no',
+    'MODE' => 'minutes',
+    'CRON_EXPRESSION' => '',
+    'STOP_THRESHOLD' => 0,
+    'ENABLE_NOTIFICATIONS' => 'no',
+    'WEBHOOK_URL' => '',
+    'MANUAL_MOVE' => 'no'
+];
+
+// Load existing config if present
+$existing = [];
+if (file_exists($cfgPath)) {
+    $existing = parse_ini_file($cfgPath) ?: [];
+}
+// Merge without overwriting existing keys
+foreach ($defaults as $key => $value) {
+    if (!array_key_exists($key, $existing)) {
+        $existing[$key] = $value;
+    }
+}
+// Rebuild config text in the correct order
+$configText = '';
+foreach ($defaults as $key => $defaultValue) {
+    $val = $existing[$key];
+    $configText .= "$key=\"$val\"\n";
+}
+@file_put_contents($cfgPath, $configText);
+$settings = $existing;
+?>
+
+<?php
+$unraid_version = "7.2"; // fallback
+if (file_exists("/etc/unraid-version")) {
+    $data = parse_ini_file("/etc/unraid-version");
+    if (!empty($data["version"])) {
+        $unraid_version = $data["version"];
+    }
+}
+?>
+
 <script>
   // UNIVERSAL CSRF TOKEN DISCOVERY for Unraid plugin pages
   let csrfToken = "<?= $_GET['csrf_token'] ?? ($_COOKIE['csrf_token'] ?? '') ?>";
@@ -41,64 +109,6 @@ Markdown="false"
 
   console.log("Resolved CSRF token:", csrfToken || "<empty>");
 </script>
-
-
-<?php
-$cfgPath = '/boot/config/plugins/automover/settings.cfg';
-
-// Define all default keys and their order
-$defaults = [
-    'POOL_NAME' => 'cache',
-    'THRESHOLD' => 0,
-    'INTERVAL' => 60,
-    'DRY_RUN' => 'no',
-    'ALLOW_DURING_PARITY' => 'no',
-    'AUTOSTART' => 'no',
-    'AGE_BASED_FILTER' => 'no',
-    'AGE_DAYS' => 1,
-    'SIZE_BASED_FILTER' => 'no',
-    'SIZE_MB' => 1,
-    'EXCLUSIONS_ENABLED' => 'no',
-    'QBITTORRENT_SCRIPT' => 'no',
-    'QBITTORRENT_HOST' => '',
-    'QBITTORRENT_USERNAME' => '',
-    'QBITTORRENT_PASSWORD' => '',
-    'QBITTORRENT_DAYS_FROM' => '0',
-    'QBITTORRENT_DAYS_TO' => '2',
-    'QBITTORRENT_STATUS' => 'completed',
-    'HIDDEN_FILTER' => 'no',
-    'FORCE_RECONSTRUCTIVE_WRITE' => 'no',
-    'CONTAINER_NAMES' => '',
-    'ENABLE_JDUPES' => 'no',
-    'HASH_PATH' => '/mnt/user/appdata',
-    'ENABLE_CLEANUP' => 'no',
-    'MODE' => 'minutes',
-    'CRON_EXPRESSION' => '',
-    'STOP_THRESHOLD' => 0,
-    'ENABLE_NOTIFICATIONS' => 'no',
-    'WEBHOOK_URL' => ''
-];
-
-// Load existing config if present
-$existing = [];
-if (file_exists($cfgPath)) {
-    $existing = parse_ini_file($cfgPath) ?: [];
-}
-// Merge without overwriting existing keys
-foreach ($defaults as $key => $value) {
-    if (!array_key_exists($key, $existing)) {
-        $existing[$key] = $value;
-    }
-}
-// Rebuild config text in the correct order
-$configText = '';
-foreach ($defaults as $key => $defaultValue) {
-    $val = $existing[$key];
-    $configText .= "$key=\"$val\"\n";
-}
-@file_put_contents($cfgPath, $configText);
-$settings = $existing;
-?>
 
 <style>
   :root {
@@ -185,15 +195,40 @@ $settings = $existing;
     flex-basis: 22%;
   }
 
-  /* === Log Panels: scroll only if too long === */
-  #moved-log-container pre {
-    max-height: 55vh;
+.unraid-71 #automover-settings {
+    min-height: 77vh;
+    max-height: 77vh;
     overflow-y: auto;
     margin: 0;
   }
 
-  #last-run-container pre {
-    max-height: 65vh;
+  .unraid-71 #moved-log-container pre {
+    max-height: 60vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  .unraid-71 #last-run-container pre {
+    max-height: 68vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  .unraid-72 #automover-settings {
+    min-height: 76vh;
+    max-height: 76vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  .unraid-72 #moved-log-container pre {
+    max-height: 59vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  .unraid-72 #last-run-container pre {
+    max-height: 67vh;
     overflow-y: auto;
     margin: 0;
   }
@@ -229,6 +264,14 @@ $settings = $existing;
     border-radius: 5px;
     color: #fff;
     padding: 8px;
+  }
+
+  .unraid-71 #automover-wrapper {
+    margin-top: -31px !important;
+  }
+
+  .unraid-72 #automover-wrapper {
+    margin-top: -20px !important;
   }
 
   button {
@@ -912,6 +955,160 @@ $settings = $existing;
     max-width: 100%;
     display: inline-block;
   }
+
+  #manual-move-section {
+    width: 24.5%;
+    box-sizing: border-box;
+  }
+
+  .manual-move-toggle-wrapper {
+    margin-top: 20px;
+  }
+
+  #manual-move-section .form-pair label {
+    width: 130px;
+    /* match automover settings labels */
+    font-weight: bold;
+    color: var(--primary-blue);
+  }
+
+  #manual-move-section .form-pair input {
+    width: 200px;
+    /* same as others */
+  }
+
+  #manual-move-section .form-check {
+    gap: 4px !important;
+  }
+
+  #manual-move-section input[type="checkbox"] {
+    margin-right: 2px !important;
+    transform: scale(1.1);
+  }
+
+  /* Shake animation for invalid click */
+  @keyframes pickerShake {
+    0% {
+      transform: translateX(0);
+    }
+
+    20% {
+      transform: translateX(-8px);
+    }
+
+    40% {
+      transform: translateX(8px);
+    }
+
+    60% {
+      transform: translateX(-8px);
+    }
+
+    80% {
+      transform: translateX(8px);
+    }
+
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  .shake-picker {
+    animation: pickerShake 0.3s ease;
+  }
+
+  /* --- Picker link styles (same as exclusions modal) --- */
+  .picker-link {
+    color: var(--primary-blue);
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .picker-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Breadcrumb container matches exclusions modal */
+  #manual-picker-crumbs {
+    font-size: 14px;
+    color: var(--primary-blue);
+    padding: 10px 12px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  /* Breadcrumb pieces */
+  .picker-crumb {
+    color: #3ca8ff;
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+
+  .picker-crumb:hover {
+    text-decoration: underline;
+    color: #ff4444;
+  }
+
+  #manual_source,
+  #manual_dest {
+    cursor: pointer;
+  }
+
+  #qbit-days-to-warning,
+  #qbit-days-order-warning {
+    max-width: 200px;
+    width: 200px;
+    /* optional, keeps consistent width */
+    white-space: normal;
+    /* allows wrapping */
+  }
+
+  .manual-error-toast {
+    display: none;
+    color: #ff4444;
+    padding: -66px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 200px;
+    white-space: normal;
+  }
+
+  .manual-error-wide {
+    max-width: 350px !important;
+  }
+
+  @keyframes manualShake {
+    0% {
+      transform: translateX(0);
+    }
+
+    20% {
+      transform: translateX(-8px);
+    }
+
+    40% {
+      transform: translateX(8px);
+    }
+
+    60% {
+      transform: translateX(-8px);
+    }
+
+    80% {
+      transform: translateX(8px);
+    }
+
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  .manual-shake {
+    animation: manualShake .35s ease;
+  }
 </style>
 
 <div id="automover-wrapper">
@@ -1040,22 +1237,21 @@ $settings = $existing;
       </div>
     </div>
 
-<!-- Webhook URL -->
-<div class="form-pair" id="webhook_row" style="display:none;">
-  <label for="webhook_url">
-    <span title="Optional: Discord Webhook URL for notifications" class="automovertip">Discord Webhook:</span>
-  </label>
-  <div class="input-wrapper">
-    <span title="Optional: Discord Webhook URL for notifications" class="automovertip">
-    <input type="text" id="webhook_url"
-      placeholder="https://discord.com/api/webhooks/yourwebhookid"
-      value="<?php echo htmlspecialchars($settings['WEBHOOK_URL'] ?? '') ?>">
-    </span>
-    <div id="webhook-warning" class="field-warning">
-      ⚠️ Needs entered like this https://discord.com/api/webhooks/yourwebhookid
+    <!-- Webhook URL -->
+    <div class="form-pair" id="webhook_row" style="display:none;">
+      <label for="webhook_url">
+        <span title="Optional: Discord Webhook URL for notifications" class="automovertip">Discord Webhook:</span>
+      </label>
+      <div class="input-wrapper">
+        <span title="Optional: Discord Webhook URL for notifications" class="automovertip">
+          <input type="text" id="webhook_url" placeholder="https://discord.com/api/webhooks/yourwebhookid"
+            value="<?php echo htmlspecialchars($settings['WEBHOOK_URL'] ?? '') ?>">
+        </span>
+        <div id="webhook-warning" class="field-warning">
+          ⚠️ Needs entered like this https://discord.com/api/webhooks/yourwebhookid
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
     <!-- Container Names -->
     <div class="form-pair">
@@ -1163,7 +1359,8 @@ $settings = $existing;
               value="<?php echo htmlspecialchars($settings['QBITTORRENT_DAYS_TO'] ?? '') ?>">
           </span>
           <div id="qbit-days-to-warning" class="field-warning">⚠️ Must be a number between 1 and 999</div>
-          <div id="qbit-days-order-warning" class="field-warning">⚠️ Days From cannot be equal or lower than Days To</div>
+          <div id="qbit-days-order-warning" class="field-warning">⚠️ Days From cannot be equal or lower than Days To
+          </div>
         </div>
       </div>
 
@@ -1232,7 +1429,7 @@ $settings = $existing;
             title="Click to open file picker">
         </span>
         <span title="Open to view/edit exclusions" class="automovertip">
-          <button id="viewExclusionsBtn" type="button">Exclusions</button>
+          <button id="viewExclusionsBtn" type="button">Exclusions List</button>
         </span>
       </div>
     </div>
@@ -1367,7 +1564,7 @@ $settings = $existing;
       </span>
 
       <span
-        title="Optional: Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos"
+        title="Enable this if you want jdupes to run a fix-hardlinks scan on the shares moved. Exclusions for appdata, system, domains, and isos"
         class="automovertip">
         <label>
           <input type="checkbox" id="ENABLE_JDUPES" <?php echo ($settings['ENABLE_JDUPES'] ?? '' )==='yes' ? 'checked'
@@ -1377,9 +1574,17 @@ $settings = $existing;
 
       <span title="Send Unraid system notifications when Automover starts and finishes" class="automovertip">
         <label>
-          <input type="checkbox" id="enable_notifications"
-            <?php echo ($settings['ENABLE_NOTIFICATIONS'] ?? '') === 'yes' ? 'checked' : '' ?>>
+          <input type="checkbox" id="enable_notifications" <?php echo ($settings['ENABLE_NOTIFICATIONS'] ?? '' )==='yes'
+            ? 'checked' : '' ?>>
           Enable Notifications
+        </label>
+      </span>
+
+      <span title="Enable to show a manual move section below" class="automovertip">
+        <label>
+          <input type="checkbox" id="manual_move_toggle" <?php echo ($settings['MANUAL_MOVE'] ?? 'no' )==='yes'
+            ? 'checked' : '' ; ?>>
+          Manual Move
         </label>
       </span>
     </div>
@@ -1394,13 +1599,13 @@ $settings = $existing;
     <div class="log-header-row">
       <h3>Files Moved</h3>
       <div class="toast-wrapper">
-        <span title="Clear the mover log for last run log" class="automovertip">
+        <span title="Clear the files moved log" class="automovertip">
           <button id="clear-mover-log">Clear Log</button>
         </span>
         <div id="toast-mover" class="toast-inline"></div>
       </div>
     </div>
-    <div id="log-counts" class="log-stats"></div>
+    <div id="log-counts" class="log-stats" style="margin-top:-10px;"></div>
     <input type="text" id="log-filter" class="short-input-filter" placeholder="🔍 Filter keyword"
       style="margin-bottom:12px;">
     <pre id="automover-log">Loading</pre>
@@ -1464,6 +1669,183 @@ $settings = $existing;
     </div>
   </div>
 </div>
+
+<!-- ==========================
+     MANUAL MOVE SECTION
+     ========================== -->
+<div class="manual-move-toggle-wrapper">
+  <div id="manual-move-section" style="display:none; background:#111; padding:20px; border-radius:12px;
+            box-shadow:0 0 12px rgba(0,128,128,.3); margin-bottom:20px;">
+
+    <h3 style="color:var(--primary-blue); margin-top:0;">Manual Move</h3>
+
+    <!-- Source -->
+    <div class="form-pair">
+      <label for="manual_source"> <span title="Source folder to move or copy"
+          class="automovertip">Source:</label></span>
+      <div class="input-wrapper">
+        <span title="Source folder to move or copy" class="automovertip">
+          <input type="text" id="manual_source" readonly placeholder="Select source">
+        </span>
+        <div id="manual-source-error" class="manual-error-toast">⚠️ Source is required</div>
+      </div>
+    </div>
+
+    <!-- Destination -->
+    <div class="form-pair">
+      <label for="manual_dest"> <span title="Destination folder for the move or copy"
+          class="automovertip">Destination:</label></span>
+      <div class="input-wrapper">
+        <span title="Destination folder for the move or copy" class="automovertip">
+          <input type="text" id="manual_dest" readonly placeholder="Select destination">
+        </span>
+        <div id="manual-dest-error" class="manual-error-toast">⚠️ Destination is required</div>
+      </div>
+    </div>
+
+    <!-- Options Row -->
+    <div style="display:flex; gap:10px; margin-top:10px;">
+
+      <span
+        title="Uses rsync -aH /src/ /dst/ as the command which only copies to destination new or modified while preserving hardlinks"
+        class="automovertip">
+        <label class="form-check">
+          <input type="checkbox" id="manual_copy">
+          Copy
+        </label>
+      </span>
+
+      <span
+        title="Uses rsync -aH --remove-source-files /src/ dst/ as the command which copies new or modified to destination while preserving hardlinks and after successful transfer deletes the files from source that were transferred"
+        class="automovertip">
+        <label class="form-check">
+          <input type="checkbox" id="manual_delete">
+          Delete Source After
+        </label>
+      </span>
+
+      <span
+        title="Uses rsync -aH --delete /src/ /dst/ as the command which keep destination in full sync with source deleting anything on destination that is not currently on source"
+        class="automovertip">
+        <label class="form-check">
+          <input type="checkbox" id="manual_fullsync">
+          Full Sync
+        </label>
+    </div>
+    </span>
+    <div id="manual-options-error" class="manual-error-toast manual-error-wide">
+      ⚠️ One of the three options is required
+    </div>
+
+    <div style="margin-top:4px; max-width: 360px; color:#aaa; font-size:12px;">
+      <div>*Only dry run and enable notifications from above options are used and all others are ignored</div>
+    </div>
+
+    <span title="Starts the manual rsync manual move process" class="automovertip">
+      <button type="button" id="start-manual-rsync" class="button button-primary" style="padding:8px 16px;">
+        Start
+      </button>
+    </span>
+
+    <div id="manual-move-confirmation" style="display:none; margin-top:10px; background:var(--primary-blue);
+              padding:6px 10px; border-radius:6px; font-weight:bold;">
+      ✅ Manual Move Started
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ======================= -->
+<!--   PATH PICKER MODAL     -->
+<!-- ======================= -->
+<div id="path-picker-modal" style=" 
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    z-index: 999999;
+    justify-content: center;
+    align-items: center;
+">
+
+  <div style="
+    width: 700px;
+    height: 520px;
+    padding: 12px;
+    display:flex;
+    flex-direction: column;
+    border: 1px solid var(--primary-blue);
+    border-radius: 12px;
+	  overflow: hidden;
+    background:#111
+">
+    <!-- Row 1: Title only -->
+    <div style="display:flex;">
+      <strong style="flex:1; font-size: 14px; color: #3ca8ff;">Select Path</strong>
+    </div>
+
+    <!-- Row 2: Up (left) + Close (right) -->
+    <div style="display:flex; margin-top: 8px;">
+      <button id="picker-up" class="button" style="margin-right:auto;">⬆ Up</button>
+      <button id="picker-close" class="button">Close</button>
+    </div>
+
+    <div id="manual-picker-crumbs" style="
+            padding: 10px 12px;
+            font-size: 14px;
+            color: #ccc;
+            overflow-x: auto;
+            white-space: nowrap;
+        "></div>
+
+    <div id="manual-picker-grid" style="
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px;
+        "></div>
+
+<!-- FOOTER (Row 1 + Row 2) -->
+<div style="padding:1px;">
+
+  <!-- ROW 1: Create Folder (left) + Add / Clear (right) -->
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+
+    <!-- Left -->
+    <button id="picker-create-folder" class="button button-primary">
+      Create Folder
+    </button>
+
+    <!-- Right -->
+    <div>
+      <button id="picker-clear" class="button">Clear Selected</button>
+      <button id="picker-add" class="button button-primary">Add Selected</button>
+    </div>
+
+  </div>
+
+  <!-- ROW 2 (hidden unless creating folder) -->
+<div id="picker-newfolder-row"
+     style="display:none; margin-top:10px; align-items:center; gap:8px;">
+
+    <input id="picker-newfolder-input"
+           type="text"
+           placeholder="New folder name"
+           style="background:#000; color:#fff; border:1px solid var(--primary-blue);
+                  padding:6px 8px; border-radius:6px; width:200px;">
+
+    <button id="picker-newfolder-confirm"
+            class="button button-primary"
+            style="padding:6px 10px;">Create</button>
+
+    <button id="picker-newfolder-cancel"
+            class="button"
+            style="padding:6px 10px;">Cancel</button>
+  </div>
+</div>
+
+  </div>
 </div>
 
 <script>
@@ -1481,7 +1863,7 @@ $settings = $existing;
   updateStatus();
   setInterval(updateStatus, 5000);
 
-  // === 🧩 Poll for Automover completion (done flag) ===
+  // === Poll for Automover completion (done flag) ===
   function checkAutomoverDone() {
     fetch('/plugins/automover/helpers/check_done.php', { cache: 'no-store' })
       .then(res => res.json())
@@ -1489,7 +1871,6 @@ $settings = $existing;
         if (data.done) {
           const buttons = [
             document.getElementById('save-settings'),
-            document.getElementById('stop-button'),
             document.getElementById('moveNowBtn'),
           ];
           buttons.forEach(btn => {
@@ -1507,14 +1888,17 @@ $settings = $existing;
   // run every 5s like your status updates
   setInterval(checkAutomoverDone, 5000);
 
-  // Disable control buttons while Automover is running
+  // Disable only Save & Start and Move Now
   function checkAutomoverLock() {
     fetch('/plugins/automover/helpers/check_lock.php', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         const locked = data.locked === true;
-        const btnIds = ['save-settings', 'stop-button', 'moveNowBtn'];
-        btnIds.forEach(id => {
+
+        // These get disabled during an active move
+        const disableButtons = ['save-settings', 'moveNowBtn'];
+
+        disableButtons.forEach(id => {
           const el = document.getElementById(id);
           if (el) {
             el.disabled = locked;
@@ -1522,8 +1906,16 @@ $settings = $existing;
             el.style.cursor = locked ? 'not-allowed' : 'pointer';
           }
         });
+
+        // STOP BUTTON must always be enabled
+        const stopBtn = document.getElementById('stop-button');
+        if (stopBtn) {
+          stopBtn.disabled = false;
+          stopBtn.style.opacity = '1';
+          stopBtn.style.cursor = 'pointer';
+        }
       })
-      .catch(() => { }); // ignore errors silently
+      .catch(() => { });
   }
 
   // Run once immediately, then every 5s (same as status polling)
@@ -1550,55 +1942,66 @@ $settings = $existing;
     const ageDaysContainer = document.getElementById('age-days-container');
     const sizeFilterCheckbox = document.getElementById('size_based_filter');
     const sizeMbContainer = document.getElementById('size-mb-container');
+    // === Manual Move Toggle State Persistence ===
+    const manualMoveToggle = document.getElementById('manual_move_toggle');
+    const manualMoveSection = document.getElementById('manual-move-section');
 
-// === Live validation for Discord Webhook URL (prefix-based) ===
-const webhookInput = document.getElementById('webhook_url');
-const webhookWarning = document.getElementById('webhook-warning');
+    // Set initial visibility based on checkbox state
+    manualMoveSection.style.display = manualMoveToggle.checked ? 'block' : 'none';
 
-if (webhookInput && webhookWarning) {
-  webhookInput.addEventListener('input', function () {
-    const value = this.value.trim();
-
-    // empty is allowed
-    let valid = (value === '');
-
-    // allow either discord.com or discordapp.com prefix
-    if (value.startsWith('https://discord.com/api/webhooks/') ||
-        value.startsWith('https://discordapp.com/api/webhooks/')) {
-      valid = true;
-    }
-
-    if (!valid) {
-      this.classList.add('invalid');
-      webhookWarning.style.display = 'block';
-      webhookWarning.style.opacity = '1';
-    } else {
-      this.classList.remove('invalid');
-      webhookWarning.style.opacity = '0';
-      setTimeout(() => {
-        webhookWarning.style.display = 'none';
-      }, 200);
-    }
-  });
-}
-
-  // === Discord Webhook visibility control (safe) ===
-  const enableNotificationsCheckbox = document.getElementById('enable_notifications');
-
-  // try both dash and underscore, in case HTML used one or the other
-  const webhookRow =
-    document.getElementById('webhook-row') ||
-    document.getElementById('webhook_row');
-
-  if (enableNotificationsCheckbox && webhookRow) {
-    // set initial state on load
-    webhookRow.style.display = enableNotificationsCheckbox.checked ? 'flex' : 'none';
-
-    // update on change
-    enableNotificationsCheckbox.addEventListener('change', function () {
-      webhookRow.style.display = this.checked ? 'flex' : 'none';
+    // Live toggle when checkbox is clicked
+    manualMoveToggle.addEventListener('change', function () {
+      manualMoveSection.style.display = this.checked ? 'block' : 'none';
     });
-  }
+
+    // === Live validation for Discord Webhook URL (prefix-based) ===
+    const webhookInput = document.getElementById('webhook_url');
+    const webhookWarning = document.getElementById('webhook-warning');
+
+    if (webhookInput && webhookWarning) {
+      webhookInput.addEventListener('input', function () {
+        const value = this.value.trim();
+
+        // empty is allowed
+        let valid = (value === '');
+
+        // allow either discord.com or discordapp.com prefix
+        if (value.startsWith('https://discord.com/api/webhooks/') ||
+          value.startsWith('https://discordapp.com/api/webhooks/')) {
+          valid = true;
+        }
+
+        if (!valid) {
+          this.classList.add('invalid');
+          webhookWarning.style.display = 'block';
+          webhookWarning.style.opacity = '1';
+        } else {
+          this.classList.remove('invalid');
+          webhookWarning.style.opacity = '0';
+          setTimeout(() => {
+            webhookWarning.style.display = 'none';
+          }, 200);
+        }
+      });
+    }
+
+    // === Discord Webhook visibility control (safe) ===
+    const enableNotificationsCheckbox = document.getElementById('enable_notifications');
+
+    // try both dash and underscore, in case HTML used one or the other
+    const webhookRow =
+      document.getElementById('webhook-row') ||
+      document.getElementById('webhook_row');
+
+    if (enableNotificationsCheckbox && webhookRow) {
+      // set initial state on load
+      webhookRow.style.display = enableNotificationsCheckbox.checked ? 'flex' : 'none';
+
+      // update on change
+      enableNotificationsCheckbox.addEventListener('change', function () {
+        webhookRow.style.display = this.checked ? 'flex' : 'none';
+      });
+    }
 
 
 
@@ -1651,7 +2054,7 @@ if (webhookInput && webhookWarning) {
           return false;
         }
 
-        // ✅ Live toggle function
+        // Live toggle function
         function toggleMode(mode) {
           if (mode === 'minutes') {
             intervalRow.style.display = 'flex';
@@ -1969,6 +2372,55 @@ if (webhookInput && webhookWarning) {
       document.getElementById(warningId).style.display = invalid ? 'block' : 'none';
       return !invalid;
     }
+
+    // === Manual Move Validation ===
+    document.getElementById("start-manual-rsync").addEventListener("click", function () {
+
+      const src = document.getElementById("manual_source").value.trim();
+      const dst = document.getElementById("manual_dest").value.trim();
+      const c1 = document.getElementById("manual_copy").checked;
+      const c2 = document.getElementById("manual_delete").checked;
+      const c3 = document.getElementById("manual_fullsync").checked;
+
+      let valid = true;
+
+      // reset all errors
+      document.getElementById("manual-source-error").style.display = "none";
+      document.getElementById("manual-dest-error").style.display = "none";
+      document.getElementById("manual-options-error").style.display = "none";
+
+      // check source
+      if (src === "") {
+        document.getElementById("manual-source-error").style.display = "block";
+        valid = false;
+      }
+
+      // check destination
+      if (dst === "") {
+        document.getElementById("manual-dest-error").style.display = "block";
+        valid = false;
+      }
+
+      // check options
+      if (!c1 && !c2 && !c3) {
+        document.getElementById("manual-options-error").style.display = "block";
+        valid = false;
+      }
+
+      // If invalid → shake section + stop
+      if (!valid) {
+        const box = document.getElementById("manual-move-section");
+        box.classList.remove("manual-shake");
+        void box.offsetWidth; // restart animation
+        box.classList.add("manual-shake");
+        return;
+      }
+
+      // otherwise allow your real Start logic to run below…
+      // (your existing AJAX code)
+
+    });
+
     // === Qbittorrent Validation ===
     const qbitHostInput = document.getElementById('qbit_host');
     const qbitUserInput = document.getElementById('qbit_user');
@@ -1996,12 +2448,12 @@ if (webhookInput && webhookWarning) {
 
       if (hostVal === "") {
         qbitHostInput.classList.add("invalid");
-        hostWarning.textContent = "Host is required";
+        hostWarning.textContent = "⚠️ Host is required";
         hostWarning.style.display = "block";
         valid = false;
       } else if (hasProtocol) {
         qbitHostInput.classList.add("invalid");
-        hostWarning.textContent = "Don't use http(s):// — only yourip:port";
+        hostWarning.textContent = "⚠️ Don't use http(s):// — only yourip:port";
         hostWarning.style.display = "block";
         valid = false;
       } else {
@@ -2050,15 +2502,15 @@ if (webhookInput && webhookWarning) {
       return valid;
     }
 
-    // 🔁 Live validation for qBittorrent fields
+    // Live validation for qBittorrent fields
     [qbitHostInput, qbitUserInput, qbitPassInput, qbitDaysFromInput, qbitDaysToInput].forEach(input => {
       if (input) input.addEventListener('input', validateQbitFields);
     });
 
-    // 🔁 Also revalidate when toggling the "Enable Qbittorrent Script" checkbox
+    // Also revalidate when toggling the "Enable Qbittorrent Script" checkbox
     if (qbitCheckbox) qbitCheckbox.addEventListener('change', validateQbitFields);
 
-    // 🔁 Dynamic validation between Days From and Days To
+    // Dynamic validation between Days From and Days To
     [qbitDaysFromInput, qbitDaysToInput].forEach(input => {
       if (input) {
         input.addEventListener('input', () => {
@@ -2073,32 +2525,32 @@ if (webhookInput && webhookWarning) {
       }
     });
 
-function validateWebhook() {
-  const enableNotifications = document.getElementById('enable_notifications');
-  const webhookRow = document.getElementById('webhook-row');
-  const webhookInput = document.getElementById('webhook_url');
-  const webhookWarning = document.getElementById('webhook-warning');
+    function validateWebhook() {
+      const enableNotifications = document.getElementById('enable_notifications');
+      const webhookRow = document.getElementById('webhook-row');
+      const webhookInput = document.getElementById('webhook_url');
+      const webhookWarning = document.getElementById('webhook-warning');
 
-  // Show/hide field depending on notifications
-  if (enableNotifications && webhookRow) {
-    webhookRow.style.display = enableNotifications.checked ? 'flex' : 'none';
-  }
+      // Show/hide field depending on notifications
+      if (enableNotifications && webhookRow) {
+        webhookRow.style.display = enableNotifications.checked ? 'flex' : 'none';
+      }
 
-  if (!enableNotifications.checked) return true; // skip validation if notifications disabled
-  if (!webhookInput) return true;
+      if (!enableNotifications.checked) return true; // skip validation if notifications disabled
+      if (!webhookInput) return true;
 
-  const val = webhookInput.value.trim();
-  if (val === '') {
-    webhookInput.classList.remove('invalid');
-    webhookWarning.style.display = 'none';
-    return true; // empty is allowed
-  }
+      const val = webhookInput.value.trim();
+      if (val === '') {
+        webhookInput.classList.remove('invalid');
+        webhookWarning.style.display = 'none';
+        return true; // empty is allowed
+      }
 
-  const valid = val.startsWith('https://discord.com/api/webhooks/');
-  webhookInput.classList.toggle('invalid', !valid);
-  webhookWarning.style.display = valid ? 'none' : 'block';
-  return valid;
-}
+      const valid = val.startsWith('https://discord.com/api/webhooks/');
+      webhookInput.classList.toggle('invalid', !valid);
+      webhookWarning.style.display = valid ? 'none' : 'block';
+      return valid;
+    }
 
     // ===== Exclusions picker (helper + csrf_token) =====
     const modal = document.getElementById('exclusion-modal');
@@ -2197,7 +2649,7 @@ function validateWebhook() {
       }
     }
 
-    // ✅ Delegated click handler (only one global listener needed)
+    // Delegated click handler (only one global listener needed)
     crumbs.addEventListener('click', e => {
       const crumb = e.target.closest('.crumb');
       if (!crumb) return;
@@ -2338,7 +2790,7 @@ function validateWebhook() {
       }
     });
 
-    // ✅ Add extensions as wildcards
+    // Add extensions as wildcards
     addExtBtn.addEventListener('click', () => {
       if (selectedExts.size === 0) return;
 
@@ -2366,7 +2818,7 @@ function validateWebhook() {
         });
     });
 
-    // ✅ Remove extensions as wildcards
+    // Remove extensions as wildcards
     removeExtBtn.addEventListener('click', () => {
       if (selectedExts.size === 0) return;
 
@@ -2426,12 +2878,12 @@ function validateWebhook() {
       }
 
       // --- Final validation check ---
-if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
-      sizeMbValid && qbitValid && cronValid && webhookValid)) {
-  form.classList.add('shake');
-  setTimeout(() => form.classList.remove('shake'), 300);
-  return;
-}
+      if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
+        sizeMbValid && qbitValid && cronValid && webhookValid)) {
+        form.classList.add('shake');
+        setTimeout(() => form.classList.remove('shake'), 300);
+        return;
+      }
 
       // --- Build parameters for save_settings.php ---
       const params = new URLSearchParams({
@@ -2463,7 +2915,8 @@ if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
         CRON_EXPRESSION: cronInput.value,
         STOP_THRESHOLD: stopThresholdInput.value,
         ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
-        WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || ''
+        WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || '',
+        MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no'
       });
 
       // --- Step 1: Save settings ---
@@ -2495,7 +2948,7 @@ if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
             return;
           }
 
-          // ✅ Success animation
+          // Success animation
           confirmBadge.style.display = 'block';
           confirmBadge.style.opacity = '1';
           confirmBadge.style.animation = 'flash 0.4s ease';
@@ -2635,13 +3088,404 @@ if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
       }
     });
   }
+
+  // ==============================
+  // MANUAL MOVE — MUTUALLY EXCLUSIVE CHECKBOX LOGIC
+  // ==============================
+  function setupManualRsyncModeExclusivity() {
+    const c1 = document.getElementById("manual_copy");
+    const c2 = document.getElementById("manual_delete");
+    const c3 = document.getElementById("manual_fullsync");
+
+    function uncheckOthers(active) {
+      [c1, c2, c3].forEach(c => {
+        if (c !== active) c.checked = false;
+      });
+    }
+
+    c1.addEventListener("change", () => { if (c1.checked) uncheckOthers(c1); });
+    c2.addEventListener("change", () => { if (c2.checked) uncheckOthers(c2); });
+    c3.addEventListener("change", () => { if (c3.checked) uncheckOthers(c3); });
+  }
+
+  document.addEventListener("DOMContentLoaded", setupManualRsyncModeExclusivity);
+
+  // ==============================
+  // MANUAL MOVE TOGGLE
+  // ==============================
+  const manualToggle = document.getElementById("manual_move_toggle");
+  const manualSection = document.getElementById("manual-move-section");
+
+  manualToggle.addEventListener("change", () => {
+    manualSection.style.display = manualToggle.checked ? "block" : "none";
+  });
+
+  // ==============================
+  // MANUAL MOVE: SAFE TOAST
+  // ==============================
+  function safeToast(msg, type = "ok") {
+    const ref = (typeof toastSettings !== "undefined") ? toastSettings : null;
+    if (typeof showToast === "function" && ref) {
+      showToast(ref, msg, type);
+    } else {
+      console.log("Toast:", msg);
+    }
+  }
+
+  // ==============================
+  // MANUAL MOVE INITIALIZER (ONE TIME ONLY)
+  // ==============================
+  if (!window.manualMoveInit) {
+    window.manualMoveInit = true;
+
+    // Toggle block visibility
+    const manualToggle = document.getElementById("manual_move_toggle");
+    const manualSection = document.getElementById("manual-move-section");
+
+    manualToggle.addEventListener("change", () => {
+      manualSection.style.display = manualToggle.checked ? "block" : "none";
+    });
+
+    // Start Manual Rsync
+    document.getElementById("start-manual-rsync").addEventListener("click", () => {
+      // Immediately disable Automover buttons when manual move starts
+      ['save-settings', 'moveNowBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.disabled = true;
+          el.style.opacity = '0.5';
+          el.style.cursor = 'not-allowed';
+        }
+      });
+
+      const src = document.getElementById("manual_source").value.trim();
+      const dst = document.getElementById("manual_dest").value.trim();
+
+      const modeCopy = document.getElementById("manual_copy").checked;
+      const modeDelete = document.getElementById("manual_delete").checked;
+      const modeFull = document.getElementById("manual_fullsync").checked;
+
+      if (!src || !dst) {
+        safeToast("Source and Destination are required.", "err");
+        return;
+      }
+
+      if (![modeCopy, modeDelete, modeFull].includes(true)) {
+        safeToast("Select one rsync mode.", "err");
+        return;
+      }
+
+      const params = new URLSearchParams();
+      params.append("csrf_token", csrfToken);
+      params.append("source", src);
+      params.append("dest", dst);
+      params.append("copy", modeCopy ? "1" : "0");
+      params.append("delete", modeDelete ? "1" : "0");
+      params.append("fullsync", modeFull ? "1" : "0");
+
+      fetch("/plugins/automover/helpers/manual_rsync.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRF-TOKEN": csrfToken
+        },
+        body: params.toString()
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            const badge = document.getElementById("manual-move-confirmation");
+            badge.style.display = "block";
+            badge.style.opacity = "1";
+            setTimeout(() => {
+              badge.style.opacity = "0";
+              setTimeout(() => (badge.style.display = "none"), 500);
+            }, 2500);
+
+            safeToast("Manual rsync started.", "ok");
+          } else {
+            safeToast(data.error || "Manual rsync failed", "err");
+          }
+        })
+        .catch(() => safeToast("Failed to start manual rsync.", "err"));
+    });
+  }
+
+  // ==========================
+  // Picker state
+  // ==========================
+  let pickerMode = "";      // "src" or "dst"
+  let pickerPath = "/mnt";
+  let selectedPath = "";
+
+  const pickerModal = document.getElementById("path-picker-modal");
+  const pickerGrid = document.getElementById("manual-picker-grid");
+  const pickerCrumbs = document.getElementById("manual-picker-crumbs");
+
+  // Open from source input
+  document.getElementById("manual_source").addEventListener("click", () => {
+    pickerMode = "src";
+    selectedPath = "";
+    pickerPath = "/mnt";
+    pickerModal.style.display = "flex";
+    loadPicker(pickerPath);
+  });
+
+  // Open from destination input
+  document.getElementById("manual_dest").addEventListener("click", () => {
+    pickerMode = "dst";
+    selectedPath = "";
+    pickerPath = "/mnt";
+    pickerModal.style.display = "flex";
+    loadPicker(pickerPath);
+  });
+
+  // ==========================
+  // Load directory contents
+  // ==========================
+  function loadPicker(path) {
+    pickerPath = path;
+
+    fetch(`/plugins/automover/helpers/list_dir.php?path=${encodeURIComponent(path)}`)
+      .then(r => r.json())
+      .then(data => {
+        buildCrumbs(path);
+        buildGrid(data.entries);
+      });
+  }
+
+  // ==========================
+  // Breadcrumbs
+  // ==========================
+  function buildCrumbs(path) {
+    const crumbs = document.getElementById("manual-picker-crumbs");
+    crumbs.innerHTML = "";
+
+    // Normalize path so we don't get weird stuff like /mnt/mnt/cache
+    if (!path.startsWith("/mnt")) {
+      path = "/mnt";
+    }
+
+    // parts: ['mnt', 'cache', 'dev-files']
+    const parts = path.split("/").filter(Boolean);
+
+    let current = "";
+    parts.forEach((part, index) => {
+      current += "/" + part;          // /mnt, /mnt/cache, /mnt/cache/dev-files
+      const crumbPath = current;      // freeze value for this crumb
+
+      const span = document.createElement("span");
+      span.className = "picker-crumb";
+
+      // First crumb shows "/mnt", others just "folder"
+      if (index === 0) {
+        span.textContent = "/mnt";
+      } else {
+        span.textContent = part;
+      }
+
+      span.style.cursor = "pointer";
+      span.style.color = "#3ca8ff";
+      span.style.marginRight = "4px";
+
+      // Hover color like exclusions (red-ish)
+      span.addEventListener("mouseenter", () => {
+        span.style.color = "#ff4444";
+      });
+      span.addEventListener("mouseleave", () => {
+        span.style.color = "#3ca8ff";
+      });
+
+      span.onclick = () => {
+        console.log("Breadcrumb clicked:", crumbPath);
+        loadPicker(crumbPath);
+      };
+
+      crumbs.appendChild(span);
+
+      // Add "/" separator between crumbs (but not after last)
+      if (index < parts.length - 1) {
+        const sep = document.createElement("span");
+        sep.textContent = "/";
+        sep.style.color = "#888";
+        sep.style.marginRight = "4px";
+        crumbs.appendChild(sep);
+      }
+    });
+
+    function addCrumb(p) {
+      const el = document.createElement("span");
+      el.textContent = p;
+      el.classList.add("picker-crumb");   // <-- blue text style
+
+      el.onclick = () => loadPicker(p);
+      pickerCrumbs.appendChild(el);
+    }
+  }
+
+  // ==========================
+  // Build folder/file grid
+  // ==========================
+  function buildGrid(entries) {
+    pickerGrid.innerHTML = "";
+
+    const srcVal = document.getElementById("manual_source").value.trim();
+    const dstVal = document.getElementById("manual_dest").value.trim();
+    const otherPath = (pickerMode === "src" ? dstVal : srcVal);
+
+    // Classify the OTHER side (what's already chosen)
+    const otherIsUser0 = /^\/mnt\/user0(\/|$)/.test(otherPath);
+    const otherIsUser = !otherIsUser0 && /^\/mnt\/user(\/|$)/.test(otherPath);
+    const otherIsDisk = /^\/mnt\/disk[0-9]+(\/|$)/.test(otherPath);
+
+    console.log("OTHER PATH:", otherPath, { otherIsUser, otherIsUser0, otherIsDisk });
+
+    entries.forEach(e => {
+      const full = pickerPath.replace(/\/$/, "") + "/" + e.name; // normalize single slash
+
+      // Classify THIS entry (order matters!)
+      const isUser0 = /^\/mnt\/user0(\/|$)/.test(full);
+      const isUser = !isUser0 && /^\/mnt\/user(\/|$)/.test(full);
+      const isDisk = /^\/mnt\/disk[0-9]+(\/|$)/.test(full);
+
+      let disabled = false;
+
+      // ======================================================
+      // Your requested block rules:
+      // 1) If other is /mnt/user   → block user0 + disks
+      // 2) If other is /mnt/user0  → block user + disks
+      // 3) If other is /mnt/diskX  → block user + user0
+      // ======================================================
+
+      if (otherIsUser) {
+        if (isUser0 || isDisk) disabled = true;
+      }
+
+      if (otherIsUser0) {
+        if (isUser || isDisk) disabled = true;
+      }
+
+      if (otherIsDisk) {
+        if (isUser || isUser0) disabled = true;
+      }
+
+      // ======================================================
+      // NEW RULE: Prevent selecting identical path
+      // ======================================================
+      if (full === otherPath.replace(/\/$/, "")) {
+        disabled = true;
+      }
+
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.padding = "6px";
+      row.style.borderBottom = "1px solid #333";
+      row.style.opacity = disabled ? "0.35" : "1.0";
+
+      // Checkbox (folders only)
+      let cb = null;
+      if (e.type === "dir") {
+        cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.disabled = disabled;
+        cb.style.marginRight = "10px";
+
+        cb.onclick = ev => {
+          ev.stopPropagation();
+          pickerGrid.querySelectorAll("input[type=checkbox]").forEach(c => {
+            if (c !== cb) c.checked = false;
+          });
+          selectedPath = cb.checked ? full : "";
+        };
+
+        row.appendChild(cb);
+      } else {
+        const spacer = document.createElement("div");
+        spacer.style.width = "22px";
+        row.appendChild(spacer);
+      }
+
+      // Name (click folder → open)
+      const name = document.createElement("span");
+      name.classList.add("picker-link");   // <-- blue text like exclusions
+
+      name.innerHTML = e.type === "dir" ? "📁 " + e.name : "📄 " + e.name;
+
+      name.onclick = () => {
+        if (disabled) {
+          shakeModal();
+          return;
+        }
+        if (e.type === "dir") loadPicker(full);
+      };
+
+      row.appendChild(name);
+      pickerGrid.appendChild(row);
+    });
+  }
+
+  // ==========================
+  // Up button
+  // ==========================
+  document.getElementById("picker-up").addEventListener("click", () => {
+    if (pickerPath !== "/mnt") {
+      const parent = pickerPath.substring(0, pickerPath.lastIndexOf("/")) || "/mnt";
+      loadPicker(parent);
+    }
+  });
+
+  // ==========================
+  // Close modal
+  // ==========================
+  document.getElementById("picker-close").addEventListener("click", () => {
+    pickerModal.style.display = "none";
+    hideNewFolderRow();
+  });
+
+  // ==========================
+  // Add Selected
+  // ==========================
+  document.getElementById("picker-add").addEventListener("click", () => {
+    if (!selectedPath) return;
+
+    if (pickerMode === "src") {
+      document.getElementById("manual_source").value = selectedPath + "/";
+    } else {
+      document.getElementById("manual_dest").value = selectedPath + "/";
+    }
+
+    pickerModal.style.display = "none";
+  });
+
+  document.getElementById("picker-clear").addEventListener("click", () => {
+    // Uncheck all checkboxes
+    pickerGrid.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      cb.checked = false;
+    });
+
+    // Reset stored selection
+    selectedPath = "";
+
+    // Clear the input field for the current picker mode
+    if (pickerMode === "src") {
+      document.getElementById("manual_source").value = "";
+    } else if (pickerMode === "dst") {
+      document.getElementById("manual_dest").value = "";
+    }
+  });
+
+  function shakeModal() {
+    const box = document.querySelector("#path-picker-modal > div");
+    box.style.animation = "shake 0.3s";
+    setTimeout(() => box.style.animation = "", 300);
+  }
 </script>
 <script>
   // === Disable buttons immediately after click ===
   document.addEventListener("DOMContentLoaded", () => {
     const actionButtons = [
       document.getElementById("save-settings"),
-      document.getElementById("stop-button"),
       document.getElementById("moveNowBtn"),
     ];
 
@@ -2681,7 +3525,7 @@ if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
   });
 </script>
 <?php if (file_exists('/boot/config/plugins/ca.mover.tuning.plg')): ?>
-<!-- ⚠️ Bottom-fixed Mover Tuning Warning -->
+<!-- Bottom-fixed Mover Tuning Warning -->
 <div id="mover-tuning-warning" style="
   display:none; /* Hidden until JS confirms it should be shown */
   position: fixed;
@@ -2731,9 +3575,8 @@ if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
       font-weight: 600;
       transition: all 0.25s ease;
       box-shadow: 0 0 10px rgba(255,165,0,0.2);
-    "
-    onmouseover="this.style.background='#ffa500';this.style.color='#fff';"
-    onmouseout="this.style.background='#000';this.style.color='#ffa500';">
+    " onmouseover="this.style.background='#ffa500';this.style.color='#fff';"
+      onmouseout="this.style.background='#000';this.style.color='#ffa500';">
       Dismiss Permanently
     </button>
     <div style="
@@ -2754,60 +3597,134 @@ if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
 </div>
 
 <script>
-// === Mover Tuning Warning Dismiss ===
-const warningBox = document.getElementById('mover-tuning-warning');
-const closeBtn = document.getElementById('mover-tuning-close');
-const dismissBtn = document.getElementById('dismiss-mover-warning');
-const dismissStatus = document.getElementById('dismiss-status');
+  // === Mover Tuning Warning Dismiss ===
+  const warningBox = document.getElementById('mover-tuning-warning');
+  const closeBtn = document.getElementById('mover-tuning-close');
+  const dismissBtn = document.getElementById('dismiss-mover-warning');
+  const dismissStatus = document.getElementById('dismiss-status');
 
-// Check dismissal state before showing to prevent flash
-fetch('/plugins/automover/helpers/mover_warning_state.php')
-  .then(res => res.json())
-  .then(data => {
-    if (!data.dismissed && warningBox) {
-      warningBox.style.display = 'block'; // Only show if NOT dismissed
-    }
-  })
-  .catch(() => {
-    // fallback: show warning if fetch fails (for safety)
-    if (warningBox) warningBox.style.display = 'block';
-  });
-
-// Close "×" (temporary hide)
-if (closeBtn && warningBox) {
-  closeBtn.addEventListener('click', () => {
-    warningBox.style.transition = 'opacity 0.3s ease';
-    warningBox.style.opacity = '0';
-    setTimeout(() => warningBox.remove(), 300);
-  });
-}
-
-// Dismiss Permanently
-if (dismissBtn && warningBox) {
-  dismissBtn.addEventListener('click', () => {
-    fetch('/plugins/automover/helpers/mover_warning_state.php', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-CSRF-TOKEN': csrfToken
-      },
-      body: new URLSearchParams({ csrf_token: csrfToken })
+  // Check dismissal state before showing to prevent flash
+  fetch('/plugins/automover/helpers/mover_warning_state.php')
+    .then(res => res.json())
+    .then(data => {
+      if (!data.dismissed && warningBox) {
+        warningBox.style.display = 'block'; // Only show if NOT dismissed
+      }
     })
-      .then(res => res.json())
-      .then(data => {
-        if (data.ok) {
-          dismissBtn.style.display = 'none';
-          dismissStatus.style.display = 'block';
-          setTimeout(() => { warningBox.style.display = 'none'; }, 1500);
-        } else {
-          alert('Failed to dismiss warning: ' + (data.error || 'Unknown error'));
-        }
+    .catch(() => {
+      // fallback: show warning if fetch fails (for safety)
+      if (warningBox) warningBox.style.display = 'block';
+    });
+
+  // Close "×" (temporary hide)
+  if (closeBtn && warningBox) {
+    closeBtn.addEventListener('click', () => {
+      warningBox.style.transition = 'opacity 0.3s ease';
+      warningBox.style.opacity = '0';
+      setTimeout(() => warningBox.remove(), 300);
+    });
+  }
+
+  // Dismiss Permanently
+  if (dismissBtn && warningBox) {
+    dismissBtn.addEventListener('click', () => {
+      fetch('/plugins/automover/helpers/mover_warning_state.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRF-TOKEN': csrfToken
+        },
+        body: new URLSearchParams({ csrf_token: csrfToken })
       })
-      .catch(err => {
-        console.error('Dismiss fetch error:', err);
-        alert('Dismiss request failed — check console for details.');
-      });
-  });
-}
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            dismissBtn.style.display = 'none';
+            dismissStatus.style.display = 'block';
+            setTimeout(() => { warningBox.style.display = 'none'; }, 1500);
+          } else {
+            alert('Failed to dismiss warning: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(err => {
+          console.error('Dismiss fetch error:', err);
+          alert('Dismiss request failed — check console for details.');
+        });
+    });
+  }
 </script>
 <?php endif; ?>
+<script>
+const UNRAID_VERSION = "<?= $unraid_version ?>";
+console.log("Detected via PHP:", UNRAID_VERSION);
+
+const major = parseFloat(UNRAID_VERSION);
+
+if (!isNaN(major) && major >= 7.2) {
+    document.body.classList.add("unraid-72");
+} else {
+    document.body.classList.add("unraid-71");
+}
+</script>
+<script>
+  const pickerCreateBtn  = document.getElementById("picker-create-folder");
+  const newFolderRow     = document.getElementById("picker-newfolder-row");
+  const newFolderInput   = document.getElementById("picker-newfolder-input");
+  const newFolderConfirm = document.getElementById("picker-newfolder-confirm");
+  const newFolderCancel  = document.getElementById("picker-newfolder-cancel");
+
+  // Show name input row
+  pickerCreateBtn.addEventListener("click", () => {
+    newFolderRow.style.display = "flex";
+    newFolderInput.value = "";
+    newFolderInput.focus();
+  });
+
+  // Confirm ✓
+  newFolderConfirm.addEventListener("click", () => {
+    const parent = pickerPath;
+    const name = newFolderInput.value.trim();
+
+    if (!name) {
+      newFolderInput.style.borderColor = "red";
+      return;
+    }
+
+    newFolderInput.style.borderColor = "";
+
+    fetch("/plugins/automover/helpers/create_folder.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body:
+        "parent=" + encodeURIComponent(parent) +
+        "&name=" + encodeURIComponent(name) +
+        "&csrf_token=" + encodeURIComponent(csrfToken)
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        hideNewFolderRow();
+        loadPicker(parent);
+      } else {
+        newFolderInput.style.borderColor = "red";
+      }
+    })
+    .catch(() => {
+      newFolderInput.style.borderColor = "red";
+    });
+  });
+
+  // Cancel ✗
+  newFolderCancel.addEventListener("click", hideNewFolderRow);
+
+  // Press Enter = ✓, Escape = ✗
+  newFolderInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") newFolderConfirm.click();
+    if (e.key === "Escape") hideNewFolderRow();
+  });
+
+  function hideNewFolderRow() {
+    newFolderRow.style.display = "none";
+    newFolderInput.style.borderColor = "";
+  }
+</script>

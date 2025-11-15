@@ -35,7 +35,7 @@ $args = [
     $_GET['STOP_THRESHOLD'] ?? '',
     $_GET['ENABLE_NOTIFICATIONS'] ?? '',
     $_GET['WEBHOOK_URL'] ?? '',
-    $_GET['FILES_MOVED_COPIES_SAVED'] ?? '',
+    $_GET['MANUAL_MOVE'] ?? '',
 ];
 
 // Escape each argument for safety
