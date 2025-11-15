@@ -15,6 +15,7 @@
 - Allow or deny moving when parity is checking
 - Two schedule modes interval and cron expression to choose from
 - Option to have start and finish notifications sent to unraid or discord
+- Option to do a manual move using rsync where you pick the source and destination
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
 - Jdupes option built in to re-hardlink any files after every move
 - Option to stop containers before moves and start them back after finish
