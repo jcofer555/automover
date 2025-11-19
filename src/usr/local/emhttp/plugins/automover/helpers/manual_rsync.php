@@ -52,18 +52,14 @@ if (file_exists($cfg_file)) {
 // ==========================================================
 // Notification configuration (MIRROR automover.sh behavior)
 // ==========================================================
-
-// Clean + normalize webhook value
 $WEBHOOK_URL = "";
 if (isset($settings["WEBHOOK_URL"])) {
     $tmp = trim($settings["WEBHOOK_URL"]);
-    // Automover treats "", null, or "null" the same — disabled
     if ($tmp !== "" && strtolower($tmp) !== "null") {
         $WEBHOOK_URL = $tmp;
     }
 }
 
-// Same logic as automover.sh
 $ENABLE_NOTIFICATIONS = (
     isset($settings["ENABLE_NOTIFICATIONS"]) &&
     strtolower(trim($settings["ENABLE_NOTIFICATIONS"])) === "yes"
@@ -97,13 +93,13 @@ $dst = escapeshellarg($dst_clean);
 // Determine rsync mode
 // ==========================================================
 if ($full === "1") {
-    $cmd = "rsync -aH --delete --out-format='%n' $src $dst";
+    $cmd = "rsync -aH --delete --out-format='%n' $src_clean $dst_clean";
     $modeName = "full sync";
 } elseif ($del === "1") {
-    $cmd = "rsync -aH --remove-source-files --out-format='%n' $src $dst";
+    $cmd = "rsync -aH --remove-source-files --out-format='%n' $src_clean $dst_clean";
     $modeName = "delete source";
 } else {
-    $cmd = "rsync -aH --out-format='%n' $src $dst";
+    $cmd = "rsync -aH --out-format='%n' $src_clean $dst_clean";
     $modeName = "copy";
 }
 
@@ -134,11 +130,10 @@ if ($isDry) {
 $start_time = time();
 
 // ==========================================================
-// START Notification (Option C)
+// START Notification
 // ==========================================================
 if ($notify) {
     if (!empty($WEBHOOK_URL)) {
-        // Discord JSON
         $json = json_encode([
             "embeds" => [[
                 "title" => "Manual rsync started",
@@ -160,14 +155,47 @@ if (file_exists($automover_log)) {
 }
 
 // ==========================================================
-// Run rsync
+// CLEAR IN-USE FILE LIST EACH RUN
 // ==========================================================
-$output = [];
-exec("$cmd 2>&1", $output);
+$inuse_file = "/tmp/automover/automover_in_use_files.txt";
+file_put_contents($inuse_file, "");
+$inuse_count = 0;
 
-// For dry run: write notice to file
-if ($isDry) {
-    file_put_contents($automover_log, "Dry run active - no files will be moved\n");
+// ==========================================================
+// RUN RSYNC WITH AUTOMOVER fuser CHECK
+// ==========================================================
+
+// Build list of files to check
+$files = [];
+exec("find " . escapeshellarg($src_clean) . " -type f 2>/dev/null", $files);
+
+$output = [];
+
+foreach ($files as $file) {
+
+    if (trim($file) === "") continue;
+
+    // Check if file is in use
+    $fuser_output = shell_exec("fuser -m " . escapeshellarg($file) . " 2>/dev/null");
+    if (!empty($fuser_output)) {
+        file_put_contents($inuse_file, "$file\n", FILE_APPEND);
+        $inuse_count++;
+        continue;
+    }
+
+    // Run rsync on the file
+    $safe_file = escapeshellarg($file);
+    $single_cmd = "rsync -aH --out-format='%n' $safe_file " . escapeshellarg($dst_clean);
+    if ($isDry) {
+        $single_cmd = "rsync --dry-run -aH --out-format='%n' $safe_file " . escapeshellarg($dst_clean);
+    }
+
+    exec("$single_cmd 2>&1", $output);
+}
+
+// Log summary of in-use files
+if ($inuse_count > 0) {
+    file_put_contents($last, "Skipped $inuse_count in-use file(s)\n", FILE_APPEND);
 }
 
 // ==========================================================
@@ -180,7 +208,6 @@ foreach ($output as $line) {
     $line = trim($line);
     if ($line === "") continue;
 
-    // Skip metadata
     if (
         $line === "sending incremental file list" ||
         preg_match('/^(sent|total|bytes|speedup|created|deleting)/i', $line)
@@ -195,7 +222,6 @@ foreach ($output as $line) {
 
     file_put_contents($automover_log, "$src_file -> $dst_file\n", FILE_APPEND);
 
-    // Share count (from destination)
     $parts = explode("/", trim($dst_file, "/"));
     if (count($parts) >= 3 && $parts[1] === "user0") {
         $share = $parts[2];
@@ -214,7 +240,7 @@ if (!$moved_any) {
 }
 
 // ==========================================================
-// FINISH Notification (Option C)
+// FINISH Notification
 // ==========================================================
 $end_time = time();
 $duration = $end_time - $start_time;
@@ -229,9 +255,6 @@ if ($duration < 60) {
 
 if ($notify) {
 
-    //
-    // ----- DISCORD FINISH NOTIFICATION (INSTANT) -----
-    //
     if (!empty($WEBHOOK_URL)) {
 
         $body = "Manual rsync finished.\nMoved: " . ($moved_any ? "Yes" : "No") . "\nRuntime: $runtime";
@@ -251,14 +274,10 @@ if ($notify) {
             ]]
         ]);
 
-        // SEND IMMEDIATELY
         exec("curl -s -X POST -H 'Content-Type: application/json' -d '$json' \"$WEBHOOK_URL\" >/dev/null 2>&1");
 
     } else {
 
-        //
-        // ----- UNRAID FINISH NOTIFICATION (DELAY 60 SECONDS) -----
-        //
         $notif_cfg = "/boot/config/plugins/dynamix/dynamix.cfg";
         $agent_active = false;
 
@@ -276,7 +295,6 @@ if ($notify) {
         if ($moved_any && !empty($shareCounts)) {
 
             if ($agent_active) {
-                // Agent → " - " separator
                 $body .= " - Per share summary: ";
                 $first = true;
                 foreach ($shareCounts as $share => $count) {
@@ -288,7 +306,6 @@ if ($notify) {
                     }
                 }
             } else {
-                // Browser notify → HTML
                 $body .= "<br><br>Per share summary:<br>";
                 foreach ($shareCounts as $share => $count) {
                     $body .= "• $share: $count file(s)<br>";
@@ -298,7 +315,6 @@ if ($notify) {
 
         $body_escaped = escapeshellarg($body);
 
-        // DELAYED 60 SECONDS ONLY FOR UNRAID
         $cmd = "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s 'Manual rsync finished' -d $body_escaped -i 'normal'";
         exec("echo \"$cmd\" | at now + 1 minute");
     }
