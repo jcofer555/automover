@@ -1109,6 +1109,34 @@ if (file_exists("/etc/unraid-version")) {
   .manual-shake {
     animation: manualShake .35s ease;
   }
+
+#exclusion-view-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    padding-right: 18px !important;
+}
+
+#exclusion-view-modal p {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-right: 0 !important;
+}
+
+#exclusionsEditor {
+    width: 100% !important;
+    margin-right: 0 !important;
+    padding-right: 8px;
+}
+
+#exclusion-view-modal .footer {
+    display: flex;
+    justify-content: flex-end !important;
+    margin-top: 10px;
+}
+
+#exclusion-view-modal .footer > div:first-child {
+    margin-right: auto;
+}
 </style>
 
 <div id="automover-wrapper">
@@ -1438,12 +1466,10 @@ if (file_exists("/etc/unraid-version")) {
   background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
       <div class="modal-body"
         style="background:#111; color:white; padding:20px; border-radius:10px;
-  width:800px; min-width: fit-content; max-width: 100%; height:600px; min-height: fit-content; max-height: 100%; overflow:hidden; display:flex; flex-direction:column;">
+  width:600px; min-width: fit-content; max-width: 100%; height:600px; min-height: fit-content; max-height: 100%; overflow:hidden; display:flex; flex-direction:column;">
         <h3 style="margin-top:0;">View/Edit Exclusions</h3>
         <p style="margin-top:4px; margin-bottom:10px; color:#aaa; font-style:italic; font-size:13px;">
-          * Any array paths changed or added need to be entered as <code>user0</code> instead of <code>disk#</code>.
-          For example: <code>/mnt/disk3/data/test/file.txt</code> should be entered as
-          <code>/mnt/user0/data/test/file.txt</code>. This does not apply to pool paths.
+          * Only paths to pool disks will work. Can do individual files or full directory paths for example /mnt/cache/data/test.txt or /mnt/cache/data. <br> Do not use array disk paths like /mnt/disk1 or /mnt/user or /mnt/user0 paths
         </p>
 
         <textarea id="exclusionsEditor" style="
