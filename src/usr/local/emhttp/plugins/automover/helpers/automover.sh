@@ -207,8 +207,17 @@ rm -f /tmp/automover/automover_done.txt
 run_qbit_script() {
   local action="$1"
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
+  local paused_file="/tmp/automover/automover_qbittorrent_paused.txt"
+  local tmp_out
+
+  # reset paused file
+  > "$paused_file"
+
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
-  echo "Starting qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
+
+  tmp_out="$(mktemp)"
+
+  # Capture full output into tmp_out AND apply filtered grep to LAST_RUN_FILE
   python3 "$python_script" \
     --host "$QBITTORRENT_HOST" \
     --user "$QBITTORRENT_USERNAME" \
@@ -217,8 +226,18 @@ run_qbit_script() {
     --days_from "$QBITTORRENT_DAYS_FROM" \
     --days_to "$QBITTORRENT_DAYS_TO" \
     --status-filter "$QBITTORRENT_STATUS" \
-    "--$action" 2>&1 | grep -E '^(Running qBittorrent|Paused|Resumed|qBittorrent)' >> "$LAST_RUN_FILE"
-  echo "Finished qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
+    "--$action" 2>&1 | tee "$tmp_out" \
+      | grep -E '^(Running qBittorrent|Paused|Resumed|qBittorrent)' \
+      >> "$LAST_RUN_FILE"
+
+  # Extract paused torrents cleanly from tmp_out
+  grep "Pausing:" "$tmp_out" \
+    | sed -E 's/.*Pausing:\s*//; s/\s*\[[0-9]+\]$//' \
+    >> "$paused_file"
+
+  rm -f "$tmp_out"
+
+  echo "Qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
 }
 
 # ==========================================================
