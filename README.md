@@ -18,9 +18,9 @@
 - Option to do a manual move using rsync where you pick the source and destination
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
 - Jdupes option built in to re-hardlink any files after every move
+- Manual rsync option usin the manual move checkbox
 - Option to stop containers before moves and start them back after finish
 - Ability to force turbo write on during move
-- Ability to disable unraids built in mover schedule
 - Ability to manually set file/folder excludes
 - Ability to skip hidden folders/files
 - Ability to exclude files from moving unless they are X amount of days or older
