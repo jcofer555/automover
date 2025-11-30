@@ -538,8 +538,46 @@ fi
       done
       containers_stopped=true
     fi
+
+# Detect if qBittorrent script host/port overlaps with a stopped container
+skip_qbit_script=false
+if [[ -n "$CONTAINER_NAMES" && -n "$QBITTORRENT_HOST" ]]; then
+  # Guard clause: only extract port if a colon exists
+  if [[ "$QBITTORRENT_HOST" == *:* ]]; then
+    qbit_port="${QBITTORRENT_HOST##*:}"
+  else
+    qbit_port=""
+  fi
+
+  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+  for container in "${CONTAINERS[@]}"; do
+    cname=$(echo "$container" | xargs)
+    [[ -z "$cname" ]] && continue
+
+    # --- Fallback name check ---
+    lcname=$(echo "$cname" | tr '[:upper:]' '[:lower:]')
+    if [[ "$lcname" == *qbittorrent* ]]; then
+      skip_qbit_script=true
+      echo "Detected qBittorrent container by name ($cname) — skipping qBittorrent script" >> "$LAST_RUN_FILE"
+      break
+    fi
+
+    # --- Port check (only if qbit_port is set) ---
+    if [[ -n "$qbit_port" ]]; then
+      ports=$(docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}}{{(index $conf 0).HostPort}} {{end}}' "$cname" 2>/dev/null)
+      for port in $ports; do
+        if [[ "$port" == "$qbit_port" ]]; then
+          skip_qbit_script=true
+          echo "Detected qBittorrent port $qbit_port in container $cname — skipping qBittorrent script" >> "$LAST_RUN_FILE"
+          break 2
+        fi
+      done
+    fi
+  done
+fi
+
 # --- qBittorrent dependency check + pause ---
-if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && "$skip_qbit_script" != true ]]; then
   if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
     echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
     command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
@@ -667,7 +705,7 @@ fi
 # ==========================================================
 #  Resume qBittorrent torrents
 # ==========================================================
-if [[ "$qbit_paused" == true && "$QBITTORRENT_SCRIPT" == "yes" ]]; then
+if [[ "$qbit_paused" == true && "$QBITTORRENT_SCRIPT" == "yes" && "$skip_qbit_script" != true ]]; then
   set_status "Resuming Torrents"
   run_qbit_script resume
 fi
