@@ -558,7 +558,7 @@ if [[ -n "$CONTAINER_NAMES" && -n "$QBITTORRENT_HOST" ]]; then
     lcname=$(echo "$cname" | tr '[:upper:]' '[:lower:]')
     if [[ "$lcname" == *qbittorrent* ]]; then
       skip_qbit_script=true
-      echo "Detected qBittorrent container by name ($cname) — skipping qBittorrent script" >> "$LAST_RUN_FILE"
+      echo "Qbittorrent container is in stop containers list — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
       break
     fi
 
@@ -568,7 +568,7 @@ if [[ -n "$CONTAINER_NAMES" && -n "$QBITTORRENT_HOST" ]]; then
       for port in $ports; do
         if [[ "$port" == "$qbit_port" ]]; then
           skip_qbit_script=true
-          echo "Detected qBittorrent port $qbit_port in container $cname — skipping qBittorrent script" >> "$LAST_RUN_FILE"
+          echo "Qbittorrent container is in stop containers list — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
           break 2
         fi
       done
