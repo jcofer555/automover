@@ -168,8 +168,13 @@ if ($notify) {
 if (file_exists($automover_log)) {
     unlink($automover_log);
 }
-$inuse_file = "/tmp/automover/automover_in_use_files.txt";
+
+$inuse_file   = "/tmp/automover/automover_in_use_files.txt";
+$exclude_file = "/tmp/automover/automover_manual_rsync_in_use_files.txt";
+
+// Reset both files each run
 file_put_contents($inuse_file, "");
+file_put_contents($exclude_file, "");
 $inuse_count = 0;
 
 // ==========================================================
