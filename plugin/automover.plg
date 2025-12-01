@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.12.01.03"
+  version="2025.12.01.04"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.12.01.04
+
+- Update to the stop qbittorrent script from running if qbittorrent in stop containers list
+
 ### 2025.12.01.03
 
 - Added it so when stop button is pressed it stops moving as well
@@ -24,10 +28,6 @@
 ### 2025.11.30.02
 
 - Added check if qbittorrent is in list for stop containers, if so skip the qbittorrent pause and resume
-
-### 2025.11.28.01
-
-- Set qbittorrent's pausing of torrents to be logged at /tmp/automover/automover_qbittorrent_paused.txt
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -42,9 +42,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.12.01.03-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.12.01.03/unraid-automover-2025.12.01.03-noarch-1.txz</URL>
-<SHA256>0ca4a9c8b171e2ec48023c01604f16488f0f44f5cd09bccd1d370f46c434cb93</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.12.01.04-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.12.01.04/unraid-automover-2025.12.01.04-noarch-1.txz</URL>
+<SHA256>3f0a03685a4061dfa42a5d529d3409fb2508828773353860b140c2bcf20630d4</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -57,7 +57,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.12.01.03-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.12.01.04-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -145,7 +145,7 @@ if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.12.01.03-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.12.01.04-noarch-1.txz" -delete
 
 # ==========================================================
 #  HANDLE AUTOSTART + CRON GENERATION
@@ -155,7 +155,7 @@ if [ "$AUTOSTART" == "no" ]; then
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.12.01.03"
+    echo " Version: 2025.12.01.04"
     echo "----------------------------------------------------"
     echo ""
 else
@@ -209,7 +209,7 @@ else
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.12.01.03"
+    echo " Version: 2025.12.01.04"
     echo "----------------------------------------------------"
     echo ""
 fi
