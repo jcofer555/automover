@@ -1152,7 +1152,7 @@ if (file_exists("/etc/unraid-version")) {
         <button type="button" id="save-settings">Save & Start</button>
       </span>
 
-      <span title="Stop Automover service" class="automovertip">
+      <span title="Stop Automover service and stop moving" class="automovertip">
         <button type="button" id="stop-button">Stop</button>
       </span>
 
@@ -1767,7 +1767,7 @@ if (file_exists("/etc/unraid-version")) {
       <div>*Only dry run and enable notifications from above options are used and all others are ignored</div>
     </div>
 
-    <span title="Starts the manual rsync manual move process" class="automovertip">
+    <span title="Starts the manual rsync manual process" class="automovertip">
       <button type="button" id="start-manual-rsync" class="button button-primary" style="padding:8px 16px;">
         Start
       </button>
@@ -2373,20 +2373,39 @@ if (file_exists("/etc/unraid-version")) {
       messageBox.innerHTML = '';
       messageBox.style.display = 'none';
 
-      fetch('/plugins/automover/helpers/stop_cron.php')
-        .then(res => res.json())
-        .then(() => {
-          updateStatus();
-          updatePoolUsage();
-          stopBadge.style.display = 'inline-block';
-          stopBadge.style.opacity = '0';
-          stopBadge.style.animation = 'none';
-          void stopBadge.offsetWidth;
-          stopBadge.style.animation = 'flash .4s ease';
-          stopBadge.style.opacity = '1';
-          setTimeout(() => { stopBadge.style.opacity = '0'; stopBadge.style.display = 'none'; }, 3000);
-        })
-        .catch(() => { document.getElementById('status-text').textContent = 'Error stopping cron'; });
+fetch('/plugins/automover/helpers/stop_automover.php', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'csrf_token=' + encodeURIComponent(csrf_token)
+})
+.then(res => res.json())
+.then(() => {
+    // Also stop cron schedule (optional but recommended)
+    return fetch('/plugins/automover/helpers/stop_cron.php', {
+        method: 'GET',
+        credentials: 'same-origin'
+    });
+})
+.then(() => {
+    updateStatus();
+    updatePoolUsage();
+
+    stopBadge.style.display = 'inline-block';
+    stopBadge.style.opacity = '0';
+    stopBadge.style.animation = 'none';
+    void stopBadge.offsetWidth;
+    stopBadge.style.animation = 'flash .4s ease';
+    stopBadge.style.opacity = '1';
+
+    setTimeout(() => {
+        stopBadge.style.opacity = '0';
+        stopBadge.style.display = 'none';
+    }, 3000);
+})
+.catch(() => {
+    document.getElementById('status-text').textContent = 'Error stopping automover';
+});
     });
 
     // Validation
