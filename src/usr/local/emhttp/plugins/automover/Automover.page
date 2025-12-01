@@ -1767,7 +1767,7 @@ if (file_exists("/etc/unraid-version")) {
       <div>*Only dry run and enable notifications from above options are used and all others are ignored</div>
     </div>
 
-    <span title="Starts the manual rsync manual process" class="automovertip">
+    <span title="Starts the manual rsync process" class="automovertip">
       <button type="button" id="start-manual-rsync" class="button button-primary" style="padding:8px 16px;">
         Start
       </button>
