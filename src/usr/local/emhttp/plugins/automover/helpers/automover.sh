@@ -3,7 +3,7 @@ SCRIPT_NAME="automover"
 LAST_RUN_FILE="/tmp/automover/automover_last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
 AUTOMOVER_LOG="/tmp/automover/automover_files_moved.log"
-EXCLUSIONS_FILE="/boot/config/plugins/automover/automover_exclusions.txt"
+EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
 IN_USE_FILE="/tmp/automover/automover_in_use_files.txt"
 STATUS_FILE="/tmp/automover/automover_status.txt"
 MOVED_SHARES_FILE="/tmp/automover/automover_moved_shares.txt"
@@ -419,6 +419,49 @@ if [[ "$EXCLUSIONS_ENABLED" == "yes" && -f "$EXCLUSIONS_FILE" ]]; then
 fi
 
 # ==========================================================
+#  Copy empty directories
+# ==========================================================
+copy_empty_dirs() {
+    local SRC="$1"
+    local DEST="$2"
+    [[ ! -d "$SRC" ]] && return
+
+    # Ensure SRC paths do not have trailing slash
+    SRC="${SRC%/}"
+
+    find "$SRC" -type d | while read -r dir; do
+        # Skip the root source dir itself
+        [[ "$dir" == "$SRC" ]] && continue
+
+        # Destination directory path
+        dst_dir="$DEST/${dir#$SRC/}"
+
+        # Skip if in exclusions
+        skip_dir=false
+        if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+            for ex in "${EXCLUDED_PATHS[@]}"; do
+                # Normalize directory exclusion with trailing slash
+                [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
+                dir_check="$dir/"
+                if [[ "$dir_check" == "$ex"* ]]; then
+                    skip_dir=true
+                    break
+                fi
+            done
+        fi
+        $skip_dir && continue
+
+        # Only create if empty
+        if [[ -z "$(ls -A "$dir")" ]]; then
+            mkdir -p "$dst_dir"
+            chown "$src_owner:$src_group" "$dst_dir"
+            chmod "$src_perms" "$dst_dir"
+            echo "Created empty directory: $dst_dir" >> "$AUTOMOVER_LOG"
+        fi
+    done
+}
+
+# ==========================================================
 #  Main move logic (alphabeticalized)
 # ==========================================================
 moved_anything=false
@@ -602,7 +645,7 @@ pre_move_done="yes"
   src_owner=$(stat -c "%u" "$src")
   src_group=$(stat -c "%g" "$src")
   src_perms=$(stat -c "%a" "$src")
-
+copy_empty_dirs "$src" "$dst"
   while IFS= read -r relpath; do
     [[ -z "$relpath" ]] && continue
     srcfile="$src/$relpath"; dstfile="$dst/$relpath"; dstdir="$(dirname "$dstfile")"
@@ -763,19 +806,51 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
           base_path="/mnt/$pool/$share_name"
           [[ ! -d "$base_path" ]] && continue
 
-          # remove empty dirs
-          find "$base_path" -type d -empty -delete 2>/dev/null
+          # -------------------------------
+          # Remove empty dirs, skip exclusions
+          # -------------------------------
+          while IFS= read -r dir; do
+            skip_dir=false
+            if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+              for ex in "${EXCLUDED_PATHS[@]}"; do
+                [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
+                dir_check="$dir/"
+                if [[ "$dir_check" == "$ex"* ]]; then
+                  skip_dir=true
+                  break
+                fi
+              done
+            fi
+            $skip_dir && continue
+            rmdir "$dir" 2>/dev/null
+          done < <(find "$base_path" -type d -empty | sort -r)
 
-          # zfs datasets
+          # -------------------------------
+          # ZFS datasets cleanup, skip exclusions
+          # -------------------------------
           if command -v zfs >/dev/null 2>&1; then
             mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
             for ds in "${datasets[@]}"; do
               mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
+              # skip if mountpoint is in exclusions
+              skip_ds=false
+              if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+                for ex in "${EXCLUDED_PATHS[@]}"; do
+                  [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
+                  mount_check="$mountpoint/"
+                  if [[ "$mount_check" == "$ex"* ]]; then
+                    skip_ds=true
+                    break
+                  fi
+                done
+              fi
+              $skip_ds && continue
               if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
                 zfs destroy -f "$ds" >/dev/null 2>&1
               fi
             done
           fi
+
         done
       done < <(sort -u "$MOVED_SHARES_FILE")
       echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
