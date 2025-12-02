@@ -1764,7 +1764,7 @@ if (file_exists("/etc/unraid-version")) {
     </div>
 
     <div style="margin-top:4px; max-width: 360px; color:#aaa; font-size:12px;">
-      <div>*Only dry run and enable notifications from above options are used and all others are ignored</div>
+      <div>*Only dry run, enable cleanup, and enable notifications from above options are used and all others are ignored</div>
     </div>
 
     <span title="Starts the manual rsync process" class="automovertip">
@@ -3177,84 +3177,88 @@ fetch('/plugins/automover/helpers/stop_automover.php', {
     }
   }
 
-  // ==============================
-  // MANUAL MOVE INITIALIZER (ONE TIME ONLY)
-  // ==============================
-  if (!window.manualMoveInit) {
-    window.manualMoveInit = true;
+// ==============================
+// MANUAL MOVE INITIALIZER
+// ==============================
+if (!window.manualMoveInit) {
+  window.manualMoveInit = true;
 
-    // Toggle block visibility
-    const manualToggle = document.getElementById("manual_move_toggle");
-    const manualSection = document.getElementById("manual-move-section");
+  // Toggle block visibility
+  const manualToggle = document.getElementById("manual_move_toggle");
+  const manualSection = document.getElementById("manual-move-section");
 
-    manualToggle.addEventListener("change", () => {
-      manualSection.style.display = manualToggle.checked ? "block" : "none";
+  manualToggle.addEventListener("change", () => {
+    manualSection.style.display = manualToggle.checked ? "block" : "none";
+  });
+
+  // Start Manual Rsync
+  document.getElementById("start-manual-rsync").addEventListener("click", () => {
+    // Immediately disable Automover buttons when manual move starts
+    ['save-settings', 'moveNowBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.disabled = true;
+        el.style.opacity = '0.5';
+        el.style.cursor = 'not-allowed';
+      }
     });
 
-    // Start Manual Rsync
-    document.getElementById("start-manual-rsync").addEventListener("click", () => {
-      // Immediately disable Automover buttons when manual move starts
-      ['save-settings', 'moveNowBtn'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.disabled = true;
-          el.style.opacity = '0.5';
-          el.style.cursor = 'not-allowed';
+    const src = document.getElementById("manual_source").value.trim();
+    const dst = document.getElementById("manual_dest").value.trim();
+
+    const modeCopy = document.getElementById("manual_copy").checked;
+    const modeDelete = document.getElementById("manual_delete").checked;
+    const modeFull = document.getElementById("manual_fullsync").checked;
+
+    if (!src || !dst) {
+      safeToast("Source and Destination are required.", "err");
+      return;
+    }
+
+    if (![modeCopy, modeDelete, modeFull].includes(true)) {
+      safeToast("Select one rsync mode.", "err");
+      return;
+    }
+
+    // Show confirmation toast
+    const badge = document.getElementById("manual-move-confirmation");
+    badge.style.display = "block";
+    badge.style.opacity = "1";
+    setTimeout(() => {
+      badge.style.opacity = "0";
+      setTimeout(() => (badge.style.display = "none"), 500);
+    }, 2500);
+
+    // Build params
+    const params = new URLSearchParams();
+    params.append("csrf_token", csrfToken);
+    params.append("source", src);
+    params.append("dest", dst);
+    params.append("copy", modeCopy ? "1" : "0");
+    params.append("delete", modeDelete ? "1" : "0");
+    params.append("fullsync", modeFull ? "1" : "0");
+
+    // Fire off request in background
+    fetch("/plugins/automover/helpers/manual_rsync.php", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRF-TOKEN": csrfToken
+      },
+      body: params.toString()
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.ok) {
+          // Optional: show error toast if backend fails
+          safeToast("Manual move failed.", "err");
         }
-      });
-
-      const src = document.getElementById("manual_source").value.trim();
-      const dst = document.getElementById("manual_dest").value.trim();
-
-      const modeCopy = document.getElementById("manual_copy").checked;
-      const modeDelete = document.getElementById("manual_delete").checked;
-      const modeFull = document.getElementById("manual_fullsync").checked;
-
-      if (!src || !dst) {
-        safeToast("Source and Destination are required.", "err");
-        return;
-      }
-
-      if (![modeCopy, modeDelete, modeFull].includes(true)) {
-        safeToast("Select one rsync mode.", "err");
-        return;
-      }
-
-      const params = new URLSearchParams();
-      params.append("csrf_token", csrfToken);
-      params.append("source", src);
-      params.append("dest", dst);
-      params.append("copy", modeCopy ? "1" : "0");
-      params.append("delete", modeDelete ? "1" : "0");
-      params.append("fullsync", modeFull ? "1" : "0");
-
-      fetch("/plugins/automover/helpers/manual_rsync.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-CSRF-TOKEN": csrfToken
-        },
-        body: params.toString()
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.ok) {
-            const badge = document.getElementById("manual-move-confirmation");
-            badge.style.display = "block";
-            badge.style.opacity = "1";
-            setTimeout(() => {
-              badge.style.opacity = "0";
-              setTimeout(() => (badge.style.display = "none"), 500);
-            }, 2500);
-
-            safeToast("Manual rsync started.", "ok");
-          } else {
-            safeToast(data.error || "Manual rsync failed", "err");
-          }
-        })
-        .catch(() => safeToast("Failed to start manual rsync.", "err"));
-    });
-  }
+      .catch(() => {
+        safeToast("Manual move request error.", "err");
+      });
+  });
+}
 
   // ==========================
   // Picker state
