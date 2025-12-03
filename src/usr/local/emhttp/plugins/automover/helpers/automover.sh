@@ -14,6 +14,7 @@ MOVED_SHARES_FILE="/tmp/automover/automover_moved_shares.txt"
 mkdir -p /tmp/automover
 LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
+> /tmp/automover/automover_cleanup_sources.txt
 
 # ==========================================================
 #  Unraid notifications helper
@@ -297,6 +298,10 @@ start_time=$(date +%s)
   echo "------------------------------------------------"
   echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
+  # --- Log exclusions state when Move Now is pressed ---
+if [[ "$MOVE_NOW" == true && "$EXCLUSIONS_ENABLED" == "yes" ]]; then
+  echo "Exclusions Enabled" >> "$LAST_RUN_FILE"
+fi
 } >> "$LAST_RUN_FILE"
 
 log_session_end() {
@@ -426,12 +431,20 @@ copy_empty_dirs() {
     local DEST="$2"
     [[ ! -d "$SRC" ]] && return
 
-    # Ensure SRC paths do not have trailing slash
+    # Normalize SRC (no trailing slash)
     SRC="${SRC%/}"
+
+    # Get the share root name (last path component)
+    sharename=$(basename "$SRC")
 
     find "$SRC" -type d | while read -r dir; do
         # Skip the root source dir itself
         [[ "$dir" == "$SRC" ]] && continue
+
+        # Extra guard: never recreate the share root itself
+        if [[ "$(basename "$dir")" == "$sharename" && "$dir" == "$SRC" ]]; then
+            continue
+        fi
 
         # Destination directory path
         dst_dir="$DEST/${dir#$SRC/}"
@@ -440,7 +453,6 @@ copy_empty_dirs() {
         skip_dir=false
         if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
             for ex in "${EXCLUDED_PATHS[@]}"; do
-                # Normalize directory exclusion with trailing slash
                 [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
                 dir_check="$dir/"
                 if [[ "$dir_check" == "$ex"* ]]; then
@@ -511,8 +523,36 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n' | LC_ALL=C sort)
   fi
 
-  file_count=${#all_filtered_items[@]}
-  (( file_count == 0 )) && { continue; }
+# Build eligible list (after exclusions + in-use checks)
+eligible_items=()
+for relpath in "${all_filtered_items[@]}"; do
+  [[ -z "$relpath" ]] && continue
+  srcfile="$src/$relpath"
+
+  # Skip exclusions
+  skip_file=false
+  if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+    for ex in "${EXCLUDED_PATHS[@]}"; do
+      [[ -d "$ex" ]] && ex="${ex%/}/"
+      if [[ "$srcfile" == "$ex"* || "$srcfile" == "$src/$ex"* ]]; then
+        skip_file=true; break
+      fi
+    done
+  fi
+  $skip_file && continue
+
+  # Skip if file in use
+  if fuser "$srcfile" >/dev/null 2>&1; then
+    grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
+    continue
+  fi
+
+  eligible_items+=("$relpath")
+done
+
+file_count=${#eligible_items[@]}
+(( file_count == 0 )) && { continue; }
+echo "$src" >> /tmp/automover/automover_cleanup_sources.txt
 
   # ==========================================================
   #  Check for eligible files before moving (pre-move trigger)
@@ -683,12 +723,20 @@ pre_move_done="yes"
   echo "Starting move of $file_count file(s) for share: $share_name" >> "$LAST_RUN_FILE"
   set_status "Moving Files For Share: $share_name"
 
-  tmpfile=$(mktemp)
-  printf '%s\n' "${all_filtered_items[@]}" > "$tmpfile"
-  file_count_moved=0
-  src_owner=$(stat -c "%u" "$src")
-  src_group=$(stat -c "%g" "$src")
-  src_perms=$(stat -c "%a" "$src")
+tmpfile=$(mktemp)
+printf '%s\n' "${eligible_items[@]}" > "$tmpfile"
+file_count_moved=0
+src_owner=$(stat -c "%u" "$src")
+src_group=$(stat -c "%g" "$src")
+src_perms=$(stat -c "%a" "$src")
+
+# Ensure destination root exists with correct ownership/permissions
+if [[ ! -d "$dst" ]]; then
+  mkdir -p "$dst"
+fi
+chown "$src_owner:$src_group" "$dst"
+chmod "$src_perms" "$dst"
+
 copy_empty_dirs "$src" "$dst"
   while IFS= read -r relpath; do
     [[ -z "$relpath" ]] && continue
@@ -816,19 +864,19 @@ if [[ "$DRY_RUN" != "yes" ]]; then
 fi
 
 # ==========================================================
-#  Cleanup Empty Folders (including ZFS datasets) - ONLY moved shares
+#  Cleanup Empty Folders (including ZFS datasets) - ONLY moved sources
 # ==========================================================
 if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   set_status "Cleaning Up"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
   elif [[ "$moved_anything" == true ]]; then
-    if [[ ! -s "$MOVED_SHARES_FILE" ]]; then
-      echo "No moved shares recorded — skipping cleanup" >> "$LAST_RUN_FILE"
+    if [[ ! -s /tmp/automover_cleanup_sources.txt ]]; then
+      echo "No source paths recorded — skipping cleanup" >> "$LAST_RUN_FILE"
     else
-      # sort unique in case same share got added twice
-      while IFS= read -r share_name; do
-        [[ -z "$share_name" ]] && continue
+      while IFS= read -r src_path; do
+        [[ -z "$src_path" || ! -d "$src_path" ]] && continue
+        share_name=$(basename "$src_path")
 
         # force exclude these 4
         case "$share_name" in
@@ -838,65 +886,64 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
             ;;
         esac
 
-        cfg="$SHARE_CFG_DIR/$share_name.cfg"
-        [[ -f "$cfg" ]] || continue
-
-        pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
-        pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
-        [[ -z "$pool1" && -z "$pool2" ]] && continue
-
-        for pool in "$pool1" "$pool2"; do
-          [[ -z "$pool" ]] && continue
-          base_path="/mnt/$pool/$share_name"
-          [[ ! -d "$base_path" ]] && continue
-
-          # -------------------------------
-          # Remove empty dirs, skip exclusions
-          # -------------------------------
-          while IFS= read -r dir; do
-            skip_dir=false
-            if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
-              for ex in "${EXCLUDED_PATHS[@]}"; do
-                [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
-                dir_check="$dir/"
-                if [[ "$dir_check" == "$ex"* ]]; then
-                  skip_dir=true
-                  break
-                fi
-              done
-            fi
-            $skip_dir && continue
-            rmdir "$dir" 2>/dev/null
-          done < <(find "$base_path" -type d -empty | sort -r)
-
-          # -------------------------------
-          # ZFS datasets cleanup, skip exclusions
-          # -------------------------------
-          if command -v zfs >/dev/null 2>&1; then
-            mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$base_path" '$2 ~ "^"mp {print $1}')
-            for ds in "${datasets[@]}"; do
-              mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
-              # skip if mountpoint is in exclusions
-              skip_ds=false
-              if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
-                for ex in "${EXCLUDED_PATHS[@]}"; do
-                  [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
-                  mount_check="$mountpoint/"
-                  if [[ "$mount_check" == "$ex"* ]]; then
-                    skip_ds=true
-                    break
-                  fi
-                done
+        # -------------------------------
+        # Remove dirs bottom‑up, skip exclusions
+        # -------------------------------
+        find "$src_path" -depth -type d | while read -r dir; do
+          if [[ "$dir" == "$src_path" ]]; then
+            # Root folder: remove only if another instance exists elsewhere
+            other_exists=false
+            for mp in /mnt/*; do
+              [[ ! -d "$mp" ]] && continue
+              [[ "$mp/$share_name" == "$src_path" ]] && continue
+              if [[ -d "$mp/$share_name" ]]; then
+                other_exists=true; break
               fi
-              $skip_ds && continue
-              if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
-                zfs destroy -f "$ds" >/dev/null 2>&1
+            done
+            [[ "$other_exists" == false ]] && continue
+          fi
+
+          # Skip exclusions
+          skip_dir=false
+          if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+            for ex in "${EXCLUDED_PATHS[@]}"; do
+              [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
+              dir_check="$dir/"
+              if [[ "$dir_check" == "$ex"* ]]; then
+                skip_dir=true; break
               fi
             done
           fi
+          $skip_dir && continue
 
+          rmdir "$dir" 2>/dev/null
         done
-      done < <(sort -u "$MOVED_SHARES_FILE")
+
+        # -------------------------------
+        # ZFS datasets cleanup, skip exclusions
+        # -------------------------------
+        if command -v zfs >/dev/null 2>&1; then
+          mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$src_path" '$2 ~ "^"mp {print $1}')
+          for ds in "${datasets[@]}"; do
+            mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
+            skip_ds=false
+            if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+              for ex in "${EXCLUDED_PATHS[@]}"; do
+                [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
+                mount_check="$mountpoint/"
+                if [[ "$mount_check" == "$ex"* ]]; then
+                  skip_ds=true; break
+                fi
+              done
+            fi
+            $skip_ds && continue
+            if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+              zfs destroy -f "$ds" >/dev/null 2>&1
+            fi
+          done
+        fi
+
+      done < <(sort -u /tmp/automover_cleanup_sources.txt)
       echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
     fi
   else
@@ -1018,6 +1065,29 @@ else
     : > "$AUTOMOVER_LOG"
     echo "No files moved for this run" >> "$AUTOMOVER_LOG"
   fi
+fi
+
+# ==========================================================
+#  Post-move share existence check and config cleanup
+# ==========================================================
+if [[ "$moved_anything" == true && "$ENABLE_CLEANUP" == "yes" ]]; then
+  set_status "Checking Share Existence"
+
+  while IFS= read -r share_name; do
+    [[ -z "$share_name" ]] && continue
+    cfg="/boot/config/shares/${share_name}.cfg"
+
+    [[ -f "$cfg" ]] || continue
+
+    found=false
+    for mount in /mnt/*; do
+      [[ -d "$mount/$share_name" ]] && { found=true; break; }
+    done
+
+    if [[ "$found" == false ]]; then
+      rm -f "$cfg"
+    fi
+  done < "$MOVED_SHARES_FILE"
 fi
 
 # ==========================================================

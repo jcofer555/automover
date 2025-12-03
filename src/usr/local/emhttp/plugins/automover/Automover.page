@@ -1582,7 +1582,7 @@ if (file_exists("/etc/unraid-version")) {
         </label>
       </span>
 
-      <span title="Enable to cleanup folders and datasets from source path" class="automovertip">
+      <span title="Enable to remove empty folders and datasets from shares that are moved" class="automovertip">
         <label>
           <input type="checkbox" id="enable_cleanup" <?php echo ($settings['ENABLE_CLEANUP'] ?? '' )==='yes' ? 'checked'
             : '' ?>> Enable Cleanup
