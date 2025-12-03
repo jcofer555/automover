@@ -559,29 +559,6 @@ if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" &&
   sent_start_notification="yes"
 fi
 
-    # --- Enable turbo write ---
-    if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
-      set_status "Enabling Turbo Write"
-      turbo_write_prev=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
-      echo "$turbo_write_prev" > /tmp/automover_prev_write_method
-      logger "Force turbo write on"
-      /usr/local/sbin/mdcmd set md_write_method 1
-      echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
-      turbo_write_enabled=true
-    fi
-    # --- Stop managed containers ---
-    if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" ]]; then
-      set_status "Stopping Containers"
-      IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-      for container in "${CONTAINERS[@]}"; do
-        container=$(echo "$container" | xargs)
-        [[ -z "$container" ]] && continue
-        echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
-        docker stop "$container" || echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
-      done
-      containers_stopped=true
-    fi
-
 # Detect if qBittorrent script host/port overlaps with a stopped container
 skip_qbit_script=false
 if [[ -n "$CONTAINER_NAMES" && -n "$QBITTORRENT_HOST" ]]; then
@@ -614,7 +591,74 @@ if [[ -n "$CONTAINER_NAMES" && -n "$QBITTORRENT_HOST" ]]; then
       done
     fi
   done
+
+  # --- Extra check: dynamic parent + PID mapping ---
+  if [[ "$skip_qbit_script" == false && -n "$qbit_port" ]]; then
+    parents=()
+    for cid in $(docker ps -q); do
+      netmode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$cid")
+      if [[ "$netmode" == container:* ]]; then
+        parent=${netmode#container:}
+        parents+=("$parent")
+      fi
+    done
+    parents=($(printf "%s\n" "${parents[@]}" | sort -u))
+
+    for parent in "${parents[@]}"; do
+      parent_id=$(docker inspect -f '{{.Id}}' "$parent" 2>/dev/null)
+      parent_pid=$(docker inspect -f '{{.State.Pid}}' "$parent" 2>/dev/null)
+      [[ -z "$parent_pid" || "$parent_pid" == "0" ]] && continue
+
+      listener_pids=$(nsenter -t "$parent_pid" -n ss -ltnp 2>/dev/null \
+        | grep ":$qbit_port " | grep -o 'pid=[0-9]\+' | cut -d= -f2 | sort -u)
+
+      if [[ -n "$listener_pids" ]]; then
+        for cid in $(docker ps -q); do
+          netmode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$cid")
+          cname=$(docker inspect -f '{{.Name}}' "$cid" | sed 's#^/##')
+          if [[ "$netmode" == "container:$parent" || "$netmode" == "container:$parent_id" ]]; then
+            cpids=$(docker top "$cname" -eo pid 2>/dev/null | awk 'NR>1 {print $1}')
+            for lp in $listener_pids; do
+              if echo "$cpids" | grep -q "^$lp$"; then
+                for stopped in "${CONTAINERS[@]}"; do
+                  stopped=$(echo "$stopped" | xargs)
+                  if [[ "$cname" == "$stopped" ]]; then
+                    skip_qbit_script=true
+                    echo "Qbittorrent container is in stop containers list — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
+                    break 4
+                  fi
+                done
+              fi
+            done
+          fi
+        done
+      fi
+    done
+  fi
 fi
+
+    # --- Enable turbo write ---
+    if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
+      set_status "Enabling Turbo Write"
+      turbo_write_prev=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
+      echo "$turbo_write_prev" > /tmp/automover_prev_write_method
+      logger "Force turbo write on"
+      /usr/local/sbin/mdcmd set md_write_method 1
+      echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
+      turbo_write_enabled=true
+    fi
+    # --- Stop managed containers ---
+    if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" ]]; then
+      set_status "Stopping Containers"
+      IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+      for container in "${CONTAINERS[@]}"; do
+        container=$(echo "$container" | xargs)
+        [[ -z "$container" ]] && continue
+        echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
+        docker stop "$container" || echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
+      done
+      containers_stopped=true
+    fi
 
 # --- qBittorrent dependency check + pause ---
 if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && "$skip_qbit_script" == false ]]; then

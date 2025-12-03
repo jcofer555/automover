@@ -1156,7 +1156,7 @@ if (file_exists("/etc/unraid-version")) {
         <button type="button" id="stop-button">Stop</button>
       </span>
 
-      <span title="Run Automover immediately, ignoring exclusions and filters" class="automovertip">
+      <span title="Run Automover immediately, ignoring filters" class="automovertip">
         <button type="button" id="moveNowBtn">Move Now</button>
       </span>
     </div>
