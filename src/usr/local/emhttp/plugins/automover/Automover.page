@@ -1137,6 +1137,10 @@ if (file_exists("/etc/unraid-version")) {
 #exclusion-view-modal .footer > div:first-child {
     margin-right: auto;
 }
+
+#stop-button {
+  border: none;
+}
 </style>
 
 <div id="automover-wrapper">

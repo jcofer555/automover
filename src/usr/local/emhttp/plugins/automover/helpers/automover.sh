@@ -448,36 +448,6 @@ copy_empty_dirs() {
     done
 }
 
-insert_skip_totals() {
-  local tmpfile
-  tmpfile=$(mktemp)
-
-  {
-    [[ "$HIDDEN_FILTER" == "yes" ]] && echo "Skipped due to hidden filter: $skipped_hidden file(s)"
-    [[ "$SIZE_BASED_FILTER" == "yes" ]] && echo "Skipped due to size filter: $skipped_size file(s)"
-    [[ "$AGE_BASED_FILTER" == "yes" ]] && echo "Skipped due to age filter: $skipped_age file(s)"
-    [[ "$EXCLUSIONS_ENABLED" == "yes" ]] && echo "Skipped due to exclusions: $skipped_exclusions file(s)"
-  } > "$tmpfile"
-
-  # Try to splice totals before the first "Starting move of" line
-  awk -v insert="$(cat "$tmpfile")" '
-    BEGIN {printed=0}
-    /Starting move of/ && !printed {
-      print insert
-      printed=1
-    }
-    {print}
-    END {
-      if (!printed) {
-        # Fallback: append at the end if no "Starting move of" line was found
-        print insert
-      }
-    }
-  ' "$LAST_RUN_FILE" > "${LAST_RUN_FILE}.new" && mv "${LAST_RUN_FILE}.new" "$LAST_RUN_FILE"
-
-  rm -f "$tmpfile"
-}
-
 # ==========================================================
 #  Main move logic (alphabeticalized)
 # ==========================================================
@@ -839,7 +809,23 @@ fi
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
 
-insert_skip_totals
+# ==========================================================
+#  Print skip totals
+# ==========================================================
+{
+  if [[ "$HIDDEN_FILTER" == "yes" ]]; then
+    echo "Skipped due to hidden filter: $skipped_hidden file(s)"
+  fi
+  if [[ "$SIZE_BASED_FILTER" == "yes" ]]; then
+    echo "Skipped due to size filter: $skipped_size file(s)"
+  fi
+  if [[ "$AGE_BASED_FILTER" == "yes" ]]; then
+    echo "Skipped due to age filter: $skipped_age file(s)"
+  fi
+  if [[ "$EXCLUSIONS_ENABLED" == "yes" ]]; then
+    echo "Skipped due to exclusions: $skipped_exclusions file(s)"
+  fi
+} >> "$LAST_RUN_FILE"
 
 # ==========================================================
 #  No shares had any eligible files
