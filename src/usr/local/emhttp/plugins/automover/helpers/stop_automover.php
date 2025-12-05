@@ -58,9 +58,6 @@ if (file_exists($lock)) {
 // ==========================================================
 file_put_contents($status, "Stopped");
 
-// Optionally add to last-run log
-file_put_contents($last, "Stop automover invoked - " . date("Y-m-d H:i:s") . "\n", FILE_APPEND);
-
 // ==========================================================
 // Success
 // ==========================================================

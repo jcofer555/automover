@@ -1252,12 +1252,12 @@ if (file_exists("/etc/unraid-version")) {
     <div class="form-pair" id="cron-expression-row"
       style="<?php echo (($settings['MODE'] ?? 'minutes') === 'cron') ? '' : 'display:none;'; ?>">
       <label for="cron_expression">
-        <span title="Enter a valid cron expression (e.g. 0 3 * * *)" class="automovertip">
+        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help" class="automovertip">
           Cron Expression:
         </span>
       </label>
       <div class="input-wrapper">
-        <span title="Enter a valid cron expression (e.g. 0 3 * * *)" class="automovertip">
+        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help" class="automovertip">
           <input type="text" id="cron_expression" class="short-input" placeholder="e.g. 0 3 * * *"
             value="<?php echo htmlspecialchars($settings['CRON_EXPRESSION'] ?? ''); ?>">
         </span>

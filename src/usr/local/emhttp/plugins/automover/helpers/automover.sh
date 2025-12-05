@@ -26,10 +26,8 @@ unraid_notify() {
   local delay="${4:-0}"
 
   if (( delay > 0 )); then
-    # Delay in minutes (for finish notifications)
     echo "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s '$title' -d '$message' -i '$level'" | at now + "$delay" minutes
   else
-    # Instant (for start notifications)
     /usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s "$title" -d "$message" -i "$level"
   fi
 }
@@ -40,13 +38,11 @@ unraid_notify() {
 send_discord_message() {
   local title="$1"
   local message="$2"
-  local color="${3:-65280}" # default = green
+  local color="${3:-65280}"
   local webhook="${WEBHOOK_URL:-}"
 
-  # Only run if webhook is set and not empty
   [[ -z "$webhook" ]] && return
 
-  # Ensure jq exists (for JSON encoding)
   if ! command -v jq >/dev/null 2>&1; then
     logger "jq not found; skipping Discord webhook notification"
     return
@@ -94,13 +90,11 @@ send_summary_notification() {
     return
   fi
 
-  # --- Skip if nothing moved ---
   if [[ "$moved_anything" != "true" ]]; then
     echo "No files moved - skipping sending notifications" >> "$LAST_RUN_FILE"
     return
   fi
 
-  # --- Build per-share counts ---
   declare -A SHARE_COUNTS
   total_moved=0
   if [[ -f "$AUTOMOVER_LOG" && -s "$AUTOMOVER_LOG" ]]; then
@@ -114,7 +108,6 @@ send_summary_notification() {
     done < <(grep -E ' -> ' "$AUTOMOVER_LOG")
   fi
 
-  # --- Calculate runtime ---
   end_time=$(date +%s)
   duration=$((end_time - start_time))
   if (( duration < 60 )); then
@@ -127,10 +120,8 @@ send_summary_notification() {
     runtime="${hours}h ${mins}m"
   fi
 
-  # --- Base message ---
   notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}."
 
-  # --- Discord: add per-share summary (alphabetical) ---
   if [[ -n "$WEBHOOK_URL" ]]; then
     if (( ${#SHARE_COUNTS[@]} > 0 )); then
       notif_body+="
@@ -141,50 +132,42 @@ Per share summary:"
 • ${share}: ${SHARE_COUNTS[$share]} file(s)"
       done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
     fi
-
-    # Send with real newlines preserved
     send_discord_message "Automover session finished" "$notif_body" 65280
-
   else
-    # --- Unraid notify section ---
     notif_body_html="$notif_body"
+    notif_cfg="/boot/config/plugins/dynamix/dynamix.cfg"
+    agent_active=false
 
-# --- Check Unraid notification normal ---
-notif_cfg="/boot/config/plugins/dynamix/dynamix.cfg"
-agent_active=false
-
-if [[ -f "$notif_cfg" ]]; then
-  normal_val=$(grep -Po 'normal="\K[0-9]+' "$notif_cfg" 2>/dev/null)
-  if [[ "$normal_val" =~ ^(4|5|6|7)$ ]]; then
-    agent_active=true
-  elif [[ "$normal_val" == "0" ]]; then
-    echo "Unraid's notice notifications are disabled at Settings > Notifications" >> "$LAST_RUN_FILE"
-  fi
-fi
-
-if [[ "$agent_active" == true ]]; then
-  # Agent (e.g., Discord or another service) enabled for normal notifications: use " - " separator
-  if (( ${#SHARE_COUNTS[@]} > 0 )); then
-    notif_body_html+=" - Per share summary: "
-    first=true
-    while IFS= read -r share; do
-      if [[ "$first" == true ]]; then
-        notif_body_html+="${share}: ${SHARE_COUNTS[$share]} file(s)"
-        first=false
-      else
-        notif_body_html+=" - ${share}: ${SHARE_COUNTS[$share]} file(s)"
+    if [[ -f "$notif_cfg" ]]; then
+      normal_val=$(grep -Po 'normal="\K[0-9]+' "$notif_cfg" 2>/dev/null)
+      if [[ "$normal_val" =~ ^(4|5|6|7)$ ]]; then
+        agent_active=true
+      elif [[ "$normal_val" == "0" ]]; then
+        echo "Unraid's notice notifications are disabled at Settings > Notifications" >> "$LAST_RUN_FILE"
       fi
-    done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
-  fi
-else
-  # Normal entity not set to agent: use HTML <br> formatting for UI/browser notifications
-  if (( ${#SHARE_COUNTS[@]} > 0 )); then
-    notif_body_html+="<br><br>Per share summary:<br>"
-    while IFS= read -r share; do
-      notif_body_html+="• ${share}: ${SHARE_COUNTS[$share]} file(s)<br>"
-    done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
-  fi
-fi
+    fi
+
+    if [[ "$agent_active" == true ]]; then
+      if (( ${#SHARE_COUNTS[@]} > 0 )); then
+        notif_body_html+=" - Per share summary: "
+        first=true
+        while IFS= read -r share; do
+          if [[ "$first" == true ]]; then
+            notif_body_html+="${share}: ${SHARE_COUNTS[$share]} file(s)"
+            first=false
+          else
+            notif_body_html+=" - ${share}: ${SHARE_COUNTS[$share]} file(s)"
+          fi
+        done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+      fi
+    else
+      if (( ${#SHARE_COUNTS[@]} > 0 )); then
+        notif_body_html+="<br><br>Per share summary:<br>"
+        while IFS= read -r share; do
+          notif_body_html+="• ${share}: ${SHARE_COUNTS[$share]} file(s)<br>"
+        done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
+      fi
+    fi
     unraid_notify "Automover session finished" "$notif_body_html" "normal" 1
   fi
 }
@@ -394,9 +377,15 @@ fi
 # ==========================================================
 #  Log which filters are enabled
 # ==========================================================
+skipped_hidden=0
+skipped_size=0
+skipped_age=0
+skipped_exclusions=0
+
 if [[ "$MOVE_NOW" == false ]]; then
   filters_active=false
-  if [[ "$HIDDEN_FILTER" == "yes" || "$SIZE_BASED_FILTER" == "yes" || "$AGE_BASED_FILTER" == "yes" || "$EXCLUSIONS_ENABLED" == "yes" ]]; then
+  if [[ "$HIDDEN_FILTER" == "yes" || "$SIZE_BASED_FILTER" == "yes" || \
+        "$AGE_BASED_FILTER" == "yes" || "$EXCLUSIONS_ENABLED" == "yes" ]]; then
     filters_active=true
   fi
   if [[ "$filters_active" == true ]]; then
@@ -430,26 +419,14 @@ copy_empty_dirs() {
     local SRC="$1"
     local DEST="$2"
     [[ ! -d "$SRC" ]] && return
-
-    # Normalize SRC (no trailing slash)
     SRC="${SRC%/}"
-
-    # Get the share root name (last path component)
     sharename=$(basename "$SRC")
-
     find "$SRC" -type d | while read -r dir; do
-        # Skip the root source dir itself
         [[ "$dir" == "$SRC" ]] && continue
-
-        # Extra guard: never recreate the share root itself
         if [[ "$(basename "$dir")" == "$sharename" && "$dir" == "$SRC" ]]; then
             continue
         fi
-
-        # Destination directory path
         dst_dir="$DEST/${dir#$SRC/}"
-
-        # Skip if in exclusions
         skip_dir=false
         if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
             for ex in "${EXCLUDED_PATHS[@]}"; do
@@ -462,8 +439,6 @@ copy_empty_dirs() {
             done
         fi
         $skip_dir && continue
-
-        # Only create if empty
         if [[ -z "$(ls -A "$dir")" ]]; then
             mkdir -p "$dst_dir"
             chown "$src_owner:$src_group" "$dst_dir"
@@ -471,6 +446,36 @@ copy_empty_dirs() {
             echo "Created empty directory: $dst_dir" >> "$AUTOMOVER_LOG"
         fi
     done
+}
+
+insert_skip_totals() {
+  local tmpfile
+  tmpfile=$(mktemp)
+
+  {
+    [[ "$HIDDEN_FILTER" == "yes" ]] && echo "Skipped due to hidden filter: $skipped_hidden file(s)"
+    [[ "$SIZE_BASED_FILTER" == "yes" ]] && echo "Skipped due to size filter: $skipped_size file(s)"
+    [[ "$AGE_BASED_FILTER" == "yes" ]] && echo "Skipped due to age filter: $skipped_age file(s)"
+    [[ "$EXCLUSIONS_ENABLED" == "yes" ]] && echo "Skipped due to exclusions: $skipped_exclusions file(s)"
+  } > "$tmpfile"
+
+  # Try to splice totals before the first "Starting move of" line
+  awk -v insert="$(cat "$tmpfile")" '
+    BEGIN {printed=0}
+    /Starting move of/ && !printed {
+      print insert
+      printed=1
+    }
+    {print}
+    END {
+      if (!printed) {
+        # Fallback: append at the end if no "Starting move of" line was found
+        print insert
+      }
+    }
+  ' "$LAST_RUN_FILE" > "${LAST_RUN_FILE}.new" && mv "${LAST_RUN_FILE}.new" "$LAST_RUN_FILE"
+
+  rm -f "$tmpfile"
 }
 
 # ==========================================================
@@ -485,7 +490,6 @@ sent_start_notification="no"
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   [[ -f "$cfg" ]] || continue
   share_name="${cfg##*/}"; share_name="${share_name%.cfg}"
-
   use_cache=$(grep -E '^shareUseCache=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs | tr '[:upper:]' '[:lower:]')
   pool1=$(grep -E '^shareCachePool=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
   pool2=$(grep -E '^shareCachePool2=' "$cfg" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs)
@@ -510,49 +514,91 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
     continue
   fi
 
-  # Determine candidate files (alphabetically)
-  if [[ "$AGE_FILTER_ENABLED" == true || "$SIZE_FILTER_ENABLED" == true ]]; then
-    if [[ "$AGE_FILTER_ENABLED" == true && "$SIZE_FILTER_ENABLED" == true ]]; then
-      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -size +"${SIZE_MB}"M -printf '%P\n' | LC_ALL=C sort)
-    elif [[ "$AGE_FILTER_ENABLED" == true ]]; then
-      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -mtime "$MTIME_ARG" -printf '%P\n' | LC_ALL=C sort)
-    else
-      mapfile -t all_filtered_items < <(cd "$src" && find . -type f -size +"${SIZE_MB}"M -printf '%P\n' | LC_ALL=C sort)
-    fi
-  else
-    mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n' | LC_ALL=C sort)
-  fi
+# ==========================================================
+#  Collect ALL files (no filters applied yet)
+# ==========================================================
+mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n' | LC_ALL=C sort)
 
-# Build eligible list (after exclusions + in-use checks)
 eligible_items=()
 for relpath in "${all_filtered_items[@]}"; do
   [[ -z "$relpath" ]] && continue
   srcfile="$src/$relpath"
 
-  # Skip exclusions
+  #
+  # ===========================
+  # Hidden Filter
+  # ===========================
+  #
+  if [[ "$HIDDEN_FILTER" == "yes" && "$(basename "$srcfile")" == .* ]]; then
+    ((skipped_hidden++))
+    continue
+  fi
+
+  #
+  # ===========================
+  # Size Filter
+  # ===========================
+  #
+  if [[ "$SIZE_FILTER_ENABLED" == true ]]; then
+    threshold_bytes=$(( SIZE_MB * 1024 * 1024 ))
+    filesize=$(stat -c%s "$srcfile")
+    if (( filesize < threshold_bytes )); then
+      ((skipped_size++))
+      continue
+    fi
+  fi
+
+  #
+  # ===========================
+  # Age Filter
+  # ===========================
+  #
+  if [[ "$AGE_FILTER_ENABLED" == true ]]; then
+    file_mtime_days=$(( ( $(date +%s) - $(stat -c %Y "$srcfile") ) / 86400 ))
+    if (( file_mtime_days < AGE_DAYS )); then
+      ((skipped_age++))
+      continue
+    fi
+  fi
+
+  #
+  # ===========================
+  # Exclusions
+  # ===========================
+  #
   skip_file=false
   if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
     for ex in "${EXCLUDED_PATHS[@]}"; do
       [[ -d "$ex" ]] && ex="${ex%/}/"
-      if [[ "$srcfile" == "$ex"* || "$srcfile" == "$src/$ex"* ]]; then
-        skip_file=true; break
+      if [[ "$srcfile" == "$ex"* ]]; then
+        skip_file=true
+        break
       fi
     done
   fi
-  $skip_file && continue
 
-  # Skip if file in use
+  if [[ "$skip_file" == true ]]; then
+    ((skipped_exclusions++))
+    continue
+  fi
+
+  #
+  # ===========================
+  # In-use File Check
+  # ===========================
+  #
   if fuser "$srcfile" >/dev/null 2>&1; then
     grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
     continue
   fi
 
+  # Passed all filters → eligible
   eligible_items+=("$relpath")
 done
 
-file_count=${#eligible_items[@]}
-(( file_count == 0 )) && { continue; }
-echo "$src" >> /tmp/automover/automover_cleanup_sources.txt
+  file_count=${#eligible_items[@]}
+  (( file_count == 0 )) && { continue; }
+  echo "$src" >> /tmp/automover/automover_cleanup_sources.txt
 
   # ==========================================================
   #  Check for eligible files before moving (pre-move trigger)
@@ -793,6 +839,8 @@ fi
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
 
+insert_skip_totals
+
 # ==========================================================
 #  No shares had any eligible files
 # ==========================================================
@@ -871,8 +919,8 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
   elif [[ "$moved_anything" == true ]]; then
-    if [[ ! -s /tmp/automover_cleanup_sources.txt ]]; then
-      echo "No source paths recorded — skipping cleanup" >> "$LAST_RUN_FILE"
+    if [[ ! -s /tmp/automover/automover_cleanup_sources.txt ]]; then
+      echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
     else
       while IFS= read -r src_path; do
         [[ -z "$src_path" || ! -d "$src_path" ]] && continue
@@ -943,7 +991,7 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
           done
         fi
 
-      done < <(sort -u /tmp/automover_cleanup_sources.txt)
+      done < <(sort -u /tmp/automover/automover_cleanup_sources.txt)
       echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
     fi
   else
