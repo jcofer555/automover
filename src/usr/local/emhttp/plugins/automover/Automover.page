@@ -39,7 +39,8 @@ $defaults = [
     'STOP_THRESHOLD' => 0,
     'ENABLE_NOTIFICATIONS' => 'no',
     'WEBHOOK_URL' => '',
-    'MANUAL_MOVE' => 'no'
+    'MANUAL_MOVE' => 'no',
+    'STOP_ALL_CONTAINERS' => 'no'
 ];
 
 // Load existing config if present
@@ -303,14 +304,6 @@ if (file_exists("/etc/unraid-version")) {
   .checkbox-row input[type="checkbox"] {
     accent-color: var(--primary-blue);
     transform: scale(1.2);
-  }
-
-  .form-check {
-    align-items: center;
-    color: var(--primary-blue);
-    cursor: pointer;
-    display: inline-flex;
-    gap: 8px;
   }
 
   input[type="checkbox"] {
@@ -1141,6 +1134,39 @@ if (file_exists("/etc/unraid-version")) {
 #stop-button {
   border: none;
 }
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 0px;                  /* same spacing as other checkboxes */
+  cursor: pointer;
+  color: var(--primary-blue);
+}
+
+.form-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  transform: scale(1.1);     /* same enlargement as others */
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+
+.form-check label {
+  margin: 0;
+  line-height: 1.4;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--primary-blue);
+  cursor: pointer;
+}
+
+#stop_all_containers {
+  margin-left: 2px;
+  transform: scale(1.1);
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
 </style>
 
 <div id="automover-wrapper">
@@ -1286,20 +1312,32 @@ if (file_exists("/etc/unraid-version")) {
     </div>
 
     <!-- Container Names -->
-    <div class="form-pair">
-      <label for="container_names" <span
-        title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable"
-        class="automovertip">Stop Containers:</span>
-      </label>
-      <div class="input-wrapper">
-        <span
-          title="Optional: Enter a comma separated list of containers to stop during moves and start afterward. Leave blank to disable"
-          class="automovertip">
-          <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed"
-            value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
+<div class="form-pair">
+  <label for="container_names">
+    <span title="Optional: Enter a comma separated list of containers to stop during moves and start after moving finishes. Leave blank to disable" class="automovertip">
+      Stop Containers:
+    </span>
+  </label>
+  <div class="input-wrapper">
+    <span title="Optional: Enter a comma separated list of containers to stop during moves and start after moving finishes. Leave blank to disable" class="automovertip">
+    <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed"
+      value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
+    </span>
+  </div>
+</div>
+
+<div class="form-pair">
+  <div class="input-wrapper">
+    <div class="form-check">
+      <input type="checkbox" id="stop_all_containers"
+        <?php echo (($settings['STOP_ALL_CONTAINERS'] ?? 'no') === 'yes') ? 'checked' : ''; ?>>
+        <span title="Optional: Enable to stop all containers on the system that are running during moves and start only those the plugin stopped after moving finishes" class="automovertip">
+      <label for="stop_all_containers">Stop All Containers</label>
         </span>
-      </div>
     </div>
+      <label></label>
+  </div>
+</div>
 
     <!-- Age -->
     <div class="form-pair" id="age-days-container" style="display:none;">
@@ -2897,6 +2935,7 @@ fetch('/plugins/automover/helpers/stop_automover.php', {
 
     // === Save & Start ===
     saveBtn.addEventListener('click', function () {
+      const stopAll = document.getElementById('stop_all_containers').checked ? 'yes' : 'no';
       const intervalInput = document.getElementById('interval');
       const cronInput = document.getElementById('cron_expression');
       const modeSelect = document.getElementById('interval_mode');
@@ -2965,7 +3004,8 @@ fetch('/plugins/automover/helpers/stop_automover.php', {
         STOP_THRESHOLD: stopThresholdInput.value,
         ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
         WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || '',
-        MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no'
+        MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no',
+        STOP_ALL_CONTAINERS: stopAll
       });
 
       // --- Step 1: Save settings ---

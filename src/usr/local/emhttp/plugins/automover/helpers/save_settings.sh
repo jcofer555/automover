@@ -34,6 +34,7 @@ STOP_THRESHOLD="${27:-0}"
 ENABLE_NOTIFICATIONS="${28:-no}"
 WEBHOOK_URL="${29:-}"
 MANUAL_MOVE="${30:-no}"
+STOP_ALL_CONTAINERS="${31:-no}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -79,6 +80,7 @@ fi
   echo "ENABLE_NOTIFICATIONS=\"$ENABLE_NOTIFICATIONS\""
   echo "WEBHOOK_URL=\"$WEBHOOK_URL\""
   echo "MANUAL_MOVE=\"$MANUAL_MOVE\""
+  echo "STOP_ALL_CONTAINERS=\"$STOP_ALL_CONTAINERS\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

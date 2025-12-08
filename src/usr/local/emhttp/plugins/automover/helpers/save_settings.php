@@ -36,6 +36,7 @@ $args = [
     $_GET['ENABLE_NOTIFICATIONS'] ?? '',
     $_GET['WEBHOOK_URL'] ?? '',
     $_GET['MANUAL_MOVE'] ?? '',
+    $_GET['STOP_ALL_CONTAINERS'] ?? '',
 ];
 
 // Escape each argument for safety

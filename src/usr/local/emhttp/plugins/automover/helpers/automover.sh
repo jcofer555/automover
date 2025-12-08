@@ -5,16 +5,17 @@ CFG_PATH="/boot/config/plugins/automover/settings.cfg"
 AUTOMOVER_LOG="/tmp/automover/automover_files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
 IN_USE_FILE="/tmp/automover/automover_in_use_files.txt"
-STATUS_FILE="/tmp/automover/automover_status.txt"
-MOVED_SHARES_FILE="/tmp/automover/automover_moved_shares.txt"
+STATUS_FILE="/tmp/automover/temp_logs/automover_status.txt"
+MOVED_SHARES_FILE="/tmp/automover/temp_logs/automover_moved_shares.txt"
+STOP_FILE="/tmp/automover/temp_logs/automover_stopped_containers.txt"
 
 # ==========================================================
 #  Setup directories and lock
 # ==========================================================
-mkdir -p /tmp/automover
+mkdir -p /tmp/automover/temp_logs
 LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
-> /tmp/automover/automover_cleanup_sources.txt
+> /tmp/automover/temp_logs/automover_cleanup_sources.txt
 
 # ==========================================================
 #  Unraid notifications helper
@@ -172,6 +173,74 @@ Per share summary:"
   fi
 }
 
+manage_containers() {
+  local action="$1"
+  local STOP_FILE="/tmp/automover/temp_logs/automover_stopped_containers.txt"
+  mkdir -p /tmp/automover/temp_logs
+
+  if [[ "$STOP_ALL_CONTAINERS" == "yes" && "$DRY_RUN" != "yes" ]]; then
+    if [[ "$action" == "stop" ]]; then
+      set_status "Stopping all docker containers"
+      echo "Stopping all docker containers" >> "$LAST_RUN_FILE"
+      : > "$STOP_FILE"
+      for cid in $(docker ps -q); do
+        cname=$(docker inspect --format='{{.Name}}' "$cid" | sed 's#^/##')
+        if docker stop "$cid" >/dev/null 2>&1; then
+          echo "Stopped container: $cname" >> "$LAST_RUN_FILE"
+          echo "$cname" >> "$STOP_FILE"
+        else
+          echo "❌ Failed to stop container: $cname" >> "$LAST_RUN_FILE"
+        fi
+      done
+      containers_stopped=true
+
+    elif [[ "$action" == "start" && "$containers_stopped" == true ]]; then
+      set_status "Starting docker containers that automover stopped"
+      echo "Starting docker containers that automoved stopped" >> "$LAST_RUN_FILE"
+      if [[ -f "$STOP_FILE" ]]; then
+        while read -r cname; do
+          if docker start "$cname" >/dev/null 2>&1; then
+            echo "Started container: $cname" >> "$LAST_RUN_FILE"
+          else
+            echo "❌ Failed to start container: $cname" >> "$LAST_RUN_FILE"
+          fi
+        done < "$STOP_FILE"
+        rm -f "$STOP_FILE"
+      fi
+    fi
+
+  elif [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" ]]; then
+    IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
+    for container in "${CONTAINERS[@]}"; do
+      container=$(echo "$container" | xargs)
+      [[ -z "$container" ]] && continue
+
+      if [[ "$action" == "stop" ]]; then
+        set_status "Stopping container: $container"
+        : > "$STOP_FILE"
+        if docker stop "$container" >/dev/null 2>&1; then
+          echo "Stopped container: $container" >> "$LAST_RUN_FILE"
+          echo "$container" >> "$STOP_FILE"
+        else
+          echo "❌ Failed to stop container: $container" >> "$LAST_RUN_FILE"
+        fi
+        containers_stopped=true
+
+      elif [[ "$action" == "start" && "$containers_stopped" == true ]]; then
+        set_status "Starting container: $container"
+        if [[ -f "$STOP_FILE" ]] && grep -qw "$container" "$STOP_FILE"; then
+          if docker start "$container" >/dev/null 2>&1; then
+            echo "Started container: $container" >> "$LAST_RUN_FILE"
+          else
+            echo "❌ Failed to start container: $container" >> "$LAST_RUN_FILE"
+          fi
+        fi
+      fi
+    done
+    [[ -f "$STOP_FILE" ]] && rm -f "$STOP_FILE"
+  fi
+}
+
 # ==========================================================
 #  Cleanup
 # ==========================================================
@@ -182,7 +251,7 @@ cleanup() {
 }
 trap 'cleanup 0' SIGINT SIGTERM SIGHUP SIGQUIT
 
-rm -f /tmp/automover/automover_done.txt
+rm -f /tmp/automover/temp_logs/automover_done.txt
 > "$MOVED_SHARES_FILE"
 
 # ==========================================================
@@ -192,14 +261,15 @@ run_qbit_script() {
   local action="$1"
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
   local paused_file="/tmp/automover/automover_qbittorrent_paused.txt"
-  local tmp_out
+  local tmp_out="/tmp/automover/temp_logs/automover_qbittorrent_parser.txt"
+
+  # make sure temp_logs dir exists
+  mkdir -p /tmp/automover/temp_logs
 
   # reset paused file
   > "$paused_file"
 
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
-
-  tmp_out="$(mktemp)"
 
   # Capture full output into tmp_out AND apply filtered grep to LAST_RUN_FILE
   python3 "$python_script" \
@@ -216,7 +286,11 @@ run_qbit_script() {
 
   # Extract paused torrents cleanly from tmp_out
   grep "Pausing:" "$tmp_out" \
-    | sed -E 's/.*Pausing:\s*//; s/\s*\[[0-9]+\]$//' \
+    | sed -E 's/.*Pausing:\s*//; s/\s*
+
+\[[0-9]+\]
+
+$//' \
     >> "$paused_file"
 
   rm -f "$tmp_out"
@@ -268,7 +342,7 @@ for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
            QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
            FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP \
-           MODE CRON_EXPRESSION STOP_THRESHOLD ENABLE_NOTIFICATIONS; do
+           MODE CRON_EXPRESSION STOP_THRESHOLD ENABLE_NOTIFICATIONS STOP_ALL_CONTAINERS; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -568,7 +642,7 @@ done
 
   file_count=${#eligible_items[@]}
   (( file_count == 0 )) && { continue; }
-  echo "$src" >> /tmp/automover/automover_cleanup_sources.txt
+  echo "$src" >> /tmp/automover/temp_logs/automover_cleanup_sources.txt
 
   # ==========================================================
   #  Check for eligible files before moving (pre-move trigger)
@@ -704,17 +778,7 @@ fi
       turbo_write_enabled=true
     fi
     # --- Stop managed containers ---
-    if [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" ]]; then
-      set_status "Stopping Containers"
-      IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-      for container in "${CONTAINERS[@]}"; do
-        container=$(echo "$container" | xargs)
-        [[ -z "$container" ]] && continue
-        echo "Stopping Docker container: $container" >> "$LAST_RUN_FILE"
-        docker stop "$container" || echo "Failed to stop container: $container" >> "$LAST_RUN_FILE"
-      done
-      containers_stopped=true
-    fi
+manage_containers stop
 
 # --- qBittorrent dependency check + pause ---
 if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && "$skip_qbit_script" == false ]]; then
@@ -739,8 +803,15 @@ pre_move_done="yes"
   echo "Starting move of $file_count file(s) for share: $share_name" >> "$LAST_RUN_FILE"
   set_status "Moving Files For Share: $share_name"
 
-tmpfile=$(mktemp)
+# ensure directory exists
+mkdir -p /tmp/automover/temp_logs
+
+# use fixed path instead of mktemp
+tmpfile="/tmp/automover/temp_logs/automover_eligible_files.txt"
+
+# write eligible items into the file
 printf '%s\n' "${eligible_items[@]}" > "$tmpfile"
+
 file_count_moved=0
 src_owner=$(stat -c "%u" "$src")
 src_group=$(stat -c "%g" "$src")
@@ -879,16 +950,7 @@ fi
 # ==========================================================
 #  Start managed containers
 # ==========================================================
-if [[ "$containers_stopped" == true && -n "$CONTAINER_NAMES" ]]; then
-  set_status "Starting Containers"
-  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-  for container in "${CONTAINERS[@]}"; do
-    container=$(echo "$container" | xargs)
-    [[ -z "$container" ]] && continue
-    echo "Starting Docker container: $container" >> "$LAST_RUN_FILE"
-    docker start "$container" || echo "Failed to start container: $container" >> "$LAST_RUN_FILE"
-  done
-fi
+manage_containers start
 
 # ==========================================================
 #  Finished move process
@@ -905,7 +967,7 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
   elif [[ "$moved_anything" == true ]]; then
-    if [[ ! -s /tmp/automover/automover_cleanup_sources.txt ]]; then
+    if [[ ! -s /tmp/automover/temp_logs/automover_cleanup_sources.txt ]]; then
       echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
     else
       while IFS= read -r src_path; do
@@ -977,7 +1039,7 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
           done
         fi
 
-      done < <(sort -u /tmp/automover/automover_cleanup_sources.txt)
+      done < <(sort -u /tmp/automover/temp_logs/automover_cleanup_sources.txt)
       echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
     fi
   else
@@ -990,8 +1052,9 @@ fi
 # ==========================================================
 if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == true ]]; then
   set_status "Running Jdupes"
+  mkdir -p /tmp/automover/temp_logs
   if command -v jdupes >/dev/null 2>&1; then
-    TEMP_LIST="/tmp/automover_jdupes_list.txt"
+    TEMP_LIST="/tmp/automover/temp_logs/automover_jdupes_list.txt"
     HASH_DIR="$HASH_PATH"
     HASH_DB="${HASH_DIR}/jdupes_hash_database.db"
 
@@ -1129,8 +1192,8 @@ fi
 # ==========================================================
 send_summary_notification
 log_session_end
-mkdir -p /tmp/automover
-echo "done" > /tmp/automover/automover_done.txt
+mkdir -p /tmp/automover/temp_logs
+echo "done" > /tmp/automover/temp_logs/automover_done.txt
 
 # Reset status and release lock
 set_status "$PREV_STATUS"
