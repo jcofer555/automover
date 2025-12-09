@@ -173,6 +173,11 @@ Per share summary:"
   fi
 }
 
+# ==========================================================
+#  Manage containers (stop/start)
+# ==========================================================
+containers_stopped=false
+
 manage_containers() {
   local action="$1"
   local STOP_FILE="/tmp/automover/temp_logs/automover_stopped_containers.txt"
@@ -196,9 +201,10 @@ manage_containers() {
 
     elif [[ "$action" == "start" && "$containers_stopped" == true ]]; then
       set_status "Starting docker containers that automover stopped"
-      echo "Starting docker containers that automoved stopped" >> "$LAST_RUN_FILE"
+      echo "Starting docker containers that automover stopped" >> "$LAST_RUN_FILE"
       if [[ -f "$STOP_FILE" ]]; then
         while read -r cname; do
+          [[ -z "$cname" ]] && continue
           if docker start "$cname" >/dev/null 2>&1; then
             echo "Started container: $cname" >> "$LAST_RUN_FILE"
           else
@@ -211,33 +217,35 @@ manage_containers() {
 
   elif [[ -n "$CONTAINER_NAMES" && "$DRY_RUN" != "yes" ]]; then
     IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-    for container in "${CONTAINERS[@]}"; do
-      container=$(echo "$container" | xargs)
-      [[ -z "$container" ]] && continue
-
-      if [[ "$action" == "stop" ]]; then
-        set_status "Stopping container: $container"
-        : > "$STOP_FILE"
+    if [[ "$action" == "stop" ]]; then
+      set_status "Stopping selected containers"
+      : > "$STOP_FILE"
+      for container in "${CONTAINERS[@]}"; do
+        container=$(echo "$container" | xargs)
+        [[ -z "$container" ]] && continue
         if docker stop "$container" >/dev/null 2>&1; then
           echo "Stopped container: $container" >> "$LAST_RUN_FILE"
           echo "$container" >> "$STOP_FILE"
         else
           echo "❌ Failed to stop container: $container" >> "$LAST_RUN_FILE"
         fi
-        containers_stopped=true
+      done
+      containers_stopped=true
 
-      elif [[ "$action" == "start" && "$containers_stopped" == true ]]; then
-        set_status "Starting container: $container"
-        if [[ -f "$STOP_FILE" ]] && grep -qw "$container" "$STOP_FILE"; then
+    elif [[ "$action" == "start" && "$containers_stopped" == true ]]; then
+      set_status "Starting selected containers"
+      if [[ -f "$STOP_FILE" ]]; then
+        while read -r container; do
+          [[ -z "$container" ]] && continue
           if docker start "$container" >/dev/null 2>&1; then
             echo "Started container: $container" >> "$LAST_RUN_FILE"
           else
             echo "❌ Failed to start container: $container" >> "$LAST_RUN_FILE"
           fi
-        fi
+        done < "$STOP_FILE"
+        rm -f "$STOP_FILE"
       fi
-    done
-    [[ -f "$STOP_FILE" ]] && rm -f "$STOP_FILE"
+    fi
   fi
 }
 
