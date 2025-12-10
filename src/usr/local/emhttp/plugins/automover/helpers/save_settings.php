@@ -38,6 +38,9 @@ $args = [
     $_GET['MANUAL_MOVE'] ?? '',
     $_GET['STOP_ALL_CONTAINERS'] ?? '',
     $_GET['ENABLE_TRIM'] ?? '',
+    $_GET['ENABLE_SCRIPTS'] ?? '',
+    $_GET['PRE_SCRIPT'] ?? '',
+    $_GET['POST_SCRIPT'] ?? '',
 ];
 
 // Escape each argument for safety

@@ -41,7 +41,10 @@ $defaults = [
     'WEBHOOK_URL' => '',
     'MANUAL_MOVE' => 'no',
     'STOP_ALL_CONTAINERS' => 'no',
-    'ENABLE_TRIM' => 'no'
+    'ENABLE_TRIM' => 'no',
+    'ENABLE_SCRIPTS' => 'no',
+    'PRE_SCRIPT' => '',
+    'POST_SCRIPT' => ''
 ];
 
 // Load existing config if present
@@ -197,7 +200,7 @@ if (file_exists("/etc/unraid-version")) {
     flex-basis: 22%;
   }
 
-.unraid-71 #automover-settings {
+  .unraid-71 #automover-settings {
     min-height: 77vh;
     max-height: 77vh;
     overflow-y: auto;
@@ -1104,70 +1107,72 @@ if (file_exists("/etc/unraid-version")) {
     animation: manualShake .35s ease;
   }
 
-#exclusion-view-modal .modal-body {
+  #exclusion-view-modal .modal-body {
     display: flex;
     flex-direction: column;
     padding-right: 18px !important;
-}
+  }
 
-#exclusion-view-modal p {
+  #exclusion-view-modal p {
     width: 100% !important;
     max-width: 100% !important;
     margin-right: 0 !important;
-}
+  }
 
-#exclusionsEditor {
+  #exclusionsEditor {
     width: 100% !important;
     margin-right: 0 !important;
     padding-right: 8px;
-}
+  }
 
-#exclusion-view-modal .footer {
+  #exclusion-view-modal .footer {
     display: flex;
     justify-content: flex-end !important;
     margin-top: 10px;
-}
+  }
 
-#exclusion-view-modal .footer > div:first-child {
+  #exclusion-view-modal .footer>div:first-child {
     margin-right: auto;
-}
+  }
 
-#stop-button {
-  border: none;
-}
+  #stop-button {
+    border: none;
+  }
 
-.form-check {
-  display: flex;
-  align-items: center;
-  gap: 0px;                  /* same spacing as other checkboxes */
-  cursor: pointer;
-  color: var(--primary-blue);
-}
+  .form-check {
+    display: flex;
+    align-items: center;
+    gap: 0px;
+    /* same spacing as other checkboxes */
+    cursor: pointer;
+    color: var(--primary-blue);
+  }
 
-.form-check input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  transform: scale(1.1);     /* same enlargement as others */
-  accent-color: var(--primary-blue);
-  cursor: pointer;
-}
+  .form-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    transform: scale(1.1);
+    /* same enlargement as others */
+    accent-color: var(--primary-blue);
+    cursor: pointer;
+  }
 
-.form-check label {
-  margin: 0;
-  line-height: 1.4;
-  font-size: 14px;
-  font-weight: bold;
-  color: var(--primary-blue);
-  cursor: pointer;
-}
+  .form-check label {
+    margin: 0;
+    line-height: 1.4;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--primary-blue);
+    cursor: pointer;
+  }
 
-#stop_all_containers {
-  margin-left: 2px;
-  transform: scale(1.1);
-  width: 16px;
-  height: 16px;
-  vertical-align: middle;
-}
+  #stop_all_containers {
+    margin-left: 2px;
+    transform: scale(1.1);
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+  }
 </style>
 
 <div id="automover-wrapper">
@@ -1283,12 +1288,14 @@ if (file_exists("/etc/unraid-version")) {
     <div class="form-pair" id="cron-expression-row"
       style="<?php echo (($settings['MODE'] ?? 'minutes') === 'cron') ? '' : 'display:none;'; ?>">
       <label for="cron_expression">
-        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help" class="automovertip">
+        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help"
+          class="automovertip">
           Cron Expression:
         </span>
       </label>
       <div class="input-wrapper">
-        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help" class="automovertip">
+        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help"
+          class="automovertip">
           <input type="text" id="cron_expression" class="short-input" placeholder="e.g. 0 3 * * *"
             value="<?php echo htmlspecialchars($settings['CRON_EXPRESSION'] ?? ''); ?>">
         </span>
@@ -1313,32 +1320,38 @@ if (file_exists("/etc/unraid-version")) {
     </div>
 
     <!-- Container Names -->
-<div class="form-pair">
-  <label for="container_names">
-    <span title="Optional: Enter a comma separated list of containers to stop during moves and start after moving finishes. Leave blank to disable" class="automovertip">
-      Stop Containers:
-    </span>
-  </label>
-  <div class="input-wrapper">
-    <span title="Optional: Enter a comma separated list of containers to stop during moves and start after moving finishes. Leave blank to disable" class="automovertip">
-    <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed"
-      value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
-    </span>
-  </div>
-</div>
-
-<div class="form-pair">
-  <div class="input-wrapper">
-    <div class="form-check">
-      <input type="checkbox" id="stop_all_containers"
-        <?php echo (($settings['STOP_ALL_CONTAINERS'] ?? 'no') === 'yes') ? 'checked' : ''; ?>>
-        <span title="Optional: Enable to stop all containers on the system that are running during moves and start only those the plugin stopped after moving finishes" class="automovertip">
-      <label for="stop_all_containers">Stop All Containers</label>
+    <div class="form-pair">
+      <label for="container_names">
+        <span
+          title="Optional: Enter a comma separated list of containers to stop during moves and start after moving finishes. Leave blank to disable"
+          class="automovertip">
+          Stop Containers:
         </span>
+      </label>
+      <div class="input-wrapper">
+        <span
+          title="Optional: Enter a comma separated list of containers to stop during moves and start after moving finishes. Leave blank to disable"
+          class="automovertip">
+          <input type="text" id="container_names" placeholder="e.g. qbit-manage,cross-seed"
+            value="<?php echo htmlspecialchars($settings['CONTAINER_NAMES'] ?? '') ?>">
+        </span>
+      </div>
     </div>
-      <label></label>
-  </div>
-</div>
+
+    <div class="form-pair">
+      <div class="input-wrapper">
+        <div class="form-check">
+          <input type="checkbox" id="stop_all_containers" <?php echo (($settings['STOP_ALL_CONTAINERS'] ?? 'no'
+            )==='yes' ) ? 'checked' : '' ; ?>>
+          <span
+            title="Optional: Enable to stop all containers on the system that are running during moves and start only those the plugin stopped after moving finishes"
+            class="automovertip">
+            <label for="stop_all_containers">Stop All Containers</label>
+          </span>
+        </div>
+        <label></label>
+      </div>
+    </div>
 
     <!-- Age -->
     <div class="form-pair" id="age-days-container" style="display:none;">
@@ -1512,7 +1525,9 @@ if (file_exists("/etc/unraid-version")) {
   width:600px; min-width: fit-content; max-width: 100%; height:600px; min-height: fit-content; max-height: 100%; overflow:hidden; display:flex; flex-direction:column;">
         <h3 style="margin-top:0;">View/Edit Exclusions</h3>
         <p style="margin-top:4px; margin-bottom:10px; color:#aaa; font-style:italic; font-size:13px;">
-          * Only paths to pool disks will work. Can do individual files or full directory paths for example /mnt/cache/data/test.txt or /mnt/cache/data. <br> Do not use array disk paths like /mnt/disk1 or /mnt/user or /mnt/user0 paths
+          * Only paths to pool disks will work. Can do individual files or full directory paths for example
+          /mnt/cache/data/test.txt or /mnt/cache/data. <br> Do not use array disk paths like /mnt/disk1 or /mnt/user or
+          /mnt/user0 paths
         </p>
 
         <textarea id="exclusionsEditor" style="
@@ -1557,6 +1572,36 @@ if (file_exists("/etc/unraid-version")) {
   box-shadow:0 0 6px rgba(0,0,0,0.4);
 ">Close</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Pre Script Path -->
+    <div class="form-pair" id="pre-script-row" style="display:none;">
+      <label for="pre_script">
+        <span title="Script to run at the beginning of every session" class="automovertip">
+          Pre-Move Script:
+        </span>
+      </label>
+      <div class="input-wrapper">
+        <span title="Script to run at the beginning of every session" class="automovertip">
+          <input type="text" id="pre_script" placeholder="/mnt/user/scripts/pre_move.sh"
+            value="<?php echo htmlspecialchars($settings['PRE_SCRIPT'] ?? ''); ?>">
+        </span>
+      </div>
+    </div>
+
+    <!-- Post Script Path -->
+    <div class="form-pair" id="post-script-row" style="display:none;">
+      <label for="post_script">
+        <span title="Script to run at the end of the session regardless if anything moves or not" class="automovertip">
+          Post-Move Script:
+        </span>
+      </label>
+      <div class="input-wrapper">
+        <span title="Script to run at the end of the session regardless if anything moves or not" class="automovertip">
+          <input type="text" id="post_script" placeholder="/mnt/user/scripts/post_move.sh"
+            value="<?php echo htmlspecialchars($settings['POST_SCRIPT'] ?? ''); ?>">
+        </span>
       </div>
     </div>
 
@@ -1649,19 +1694,27 @@ if (file_exists("/etc/unraid-version")) {
         </label>
       </span>
 
-      <span title="Enable to show a manual move section below" class="automovertip">
+      <span title="Enable running a session start and session end script which runs regardless of filters enabled" class="automovertip">
         <label>
-          <input type="checkbox" id="manual_move_toggle" <?php echo ($settings['MANUAL_MOVE'] ?? 'no' )==='yes'
-            ? 'checked' : '' ; ?>>
-          Manual Move
+          <input type="checkbox" id="enable_scripts" name="ENABLE_SCRIPTS" <?php echo (($settings['ENABLE_SCRIPTS']
+            ?? 'no' )==='yes' ) ? 'checked' : '' ; ?>>
+          Enable Pre/Post Scripts
         </label>
       </span>
 
       <span title="Enable ssd trim to run after the move completes" class="automovertip">
         <label>
-          <input type="checkbox" id="enable_trim_toggle" name="ENABLE_TRIM"
-            <?php echo (($settings['ENABLE_TRIM'] ?? 'no') === 'yes') ? 'checked' : ''; ?>>
-          Enable Ssd Trim
+          <input type="checkbox" id="enable_trim_toggle" name="ENABLE_TRIM" <?php echo (($settings['ENABLE_TRIM']
+            ?? 'no' )==='yes' ) ? 'checked' : '' ; ?>>
+          Enable SSD Trim
+        </label>
+      </span>
+
+      <span title="Enable to show a manual move section below" class="automovertip">
+        <label>
+          <input type="checkbox" id="manual_move_toggle" <?php echo ($settings['MANUAL_MOVE'] ?? 'no' )==='yes'
+            ? 'checked' : '' ; ?>>
+          Manual Move
         </label>
       </span>
     </div>
@@ -1815,7 +1868,8 @@ if (file_exists("/etc/unraid-version")) {
     </div>
 
     <div style="margin-top:4px; max-width: 360px; color:#aaa; font-size:12px;">
-      <div>*Only dry run, enable cleanup, and enable notifications from above options are used and all others are ignored</div>
+      <div>*Only dry run, enable cleanup, and enable notifications from above options are used and all others are
+        ignored</div>
     </div>
 
     <span title="Starts the manual rsync process" class="automovertip">
@@ -1883,44 +1937,36 @@ if (file_exists("/etc/unraid-version")) {
             padding: 8px 12px;
         "></div>
 
-<!-- FOOTER (Row 1 + Row 2) -->
-<div style="padding:1px;">
+    <!-- FOOTER (Row 1 + Row 2) -->
+    <div style="padding:1px;">
 
-  <!-- ROW 1: Create Folder (left) + Add / Clear (right) -->
-  <div style="display:flex; justify-content:space-between; align-items:center;">
+      <!-- ROW 1: Create Folder (left) + Add / Clear (right) -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
 
-    <!-- Left -->
-    <button id="picker-create-folder" class="button button-primary">
-      Create Folder
-    </button>
+        <!-- Left -->
+        <button id="picker-create-folder" class="button button-primary">
+          Create Folder
+        </button>
 
-    <!-- Right -->
-    <div>
-      <button id="picker-clear" class="button">Clear Selected</button>
-      <button id="picker-add" class="button button-primary">Add Selected</button>
-    </div>
+        <!-- Right -->
+        <div>
+          <button id="picker-clear" class="button">Clear Selected</button>
+          <button id="picker-add" class="button button-primary">Add Selected</button>
+        </div>
 
-  </div>
+      </div>
 
-  <!-- ROW 2 (hidden unless creating folder) -->
-<div id="picker-newfolder-row"
-     style="display:none; margin-top:10px; align-items:center; gap:8px;">
+      <!-- ROW 2 (hidden unless creating folder) -->
+      <div id="picker-newfolder-row" style="display:none; margin-top:10px; align-items:center; gap:8px;">
 
-    <input id="picker-newfolder-input"
-           type="text"
-           placeholder="New folder name"
-           style="background:#000; color:#fff; border:1px solid var(--primary-blue);
+        <input id="picker-newfolder-input" type="text" placeholder="New folder name" style="background:#000; color:#fff; border:1px solid var(--primary-blue);
                   padding:6px 8px; border-radius:6px; width:200px;">
 
-    <button id="picker-newfolder-confirm"
-            class="button button-primary"
-            style="padding:6px 10px;">Create</button>
+        <button id="picker-newfolder-confirm" class="button button-primary" style="padding:6px 10px;">Create</button>
 
-    <button id="picker-newfolder-cancel"
-            class="button"
-            style="padding:6px 10px;">Cancel</button>
-  </div>
-</div>
+        <button id="picker-newfolder-cancel" class="button" style="padding:6px 10px;">Cancel</button>
+      </div>
+    </div>
 
   </div>
 </div>
@@ -2226,6 +2272,22 @@ if (file_exists("/etc/unraid-version")) {
     qbitCheckbox.addEventListener('change', toggleQbitFields);
     toggleQbitFields();
 
+    // === PRE/POST SCRIPT FIELDS TOGGLE ===
+    const enableScripts = document.getElementById("enable_scripts");
+    const preRow = document.getElementById("pre-script-row");
+    const postRow = document.getElementById("post-script-row");
+
+    function updateScriptVisibility() {
+      if (!enableScripts || !preRow || !postRow) return;
+
+      const show = enableScripts.checked;
+      preRow.style.display = show ? "flex" : "none";
+      postRow.style.display = show ? "flex" : "none";
+    }
+
+    enableScripts?.addEventListener("change", updateScriptVisibility);
+    updateScriptVisibility();
+
     // --- element refs
     const viewBtn = document.getElementById('viewExclusionsBtn');
     const viewModal = document.getElementById('exclusion-view-modal');
@@ -2424,39 +2486,39 @@ if (file_exists("/etc/unraid-version")) {
       messageBox.innerHTML = '';
       messageBox.style.display = 'none';
 
-fetch('/plugins/automover/helpers/stop_automover.php', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'csrf_token=' + encodeURIComponent(csrf_token)
-})
-.then(res => res.json())
-.then(() => {
-    // Also stop cron schedule (optional but recommended)
-    return fetch('/plugins/automover/helpers/stop_cron.php', {
-        method: 'GET',
-        credentials: 'same-origin'
-    });
-})
-.then(() => {
-    updateStatus();
-    updatePoolUsage();
+      fetch('/plugins/automover/helpers/stop_automover.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'csrf_token=' + encodeURIComponent(csrf_token)
+      })
+        .then(res => res.json())
+        .then(() => {
+          // Also stop cron schedule (optional but recommended)
+          return fetch('/plugins/automover/helpers/stop_cron.php', {
+            method: 'GET',
+            credentials: 'same-origin'
+          });
+        })
+        .then(() => {
+          updateStatus();
+          updatePoolUsage();
 
-    stopBadge.style.display = 'inline-block';
-    stopBadge.style.opacity = '0';
-    stopBadge.style.animation = 'none';
-    void stopBadge.offsetWidth;
-    stopBadge.style.animation = 'flash .4s ease';
-    stopBadge.style.opacity = '1';
+          stopBadge.style.display = 'inline-block';
+          stopBadge.style.opacity = '0';
+          stopBadge.style.animation = 'none';
+          void stopBadge.offsetWidth;
+          stopBadge.style.animation = 'flash .4s ease';
+          stopBadge.style.opacity = '1';
 
-    setTimeout(() => {
-        stopBadge.style.opacity = '0';
-        stopBadge.style.display = 'none';
-    }, 3000);
-})
-.catch(() => {
-    document.getElementById('status-text').textContent = 'Error stopping automover';
-});
+          setTimeout(() => {
+            stopBadge.style.opacity = '0';
+            stopBadge.style.display = 'none';
+          }, 3000);
+        })
+        .catch(() => {
+          document.getElementById('status-text').textContent = 'Error stopping automover';
+        });
     });
 
     // Validation
@@ -3016,6 +3078,9 @@ fetch('/plugins/automover/helpers/stop_automover.php', {
         MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no',
         STOP_ALL_CONTAINERS: stopAll,
         ENABLE_TRIM: document.getElementById('enable_trim_toggle').checked ? 'yes' : 'no',
+        ENABLE_SCRIPTS: document.getElementById('enable_scripts').checked ? 'yes' : 'no',
+        PRE_SCRIPT: document.getElementById('pre_script').value.trim(),
+        POST_SCRIPT: document.getElementById('post_script').value.trim(),
       });
 
       // --- Step 1: Save settings ---
@@ -3231,88 +3296,88 @@ fetch('/plugins/automover/helpers/stop_automover.php', {
     }
   }
 
-// ==============================
-// MANUAL MOVE INITIALIZER
-// ==============================
-if (!window.manualMoveInit) {
-  window.manualMoveInit = true;
+  // ==============================
+  // MANUAL MOVE INITIALIZER
+  // ==============================
+  if (!window.manualMoveInit) {
+    window.manualMoveInit = true;
 
-  // Toggle block visibility
-  const manualToggle = document.getElementById("manual_move_toggle");
-  const manualSection = document.getElementById("manual-move-section");
+    // Toggle block visibility
+    const manualToggle = document.getElementById("manual_move_toggle");
+    const manualSection = document.getElementById("manual-move-section");
 
-  manualToggle.addEventListener("change", () => {
-    manualSection.style.display = manualToggle.checked ? "block" : "none";
-  });
-
-  // Start Manual Rsync
-  document.getElementById("start-manual-rsync").addEventListener("click", () => {
-    // Immediately disable Automover buttons when manual move starts
-    ['save-settings', 'moveNowBtn'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.disabled = true;
-        el.style.opacity = '0.5';
-        el.style.cursor = 'not-allowed';
-      }
+    manualToggle.addEventListener("change", () => {
+      manualSection.style.display = manualToggle.checked ? "block" : "none";
     });
 
-    const src = document.getElementById("manual_source").value.trim();
-    const dst = document.getElementById("manual_dest").value.trim();
-
-    const modeCopy = document.getElementById("manual_copy").checked;
-    const modeDelete = document.getElementById("manual_delete").checked;
-    const modeFull = document.getElementById("manual_fullsync").checked;
-
-    if (!src || !dst) {
-      safeToast("Source and Destination are required.", "err");
-      return;
-    }
-
-    if (![modeCopy, modeDelete, modeFull].includes(true)) {
-      safeToast("Select one rsync mode.", "err");
-      return;
-    }
-
-    // Show confirmation toast
-    const badge = document.getElementById("manual-move-confirmation");
-    badge.style.display = "block";
-    badge.style.opacity = "1";
-    setTimeout(() => {
-      badge.style.opacity = "0";
-      setTimeout(() => (badge.style.display = "none"), 500);
-    }, 2500);
-
-    // Build params
-    const params = new URLSearchParams();
-    params.append("csrf_token", csrfToken);
-    params.append("source", src);
-    params.append("dest", dst);
-    params.append("copy", modeCopy ? "1" : "0");
-    params.append("delete", modeDelete ? "1" : "0");
-    params.append("fullsync", modeFull ? "1" : "0");
-
-    // Fire off request in background
-    fetch("/plugins/automover/helpers/manual_rsync.php", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-CSRF-TOKEN": csrfToken
-      },
-      body: params.toString()
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (!data.ok) {
-          // Optional: show error toast if backend fails
-          safeToast("Manual move failed.", "err");
+    // Start Manual Rsync
+    document.getElementById("start-manual-rsync").addEventListener("click", () => {
+      // Immediately disable Automover buttons when manual move starts
+      ['save-settings', 'moveNowBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.disabled = true;
+          el.style.opacity = '0.5';
+          el.style.cursor = 'not-allowed';
         }
-      })
-      .catch(() => {
-        safeToast("Manual move request error.", "err");
       });
-  });
-}
+
+      const src = document.getElementById("manual_source").value.trim();
+      const dst = document.getElementById("manual_dest").value.trim();
+
+      const modeCopy = document.getElementById("manual_copy").checked;
+      const modeDelete = document.getElementById("manual_delete").checked;
+      const modeFull = document.getElementById("manual_fullsync").checked;
+
+      if (!src || !dst) {
+        safeToast("Source and Destination are required.", "err");
+        return;
+      }
+
+      if (![modeCopy, modeDelete, modeFull].includes(true)) {
+        safeToast("Select one rsync mode.", "err");
+        return;
+      }
+
+      // Show confirmation toast
+      const badge = document.getElementById("manual-move-confirmation");
+      badge.style.display = "block";
+      badge.style.opacity = "1";
+      setTimeout(() => {
+        badge.style.opacity = "0";
+        setTimeout(() => (badge.style.display = "none"), 500);
+      }, 2500);
+
+      // Build params
+      const params = new URLSearchParams();
+      params.append("csrf_token", csrfToken);
+      params.append("source", src);
+      params.append("dest", dst);
+      params.append("copy", modeCopy ? "1" : "0");
+      params.append("delete", modeDelete ? "1" : "0");
+      params.append("fullsync", modeFull ? "1" : "0");
+
+      // Fire off request in background
+      fetch("/plugins/automover/helpers/manual_rsync.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRF-TOKEN": csrfToken
+        },
+        body: params.toString()
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.ok) {
+            // Optional: show error toast if backend fails
+            safeToast("Manual move failed.", "err");
+          }
+        })
+        .catch(() => {
+          safeToast("Manual move request error.", "err");
+        });
+    });
+  }
 
   // ==========================
   // Picker state
@@ -3758,23 +3823,23 @@ if (!window.manualMoveInit) {
 </script>
 <?php endif; ?>
 <script>
-const UNRAID_VERSION = "<?= $unraid_version ?>";
-console.log("Detected via PHP:", UNRAID_VERSION);
+  const UNRAID_VERSION = "<?= $unraid_version ?>";
+  console.log("Detected via PHP:", UNRAID_VERSION);
 
-const major = parseFloat(UNRAID_VERSION);
+  const major = parseFloat(UNRAID_VERSION);
 
-if (!isNaN(major) && major >= 7.2) {
+  if (!isNaN(major) && major >= 7.2) {
     document.body.classList.add("unraid-72");
-} else {
+  } else {
     document.body.classList.add("unraid-71");
-}
+  }
 </script>
 <script>
-  const pickerCreateBtn  = document.getElementById("picker-create-folder");
-  const newFolderRow     = document.getElementById("picker-newfolder-row");
-  const newFolderInput   = document.getElementById("picker-newfolder-input");
+  const pickerCreateBtn = document.getElementById("picker-create-folder");
+  const newFolderRow = document.getElementById("picker-newfolder-row");
+  const newFolderInput = document.getElementById("picker-newfolder-input");
   const newFolderConfirm = document.getElementById("picker-newfolder-confirm");
-  const newFolderCancel  = document.getElementById("picker-newfolder-cancel");
+  const newFolderCancel = document.getElementById("picker-newfolder-cancel");
 
   // Show name input row
   pickerCreateBtn.addEventListener("click", () => {
@@ -3803,18 +3868,18 @@ if (!isNaN(major) && major >= 7.2) {
         "&name=" + encodeURIComponent(name) +
         "&csrf_token=" + encodeURIComponent(csrfToken)
     })
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        hideNewFolderRow();
-        loadPicker(parent);
-      } else {
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          hideNewFolderRow();
+          loadPicker(parent);
+        } else {
+          newFolderInput.style.borderColor = "red";
+        }
+      })
+      .catch(() => {
         newFolderInput.style.borderColor = "red";
-      }
-    })
-    .catch(() => {
-      newFolderInput.style.borderColor = "red";
-    });
+      });
   });
 
   // Cancel ✗

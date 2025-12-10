@@ -324,6 +324,38 @@ if [[ "$DRY_RUN" == "yes" ]]; then
 fi
 
 # ==========================================================
+#  Run Pre/Post Scripts
+# ==========================================================
+run_script() {
+    local script_path="$1"
+    local script_name
+    script_name=$(basename "$script_path")
+
+    # Make sure the file exists
+    if [[ ! -f "$script_path" ]]; then
+        echo "Script not found: $script_path" >> "$LAST_RUN_FILE"
+        return 1
+    fi
+
+    # Make script executable if it's a normal shell script
+    chmod +x "$script_path" 2>/dev/null
+
+    # Detect type by extension (optional) or use shebang
+    case "$script_path" in
+        *.sh|*.bash)
+            bash "$script_path"
+            ;;
+        *.php)
+            /usr/bin/php "$script_path"
+            ;;
+        *)
+            # Fallback: try to execute directly (shebang must be set)
+            "$script_path"
+            ;;
+    esac
+}
+
+# ==========================================================
 #  Move Now override
 # ==========================================================
 MOVE_NOW=false
@@ -454,6 +486,18 @@ if [[ "$DRY_RUN" == "yes" ]]; then
 else
   set_status "Starting Move Process"
   echo "Starting move process" >> "$LAST_RUN_FILE"
+fi
+
+# ==========================================================
+#  Run Pre Move Script
+# ==========================================================
+if [[ "$ENABLE_SCRIPTS" == "yes" && -n "$PRE_SCRIPT" ]]; then
+    echo "Running pre-move script: $PRE_SCRIPT" >> "$LAST_RUN_FILE"
+    if run_script "$PRE_SCRIPT" >> "$LAST_RUN_FILE" 2>&1; then
+        echo "Pre-move script completed successfully" >> "$LAST_RUN_FILE"
+    else
+        echo "Pre-move script failed" >> "$LAST_RUN_FILE"
+    fi
 fi
 
 # ==========================================================
@@ -1220,6 +1264,19 @@ fi
 #  Finish and signal
 # ==========================================================
 send_summary_notification
+
+# ==========================================================
+#  Run Post Move Script
+# ==========================================================
+if [[ "$ENABLE_SCRIPTS" == "yes" && -n "$POST_SCRIPT" ]]; then
+    echo "Running post-move script: $POST_SCRIPT" >> "$LAST_RUN_FILE"
+    if run_script "$POST_SCRIPT" >> "$LAST_RUN_FILE" 2>&1; then
+        echo "Post-move script completed successfully" >> "$LAST_RUN_FILE"
+    else
+        echo "Post-move script failed" >> "$LAST_RUN_FILE"
+    fi
+fi
+
 log_session_end
 mkdir -p /tmp/automover/temp_logs
 echo "done" > /tmp/automover/temp_logs/automover_done.txt
