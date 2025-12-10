@@ -40,7 +40,8 @@ $defaults = [
     'ENABLE_NOTIFICATIONS' => 'no',
     'WEBHOOK_URL' => '',
     'MANUAL_MOVE' => 'no',
-    'STOP_ALL_CONTAINERS' => 'no'
+    'STOP_ALL_CONTAINERS' => 'no',
+    'ENABLE_TRIM' => 'no'
 ];
 
 // Load existing config if present
@@ -1655,6 +1656,14 @@ if (file_exists("/etc/unraid-version")) {
           Manual Move
         </label>
       </span>
+
+      <span title="Enable ssd trim to run after the move completes" class="automovertip">
+        <label>
+          <input type="checkbox" id="enable_trim_toggle" name="ENABLE_TRIM"
+            <?php echo (($settings['ENABLE_TRIM'] ?? 'no') === 'yes') ? 'checked' : ''; ?>>
+          Enable Ssd Trim
+        </label>
+      </span>
     </div>
 
     <div id="python-warning" data-python-installed="<?php echo file_exists('/usr/bin/python3') ? '1' : '0'; ?>" style="display:none; color:red; padding:8px 12px; border-radius:6px;
@@ -3005,7 +3014,8 @@ fetch('/plugins/automover/helpers/stop_automover.php', {
         ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
         WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || '',
         MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no',
-        STOP_ALL_CONTAINERS: stopAll
+        STOP_ALL_CONTAINERS: stopAll,
+        ENABLE_TRIM: document.getElementById('enable_trim_toggle').checked ? 'yes' : 'no',
       });
 
       // --- Step 1: Save settings ---

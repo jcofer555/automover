@@ -35,6 +35,7 @@ ENABLE_NOTIFICATIONS="${28:-no}"
 WEBHOOK_URL="${29:-}"
 MANUAL_MOVE="${30:-no}"
 STOP_ALL_CONTAINERS="${31:-no}"
+ENABLE_TRIM="${32:-no}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -81,6 +82,7 @@ fi
   echo "WEBHOOK_URL=\"$WEBHOOK_URL\""
   echo "MANUAL_MOVE=\"$MANUAL_MOVE\""
   echo "STOP_ALL_CONTAINERS=\"$STOP_ALL_CONTAINERS\""
+  echo "ENABLE_TRIM=\"$ENABLE_TRIM\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

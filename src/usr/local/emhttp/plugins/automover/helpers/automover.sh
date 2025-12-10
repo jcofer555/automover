@@ -350,7 +350,7 @@ for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
            QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
            FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP \
-           MODE CRON_EXPRESSION STOP_THRESHOLD ENABLE_NOTIFICATIONS STOP_ALL_CONTAINERS; do
+           MODE CRON_EXPRESSION STOP_THRESHOLD ENABLE_NOTIFICATIONS STOP_ALL_CONTAINERS ENABLE_TRIM; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
 
@@ -1193,6 +1193,27 @@ if [[ "$moved_anything" == true && "$ENABLE_CLEANUP" == "yes" ]]; then
       rm -f "$cfg"
     fi
   done < "$MOVED_SHARES_FILE"
+fi
+
+# ==========================================================
+#  SSD Trim
+# ==========================================================
+if [[ "$ENABLE_TRIM" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == true ]]; then
+    set_status "Running ssd trim"
+    echo "Starting ssd trim" >> "$LAST_RUN_FILE"
+
+    # Execute TRIM using php wrapper
+    /usr/local/emhttp/plugins/dynamix/scripts/ssd_trim cron >/dev/null 2>&1
+    exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        echo "Finished ssd trim" >> "$LAST_RUN_FILE"
+    else
+        echo "Failed ssd trim" >> "$LAST_RUN_FILE"
+    fi
+
+elif [[ "$ENABLE_TRIM" == "yes" && "$DRY_RUN" == "yes" ]]; then
+    echo "Dry run active — skipping ssd trim" >> "$LAST_RUN_FILE"
 fi
 
 # ==========================================================

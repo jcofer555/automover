@@ -37,6 +37,7 @@ $args = [
     $_GET['WEBHOOK_URL'] ?? '',
     $_GET['MANUAL_MOVE'] ?? '',
     $_GET['STOP_ALL_CONTAINERS'] ?? '',
+    $_GET['ENABLE_TRIM'] ?? '',
 ];
 
 // Escape each argument for safety
