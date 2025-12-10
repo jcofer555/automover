@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.12.08.03"
+  version="2025.12.09.01"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.12.09.01
+
+- Added ssd trim as an option to be ran after the move of files
+
 ### 2025.12.08.03
 
 - Fix for stop containers
@@ -23,10 +27,6 @@
 ### 2025.12.08.02
 
 - Added stop all containers checkbox
-
-### 2025.12.05.01
-
-- Change to the logging of skip totals
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -41,9 +41,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.12.08.03-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.12.08.03/unraid-automover-2025.12.08.03-noarch-1.txz</URL>
-<SHA256>afbffa9d6df1d619628527c3035b6d30afdde525e05712902631e658b9105dc0</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.12.09.01-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.12.09.01/unraid-automover-2025.12.09.01-noarch-1.txz</URL>
+<SHA256>3d8a653d4f703172015886361709a8eef7133d016a92b50f7ede6342e704899b</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -56,7 +56,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.12.08.03-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.12.09.01-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -100,6 +100,7 @@ ordered_keys=(
 	"WEBHOOK_URL"
 	"MANUAL_MOVE"
 	"STOP_ALL_CONTAINERS"
+	"ENABLE_TRIM"
 )
 
 # ==========================================================
@@ -145,7 +146,7 @@ if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.12.08.03-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.12.09.01-noarch-1.txz" -delete
 
 # ==========================================================
 #  HANDLE AUTOSTART + CRON GENERATION
@@ -155,7 +156,7 @@ if [ "$AUTOSTART" == "no" ]; then
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.12.08.03"
+    echo " Version: 2025.12.09.01"
     echo "----------------------------------------------------"
     echo ""
 else
@@ -209,7 +210,7 @@ else
     echo ""
     echo "----------------------------------------------------"
     echo " automover has been installed."
-    echo " Version: 2025.12.08.03"
+    echo " Version: 2025.12.09.01"
     echo "----------------------------------------------------"
     echo ""
 fi
