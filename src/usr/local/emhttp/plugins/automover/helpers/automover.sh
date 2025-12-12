@@ -16,6 +16,7 @@ mkdir -p /tmp/automover/temp_logs
 LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
 > /tmp/automover/temp_logs/automover_cleanup_sources.txt
+rm -f "/tmp/automover/temp_logs/automover_qbittorrent_parser.txt"
 
 # ==========================================================
 #  Unraid notifications helper
@@ -295,24 +296,14 @@ run_qbit_script() {
       >> "$LAST_RUN_FILE"
 
   # Extract paused torrents
-  grep -E "Pausing:|Paused:" "$tmp_out" \
-    | sed -E 's/.*(Pausing:|Paused:)\s*//; s/\s*
-
-\[[0-9]+\]
-
-\s*$//' \
-    >> "$paused_file"
+grep -E "Pausing:|Paused:" "$tmp_out" \
+  | sed -E 's/.*(Pausing:|Paused:)\s*//; s/\s*\[[0-9]+\]\s*$//' \
+  >> "$paused_file"
 
   # Extract resumed torrents
-  grep -E "Resuming:|Resumed:" "$tmp_out" \
-    | sed -E 's/.*(Resuming:|Resumed:)\s*//; s/\s*
-
-\[[0-9]+\]
-
-\s*$//' \
-    >> "$resumed_file"
-
-  rm -f "$tmp_out"
+grep -E "Resuming:|Resumed:" "$tmp_out" \
+  | sed -E 's/.*(Resuming:|Resumed:)\s*//; s/\s*\[[0-9]+\]\s*$//' \
+  >> "$resumed_file"
 
   echo "Qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
 }

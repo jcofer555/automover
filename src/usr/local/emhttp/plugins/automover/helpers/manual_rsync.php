@@ -3,7 +3,7 @@ header("Content-Type: application/json");
 
 $lock   = "/tmp/automover/automover_lock.txt";
 $last   = "/tmp/automover/automover_last_run.log";
-$status = "/tmp/automover/automover_status.txt";
+$status = "/tmp/automover/temp_logs/automover_status.txt";
 
 $automover_log      = "/tmp/automover/automover_files_moved.log";
 $automover_log_prev = "/tmp/automover/automover_files_moved_prev.log";
