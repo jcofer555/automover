@@ -13,6 +13,9 @@
 - Autostart at boot option
 - Move now button to bypass filters
 - Allow or deny moving when parity is checking
+- Option to trim ssd disks after files are moved
+- Option to run a script pre move and/or post move
+- Option to have notifications sent to unraid or discord
 - Two schedule modes interval and cron expression to choose from
 - Option to have start and finish notifications sent to unraid or discord
 - Option to do a manual move using rsync where you pick the source and destination
@@ -28,4 +31,4 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="411" alt="image thumb png f0eee4e72bc985e6d53e1856dd8b976a" src="https://github.com/user-attachments/assets/8b8297b5-b5f4-4218-8d30-061071a8fde7" />
+<img width="1000" height="392" alt="image" src="https://github.com/user-attachments/assets/cc1108cf-c76f-41fb-9251-6301fa924879" />
