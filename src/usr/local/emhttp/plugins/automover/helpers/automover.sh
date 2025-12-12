@@ -269,12 +269,12 @@ run_qbit_script() {
   local action="$1"
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
   local paused_file="/tmp/automover/automover_qbittorrent_paused.txt"
-  local resume_file="/tmp/automover/automover_qbittorrent_resume.txt"
+  local resumed_file="/tmp/automover/automover_qbittorrent_resumed.txt"
   local tmp_out="/tmp/automover/temp_logs/automover_qbittorrent_parser.txt"
 
   mkdir -p /tmp/automover/temp_logs
   > "$paused_file"
-  > "$resume_file"
+  > "$resumed_file"
 
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
 
@@ -306,7 +306,7 @@ run_qbit_script() {
 \[[0-9]+\]
 
 \s*$//' \
-    >> "$resume_file"
+    >> "$resumed_file"
 
   rm -f "$tmp_out"
   echo "Qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
