@@ -15,8 +15,10 @@ STOP_FILE="/tmp/automover/temp_logs/automover_stopped_containers.txt"
 mkdir -p /tmp/automover/temp_logs
 LOCK_FILE="/tmp/automover/automover_lock.txt"
 > "$IN_USE_FILE"
-> /tmp/automover/temp_logs/automover_cleanup_sources.txt
+> "/tmp/automover/temp_logs/automover_cleanup_sources.txt"
 rm -f "/tmp/automover/temp_logs/automover_qbittorrent_parser.txt"
+> "/tmp/automover/automover_qbittorrent_paused.txt"
+> "/tmp/automover/automover_qbittorrent_resumed.txt"
 
 # ==========================================================
 #  Unraid notifications helper
@@ -275,10 +277,6 @@ run_qbit_script() {
 
   # make sure temp_logs dir exists
   mkdir -p /tmp/automover/temp_logs
-
-  # reset paused/resumed files
-  > "$paused_file"
-  > "$resumed_file"
 
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
 

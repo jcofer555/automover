@@ -2,7 +2,7 @@
 header("Content-Type: application/json");
 
 $lock      = "/tmp/automover/automover_lock.txt";
-$status    = "/tmp/automover/automover_status.txt";
+$status    = "/tmp/automover/temp_logs/automover_status.txt";
 $last      = "/tmp/automover/automover_last_run.log";
 
 // ==============================
