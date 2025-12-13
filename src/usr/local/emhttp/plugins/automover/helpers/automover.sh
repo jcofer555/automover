@@ -614,7 +614,11 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 # ==========================================================
 #  Collect ALL files (no filters applied yet)
 # ==========================================================
-mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n' | LC_ALL=C sort)
+mapfile -t all_filtered_items < <(
+  cd "$src" && find . -type f -printf '%T@ %P\n' \
+    | sort -n \
+    | awk '{print $2}'
+)
 
 eligible_items=()
 for relpath in "${all_filtered_items[@]}"; do
@@ -902,7 +906,24 @@ copy_empty_dirs "$src" "$dst"
       chown "$src_owner:$src_group" "$dstdir"
       chmod "$src_perms" "$dstdir"
     fi
-    rsync "${RSYNC_OPTS[@]}" -- "$srcfile" "$dstdir/" >/dev/null 2>&1
+ 
+# -------------------------------
+# Stop threshold check BEFORE move
+# -------------------------------
+if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]]; then
+  FINAL_USED=$(df --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
+  if [[ -n "$FINAL_USED" && "$FINAL_USED" -le "$STOP_THRESHOLD" ]]; then
+    echo "Move stopped — pool usage reached stop threshold: ${FINAL_USED}% (<= ${STOP_THRESHOLD}%)" >> "$LAST_RUN_FILE"
+    STOP_TRIGGERED=true
+    break
+  fi
+fi
+
+# --- NOW do the move ---
+rsync "${RSYNC_OPTS[@]}" -- "$srcfile" "$dstdir/" >/dev/null 2>&1
+sync
+sleep 1
+
 if [[ "$DRY_RUN" == "yes" ]]; then
   # Log what WOULD be moved
   echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
@@ -913,15 +934,6 @@ else
     echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
   fi
 fi
-    # Stop threshold check per file
-    if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]]; then
-      FINAL_USED=$(df -h --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
-      if [[ -n "$FINAL_USED" && "$FINAL_USED" -le "$STOP_THRESHOLD" ]]; then
-        echo "Move stopped - pool usage reached stop threshold:$STOP_THRESHOLD%" >> "$LAST_RUN_FILE"
-        STOP_TRIGGERED=true
-        break
-      fi
-    fi
   done < "$tmpfile"
   rm -f "$tmpfile"
 
