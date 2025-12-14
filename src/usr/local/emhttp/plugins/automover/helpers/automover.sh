@@ -614,11 +614,7 @@ for cfg in "$SHARE_CFG_DIR"/*.cfg; do
 # ==========================================================
 #  Collect ALL files (no filters applied yet)
 # ==========================================================
-mapfile -t all_filtered_items < <(
-  cd "$src" && find . -type f -printf '%T@ %P\n' \
-    | sort -n \
-    | awk '{print $2}'
-)
+mapfile -t all_filtered_items < <(cd "$src" && find . -type f -printf '%P\n' | LC_ALL=C sort)
 
 eligible_items=()
 for relpath in "${all_filtered_items[@]}"; do
