@@ -1,24 +1,24 @@
 #!/bin/bash
 SCRIPT_NAME="automover"
-LAST_RUN_FILE="/tmp/automover/automover_last_run.log"
+LAST_RUN_FILE="/tmp/automover/last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
-AUTOMOVER_LOG="/tmp/automover/automover_files_moved.log"
+AUTOMOVER_LOG="/tmp/automover/files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
-IN_USE_FILE="/tmp/automover/automover_in_use_files.txt"
-STATUS_FILE="/tmp/automover/temp_logs/automover_status.txt"
-MOVED_SHARES_FILE="/tmp/automover/temp_logs/automover_moved_shares.txt"
-STOP_FILE="/tmp/automover/temp_logs/automover_stopped_containers.txt"
+IN_USE_FILE="/tmp/automover/in_use_files.txt"
+STATUS_FILE="/tmp/automover/temp_logs/status.txt"
+MOVED_SHARES_FILE="/tmp/automover/temp_logs/moved_shares.txt"
+STOP_FILE="/tmp/automover/temp_logs/stopped_containers.txt"
 
 # ==========================================================
 #  Setup directories and lock
 # ==========================================================
 mkdir -p /tmp/automover/temp_logs
-LOCK_FILE="/tmp/automover/automover_lock.txt"
+LOCK_FILE="/tmp/automover/lock.txt"
 > "$IN_USE_FILE"
-> "/tmp/automover/temp_logs/automover_cleanup_sources.txt"
-rm -f "/tmp/automover/temp_logs/automover_qbittorrent_parser.txt"
-> "/tmp/automover/automover_qbittorrent_paused.txt"
-> "/tmp/automover/automover_qbittorrent_resumed.txt"
+> "/tmp/automover/temp_logs/cleanup_sources.txt"
+rm -f "/tmp/automover/temp_logs/qbittorrent_parser.txt"
+> "/tmp/automover/qbittorrent_paused.txt"
+> "/tmp/automover/qbittorrent_resumed.txt"
 
 # ==========================================================
 #  Unraid notifications helper
@@ -183,7 +183,7 @@ containers_stopped=false
 
 manage_containers() {
   local action="$1"
-  local STOP_FILE="/tmp/automover/temp_logs/automover_stopped_containers.txt"
+  local STOP_FILE="/tmp/automover/temp_logs/stopped_containers.txt"
   mkdir -p /tmp/automover/temp_logs
 
   if [[ "$STOP_ALL_CONTAINERS" == "yes" && "$DRY_RUN" != "yes" ]]; then
@@ -262,7 +262,7 @@ cleanup() {
 }
 trap 'cleanup 0' SIGINT SIGTERM SIGHUP SIGQUIT
 
-rm -f /tmp/automover/temp_logs/automover_done.txt
+rm -f /tmp/automover/temp_logs/done.txt
 > "$MOVED_SHARES_FILE"
 
 # ==========================================================
@@ -271,9 +271,9 @@ rm -f /tmp/automover/temp_logs/automover_done.txt
 run_qbit_script() {
   local action="$1"
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
-  local paused_file="/tmp/automover/automover_qbittorrent_paused.txt"
-  local resumed_file="/tmp/automover/automover_qbittorrent_resumed.txt"
-  local tmp_out="/tmp/automover/temp_logs/automover_qbittorrent_parser.txt"
+  local paused_file="/tmp/automover/qbittorrent_paused.txt"
+  local resumed_file="/tmp/automover/qbittorrent_resumed.txt"
+  local tmp_out="/tmp/automover/temp_logs/qbittorrent_parser.txt"
 
   # make sure temp_logs dir exists
   mkdir -p /tmp/automover/temp_logs
@@ -695,7 +695,7 @@ done
 
   file_count=${#eligible_items[@]}
   (( file_count == 0 )) && { continue; }
-  echo "$src" >> /tmp/automover/temp_logs/automover_cleanup_sources.txt
+  echo "$src" >> /tmp/automover/temp_logs/cleanup_sources.txt
 
   # ==========================================================
   #  Check for eligible files before moving (pre-move trigger)
@@ -824,7 +824,7 @@ fi
     if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
       set_status "Enabling Turbo Write"
       turbo_write_prev=$(grep -Po 'md_write_method="\K[^"]+' /var/local/emhttp/var.ini 2>/dev/null)
-      echo "$turbo_write_prev" > /tmp/automover_prev_write_method
+      echo "$turbo_write_prev" > /tmp/prev_write_method
       logger "Force turbo write on"
       /usr/local/sbin/mdcmd set md_write_method 1
       echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
@@ -860,7 +860,7 @@ pre_move_done="yes"
 mkdir -p /tmp/automover/temp_logs
 
 # use fixed path instead of mktemp
-tmpfile="/tmp/automover/temp_logs/automover_eligible_files.txt"
+tmpfile="/tmp/automover/temp_logs/eligible_files.txt"
 
 # write eligible items into the file
 printf '%s\n' "${eligible_items[@]}" > "$tmpfile"
@@ -1028,7 +1028,7 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
   elif [[ "$moved_anything" == true ]]; then
-    if [[ ! -s /tmp/automover/temp_logs/automover_cleanup_sources.txt ]]; then
+    if [[ ! -s /tmp/automover/temp_logs/cleanup_sources.txt ]]; then
       echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
     else
       while IFS= read -r src_path; do
@@ -1100,7 +1100,7 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
           done
         fi
 
-      done < <(sort -u /tmp/automover/temp_logs/automover_cleanup_sources.txt)
+      done < <(sort -u /tmp/automover/temp_logs/cleanup_sources.txt)
       echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
     fi
   else
@@ -1115,7 +1115,7 @@ if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == t
   set_status "Running Jdupes"
   mkdir -p /tmp/automover/temp_logs
   if command -v jdupes >/dev/null 2>&1; then
-    TEMP_LIST="/tmp/automover/temp_logs/automover_jdupes_list.txt"
+    TEMP_LIST="/tmp/automover/temp_logs/jdupes_list.txt"
     HASH_DIR="$HASH_PATH"
     HASH_DB="${HASH_DIR}/jdupes_hash_database.db"
 
@@ -1218,7 +1218,7 @@ if [[ "$DRY_RUN" == "yes" ]]; then
   :
 else
   if [[ "$moved_anything" == "true" && -s "$AUTOMOVER_LOG" ]]; then
-    cp -f "$AUTOMOVER_LOG" "${AUTOMOVER_LOG%/*}/automover_files_moved_prev.log"
+    cp -f "$AUTOMOVER_LOG" "${AUTOMOVER_LOG%/*}/files_moved_prev.log"
   else
     : > "$AUTOMOVER_LOG"
     echo "No files moved for this run" >> "$AUTOMOVER_LOG"
@@ -1288,7 +1288,7 @@ fi
 
 log_session_end
 mkdir -p /tmp/automover/temp_logs
-echo "done" > /tmp/automover/temp_logs/automover_done.txt
+echo "done" > /tmp/automover/temp_logs/done.txt
 
 # Reset status and release lock
 set_status "$PREV_STATUS"

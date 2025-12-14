@@ -1,8 +1,8 @@
 <?php
 $logDir = '/tmp/automover';
-$logFile = "$logDir/automover_files_moved.log";
-$prevLog = "$logDir/automover_files_moved_prev.log";
-$lastRunLog = "$logDir/automover_last_run.log";
+$logFile = "$logDir/files_moved.log";
+$prevLog = "$logDir/files_moved_prev.log";
+$lastRunLog = "$logDir/last_run.log";
 
 // ✅ Ensure the /tmp/automover directory exists
 if (!is_dir($logDir)) {

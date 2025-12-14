@@ -1,9 +1,9 @@
 <?php
 $cronFile   = '/boot/config/plugins/automover/automover.cron';
-$logFile    = '/tmp/automover/automover_last_run.log';
-$bootFail   = '/tmp/automover/automover_boot_failure';
+$logFile    = '/tmp/automover/last_run.log';
+$bootFail   = '/tmp/automover/boot_failure';
 $arrayStateFile = '/var/local/emhttp/var.ini';
-$statusFile = '/tmp/automover/temp_logs/automover_status.txt';
+$statusFile = '/tmp/automover/temp_logs/status.txt';
 
 $status     = 'Stopped';
 $lastRun    = 'None';

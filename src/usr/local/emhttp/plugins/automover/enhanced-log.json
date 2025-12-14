@@ -1,6 +1,6 @@
 {
     "files": [
-        "/var/log/automover_last_run.log",
-        "/var/log/automover_files_moved.log"
+        "/tmp/automover/last_run.log",
+        "/tmp/automover/files_moved.log"
     ]
 }

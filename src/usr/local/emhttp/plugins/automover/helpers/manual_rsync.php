@@ -1,12 +1,12 @@
 <?php
 header("Content-Type: application/json");
 
-$lock   = "/tmp/automover/automover_lock.txt";
-$last   = "/tmp/automover/automover_last_run.log";
-$status = "/tmp/automover/temp_logs/automover_status.txt";
+$lock   = "/tmp/automover/lock.txt";
+$last   = "/tmp/automover/last_run.log";
+$status = "/tmp/automover/temp_logs/status.txt";
 
-$automover_log      = "/tmp/automover/automover_files_moved.log";
-$automover_log_prev = "/tmp/automover/automover_files_moved_prev.log";
+$automover_log      = "/tmp/automover/files_moved.log";
+$automover_log_prev = "/tmp/automover/files_moved_prev.log";
 
 // ==============================
 // CSRF VALIDATION
@@ -169,8 +169,8 @@ if (file_exists($automover_log)) {
     unlink($automover_log);
 }
 
-$inuse_file   = "/tmp/automover/automover_in_use_files.txt";
-$exclude_file = "/tmp/automover/automover_manual_rsync_in_use_files.txt";
+$inuse_file   = "/tmp/automover/in_use_files.txt";
+$exclude_file = "/tmp/automover/manual_rsync_in_use_files.txt";
 
 // Reset both files each run
 file_put_contents($inuse_file, "");
@@ -185,7 +185,7 @@ $moved_any = false;
 $shareCounts = [];
 
 if ($full === "1") {
-    $exclude_file = "/tmp/automover/automover_manual_rsync_in_use_files.txt";
+    $exclude_file = "/tmp/automover/manual_rsync_in_use_files.txt";
     $files_in_use = [];
     $all_files = [];
 
