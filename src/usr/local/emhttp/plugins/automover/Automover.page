@@ -35,6 +35,14 @@ $defaults = [
     'HASH_PATH' => '/mnt/user/appdata',
     'ENABLE_CLEANUP' => 'no',
     'MODE' => 'minutes',
+    'CRON_MODE' => '',
+    'HOURLY_FREQUENCY' => '',
+    'DAILY_TIME' => '',
+    'WEEKLY_DAY' => '',
+    'WEEKLY_TIME' => '',
+    'MONTHLY_DAY' => '',
+    'MONTHLY_TIME' => '',
+    'CUSTOM_CRON' => '',
     'CRON_EXPRESSION' => '',
     'STOP_THRESHOLD' => 0,
     'ENABLE_NOTIFICATIONS' => 'no',
@@ -1246,62 +1254,180 @@ if (file_exists("/etc/unraid-version")) {
       </div>
     </div>
 
-    <!-- Schedule Mode Toggle -->
-    <div class="form-pair">
-      <label for="interval_mode">
-        <span title="Choose between interval-based scheduling or a cron expression" class="automovertip">
-          Schedule Mode:
-        </span>
-      </label>
-      <div class="input-wrapper">
-        <span title="Choose between interval-based scheduling or a cron expression" class="automovertip">
-          <select id="interval_mode" class="select-pool">
-            <option value="minutes" <?php echo (($settings['MODE'] ?? 'minutes' )==='minutes' ) ? 'selected' : '' ; ?>
-              >Interval (minutes)</option>
-            <option value="cron" <?php echo (($settings['MODE'] ?? 'minutes' )==='cron' ) ? 'selected' : '' ; ?>>Cron
-              Expression</option>
-          </select>
-        </span>
-      </div>
-    </div>
+<!-- Schedule Mode Toggle -->
+<div class="form-pair">
+  <label for="interval_mode">
+    <span title="Choose between interval-based scheduling or a cron expression" class="automovertip">
+      Schedule Mode:
+    </span>
+  </label>
+  <div class="input-wrapper">
+    <span title="Choose between interval-based scheduling or a cron expression" class="automovertip">
+      <select id="interval_mode" name="MODE" class="select-pool">
+        <option value="minutes" <?php echo (($settings['MODE'] ?? 'minutes')==='minutes') ? 'selected' : ''; ?>>
+          Interval (minutes)
+        </option>
+        <option value="cron" <?php echo (($settings['MODE'] ?? 'minutes')==='cron') ? 'selected' : ''; ?>>
+          Cron Expression
+        </option>
+      </select>
+    </span>
+  </div>
+</div>
 
-    <!-- ⏱Interval (Minutes) -->
-    <div class="form-pair" id="interval-minutes-row"
-      style="<?php echo (($settings['MODE'] ?? 'minutes') === 'minutes') ? '' : 'display:none;'; ?>">
-      <label for="interval">
-        <span title="Interval in minutes. Anything over 60 will be rounded to the nearest hour, day, week, or month"
-          class="automovertip">
-          Interval (minutes):
-        </span>
-      </label>
-      <div class="input-wrapper">
-        <span title="Interval in minutes. Anything over 60 will be rounded to the nearest hour, day, week, or month"
-          class="automovertip">
-          <input type="number" id="interval" class="short-input" min="2" step="1"
-            value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? 60); ?>">
-        </span>
-        <div id="interval-warning" class="field-warning">⚠️ Interval must be at least 2 minute</div>
-      </div>
-    </div>
+<!-- ⏱ Interval (Minutes) -->
+<div class="form-pair" id="interval-minutes-row"
+  style="<?php echo (($settings['MODE'] ?? 'minutes') === 'minutes') ? '' : 'display:none;'; ?>">
+  <label for="interval">
+    <span title="Interval in minutes. Anything over 60 will be rounded to the nearest hour, day, week, or month"
+      class="automovertip">
+      Interval (minutes):
+    </span>
+  </label>
+  <div class="input-wrapper">
+    <span title="Interval in minutes. Anything over 60 will be rounded to the nearest hour, day, week, or month"
+      class="automovertip">
+      <input type="number" id="interval" name="INTERVAL" class="short-input" min="2" step="1"
+        value="<?php echo htmlspecialchars($settings['INTERVAL'] ?? 60); ?>">
+    </span>
+    <div id="interval-warning" class="field-warning">⚠️ Interval must be at least 2 minutes</div>
+  </div>
+</div>
 
-    <!-- Custom Cron Expression -->
-    <div class="form-pair" id="cron-expression-row"
-      style="<?php echo (($settings['MODE'] ?? 'minutes') === 'cron') ? '' : 'display:none;'; ?>">
-      <label for="cron_expression">
-        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help"
-          class="automovertip">
-          Cron Expression:
-        </span>
-      </label>
-      <div class="input-wrapper">
-        <span title="Enter a valid cron expression e.g. 0 3 * * * visit https://crontab.guru/ for help"
-          class="automovertip">
-          <input type="text" id="cron_expression" class="short-input" placeholder="e.g. 0 3 * * *"
-            value="<?php echo htmlspecialchars($settings['CRON_EXPRESSION'] ?? ''); ?>">
-        </span>
-        <div id="cron-warning" class="field-warning">⚠️ Enter a valid cron expression (5 fields required)</div>
-      </div>
+<!-- Cron Mode Selection -->
+<div class="form-pair" id="cron-expression-row"
+  style="<?php echo (($settings['MODE'] ?? 'minutes') === 'cron') ? '' : 'display:none;'; ?>">
+  <label for="cron_mode">
+    <span class="automovertip" title="Select scheduling mode">
+      Schedule Selection:
+    </span>
+  </label>
+  <div class="input-wrapper">
+    <select id="cron_mode" name="CRON_MODE" class="short-input">
+      <option value="hourly"  <?php echo (($settings['CRON_MODE'] ?? '') === 'hourly')  ? 'selected' : ''; ?>>Hourly</option>
+      <option value="daily"   <?php echo (($settings['CRON_MODE'] ?? '') === 'daily')   ? 'selected' : ''; ?>>Daily</option>
+      <option value="weekly"  <?php echo (($settings['CRON_MODE'] ?? '') === 'weekly')  ? 'selected' : ''; ?>>Weekly</option>
+      <option value="monthly" <?php echo (($settings['CRON_MODE'] ?? '') === 'monthly') ? 'selected' : ''; ?>>Monthly</option>
+      <option value="custom"  <?php echo (($settings['CRON_MODE'] ?? '') === 'custom')  ? 'selected' : ''; ?>>Custom</option>
+    </select>
+  </div>
+</div>
+
+<!-- Hourly Options -->
+<div id="hourly-options" style="display:none; margin-top:10px;">
+  <div class="form-pair">
+    <label for="hourly_frequency">Select Frequency:</label>
+    <div class="input-wrapper">
+      <select id="hourly_frequency" name="HOURLY_FREQUENCY" class="short-input">
+        <option value="1" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '') === '1') ? 'selected' : ''; ?>>Every 1 Hour</option>
+        <option value="2" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '') === '2') ? 'selected' : ''; ?>>Every 2 Hours</option>
+        <option value="3" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '') === '3') ? 'selected' : ''; ?>>Every 3 Hours</option>
+        <option value="4" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '') === '4') ? 'selected' : ''; ?>>Every 4 Hours</option>
+        <option value="6" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '') === '6') ? 'selected' : ''; ?>>Every 6 Hours</option>
+        <option value="8" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '') === '8') ? 'selected' : ''; ?>>Every 8 Hours</option>
+      </select>
     </div>
+  </div>
+</div>
+
+<!-- Daily Options -->
+<div id="daily-options" style="display:none; margin-top:10px;">
+  <div class="form-pair">
+    <label for="daily_time">Time Of Day:</label>
+    <div class="input-wrapper">
+      <select id="daily_time" name="DAILY_TIME" class="short-input">
+        <?php for ($h = 0; $h < 24; $h++): 
+          $time = str_pad($h, 2, "0", STR_PAD_LEFT) . ":00"; ?>
+          <option value="<?php echo $time; ?>" <?php echo (($settings['DAILY_TIME'] ?? '') === $time) ? 'selected' : ''; ?>>
+            <?php echo $time; ?>
+          </option>
+        <?php endfor; ?>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Weekly Options -->
+<div id="weekly-options" style="display:none; margin-top:10px;">
+  <div class="form-pair">
+    <label for="weekly_day">Day Of Week:</label>
+    <div class="input-wrapper">
+      <select id="weekly_day" name="WEEKLY_DAY" class="short-input">
+        <?php 
+          $days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+          foreach ($days as $day): ?>
+          <option value="<?php echo $day; ?>" <?php echo (($settings['WEEKLY_DAY'] ?? '') === $day) ? 'selected' : ''; ?>>
+            <?php echo $day; ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-pair">
+    <label for="weekly_time">Time Of Day:</label>
+    <div class="input-wrapper">
+      <select id="weekly_time" name="WEEKLY_TIME" class="short-input">
+        <?php for ($h = 0; $h < 24; $h++): 
+          $time = str_pad($h, 2, "0", STR_PAD_LEFT) . ":00"; ?>
+          <option value="<?php echo $time; ?>" <?php echo (($settings['WEEKLY_TIME'] ?? '') === $time) ? 'selected' : ''; ?>>
+            <?php echo $time; ?>
+          </option>
+        <?php endfor; ?>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Monthly Options -->
+<div id="monthly-options" style="display:none; margin-top:10px;">
+  <div class="form-pair">
+    <label for="monthly_day">Day Of Month:</label>
+    <div class="input-wrapper">
+      <select id="monthly_day" name="MONTHLY_DAY" class="short-input">
+        <?php for ($d = 1; $d <= 31; $d++): 
+          $day = str_pad($d, 2, "0", STR_PAD_LEFT); ?>
+          <option value="<?php echo $day; ?>" <?php echo (($settings['MONTHLY_DAY'] ?? '') === $day) ? 'selected' : ''; ?>>
+            <?php echo $day; ?>
+          </option>
+        <?php endfor; ?>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-pair">
+    <label for="monthly_time">Time Of Day:</label>
+    <div class="input-wrapper">
+      <select id="monthly_time" name="MONTHLY_TIME" class="short-input">
+        <?php for ($h = 0; $h < 24; $h++): 
+          $time = str_pad($h, 2, "0", STR_PAD_LEFT) . ":00"; ?>
+          <option value="<?php echo $time; ?>" <?php echo (($settings['MONTHLY_TIME'] ?? '') === $time) ? 'selected' : ''; ?>>
+            <?php echo $time; ?>
+          </option>
+        <?php endfor; ?>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Option -->
+<div id="custom-options" style="display:none; margin-top:10px;">
+  <div class="form-pair">
+    <label for="custom_cron">Cron Expression:</label>
+    <div class="input-wrapper">
+      <input type="text" id="custom_cron" name="CUSTOM_CRON" class="short-input"
+             placeholder="* * * * *"
+             value="<?php echo htmlspecialchars($settings['CUSTOM_CRON'] ?? ''); ?>">
+    </div>
+  </div>
+
+  <div class="form-pair">
+    <div id="cron-warning" class="field-warning" role="alert">
+      ⚠️ Enter a valid cron expression (5 fields required). 
+      Visit <a href="https://crontab.guru/" target="_blank">crontab.guru</a> for help.
+    </div>
+  </div>
+</div>
 
     <!-- Webhook URL -->
     <div class="form-pair" id="webhook_row" style="display:none;">
@@ -2162,60 +2288,121 @@ if (file_exists("/etc/unraid-version")) {
         });
     });
 
-    // --- Interval Toggle
-    (function waitForIntervalToggle() {
-      function initIntervalToggle() {
-        const modeSelect = document.getElementById('interval_mode');
-        const intervalRow = document.getElementById('interval-minutes-row');
-        const cronRow = document.getElementById('cron-expression-row');
-        const intervalInput = document.getElementById('interval');
-        const cronInput = document.getElementById('cron_expression');
-        const cronWarning = document.getElementById('cron-warning');
+// --- Interval + Cron Dropdown Toggle
+(function waitForIntervalToggle() {
+  function initIntervalToggle() {
+    const modeSelect   = document.getElementById('interval_mode');
+    const intervalRow  = document.getElementById('interval-minutes-row');
+    const cronRow      = document.getElementById('cron-expression-row');
+    const intervalInput= document.getElementById('interval');
 
-        if (!modeSelect || !intervalRow || !cronRow) {
-          // DOM not ready yet — wait a bit longer
-          return false;
-        }
+    // Selectors for all modes
+    const cronModeSelect = document.getElementById('cron_mode');
+    const dailyOptions   = document.getElementById('daily-options');
+    const weeklyOptions  = document.getElementById('weekly-options');
+    const hourlyOptions  = document.getElementById('hourly-options');
+    const monthlyOptions = document.getElementById('monthly-options');
+    const customOptions  = document.getElementById('custom-options');
 
-        // Live toggle function
-        function toggleMode(mode) {
-          if (mode === 'minutes') {
-            intervalRow.style.display = 'flex';
-            cronRow.style.display = 'none';
-            intervalInput.disabled = false;
-            cronInput.disabled = true;
-          } else {
-            intervalRow.style.display = 'none';
-            cronRow.style.display = 'flex';
-            intervalInput.disabled = true;
-            cronInput.disabled = false;
-          }
-        }
+    const dailyTime   = document.getElementById('daily_time');
+    const weeklyDay   = document.getElementById('weekly_day');
+    const weeklyTime  = document.getElementById('weekly_time');
+    const hourlyFreq  = document.getElementById('hourly_frequency');
+    const monthlyDay  = document.getElementById('monthly_day');
+    const monthlyTime = document.getElementById('monthly_time');
+    const customCron  = document.getElementById('custom_cron');
 
-        // Initialize visibility based on current selection
-        toggleMode(modeSelect.value);
+    if (!modeSelect || !intervalRow || !cronRow) return false;
 
-        // Listen for dropdown changes
-        modeSelect.addEventListener('change', (e) => toggleMode(e.target.value));
+    // Toggle between minutes vs cron
+    function toggleMode(mode) {
+      if (mode === 'minutes') {
+        intervalRow.style.display = 'flex';
+        cronRow.style.display     = 'none';
+        intervalInput.disabled    = false;
+      } else {
+        intervalRow.style.display = 'none';
+        cronRow.style.display     = 'flex';
+        intervalInput.disabled    = true;
+      }
+    }
 
-        // Live validation for cron expression
-        cronInput.addEventListener('input', () => {
-          const valid = cronInput.value.trim().split(/\s+/).length === 5;
-          cronWarning.style.display = valid ? 'none' : 'block';
-          cronInput.classList.toggle('invalid', !valid);
-        });
+    // Toggle which cron sub-options are visible
+    function toggleCronOptions(value) {
+      if (!cronModeSelect) return;
+      dailyOptions.style.display   = (value === 'daily')   ? 'block' : 'none';
+      weeklyOptions.style.display  = (value === 'weekly')  ? 'block' : 'none';
+      hourlyOptions.style.display  = (value === 'hourly')  ? 'block' : 'none';
+      monthlyOptions.style.display = (value === 'monthly') ? 'block' : 'none';
+      customOptions.style.display  = (value === 'custom')  ? 'block' : 'none';
+      updateCronExpression();
+    }
 
-        return true;
+    // Build cron string from dropdowns
+    function updateCronExpression() {
+      let cronString = "";
+
+      if (cronModeSelect?.value === "hourly" && hourlyFreq) {
+        const freq = parseInt(hourlyFreq.value, 10);
+        cronString = `0 */${freq} * * *`;
+      }
+      else if (cronModeSelect?.value === "daily" && dailyTime) {
+        const [hour, minute] = dailyTime.value.split(":");
+        cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * *`;
+      }
+      else if (cronModeSelect?.value === "weekly" && weeklyDay && weeklyTime) {
+        const [hour, minute] = weeklyTime.value.split(":");
+        const dayMap = { Sunday:0, Monday:1, Tuesday:2, Wednesday:3,
+                         Thursday:4, Friday:5, Saturday:6 };
+        cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * ${dayMap[weeklyDay.value]}`;
+      }
+      else if (cronModeSelect?.value === "monthly" && monthlyDay && monthlyTime) {
+        const [hour, minute] = monthlyTime.value.split(":");
+        const day = parseInt(monthlyDay.value,10);
+        cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} ${day} * *`;
+      }
+      else if (cronModeSelect?.value === "custom" && customCron) {
+        cronString = customCron.value.trim();
       }
 
-      // Try once immediately, then poll until elements exist
-      if (!initIntervalToggle()) {
-        const observer = new MutationObserver(() => {
-          if (initIntervalToggle()) observer.disconnect();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+      // Store cron string in hidden input
+      let hidden = document.getElementById("cron_expression_hidden");
+      if (!hidden) {
+        hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.id   = "cron_expression_hidden";
+        hidden.name = "CRON_EXPRESSION";
+        cronRow.appendChild(hidden);
       }
-    })();
+      hidden.value = cronString;
+    }
+
+    // Initialize visibility
+    toggleMode(modeSelect.value);
+    toggleCronOptions(cronModeSelect?.value);
+
+    // Event listeners
+    modeSelect.addEventListener('change', (e) => toggleMode(e.target.value));
+    cronModeSelect?.addEventListener('change', (e) => toggleCronOptions(e.target.value));
+
+    dailyTime?.addEventListener('change', updateCronExpression);
+    weeklyDay?.addEventListener('change', updateCronExpression);
+    weeklyTime?.addEventListener('change', updateCronExpression);
+    hourlyFreq?.addEventListener('change', updateCronExpression);
+    monthlyDay?.addEventListener('change', updateCronExpression);
+    monthlyTime?.addEventListener('change', updateCronExpression);
+    customCron?.addEventListener('input', updateCronExpression);
+
+    return true;
+  }
+
+  if (!initIntervalToggle()) {
+    const observer = new MutationObserver(() => {
+      if (initIntervalToggle()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+})();
 
     // === Toggle HASH_PATH dropdown visibility based on ENABLE_JDUPES ===
     const enableJdupesCheckbox = document.getElementById('ENABLE_JDUPES');
@@ -3004,131 +3191,175 @@ if (file_exists("/etc/unraid-version")) {
         });
     });
 
-    // === Save & Start ===
-    saveBtn.addEventListener('click', function () {
-      const stopAll = document.getElementById('stop_all_containers').checked ? 'yes' : 'no';
-      const intervalInput = document.getElementById('interval');
-      const cronInput = document.getElementById('cron_expression');
-      const modeSelect = document.getElementById('interval_mode');
-      const thresholdInput = document.getElementById('threshold');
-      const stopThresholdInput = document.getElementById('stop_threshold');
-      const form = document.getElementById('automover-settings');
+// === Save & Start ===
+saveBtn.addEventListener('click', function () {
+  const stopAll = document.getElementById('stop_all_containers').checked ? 'yes' : 'no';
+  const intervalInput = document.getElementById('interval');
+  const modeSelect = document.getElementById('interval_mode');
+  const thresholdInput = document.getElementById('threshold');
+  const stopThresholdInput = document.getElementById('stop_threshold');
+  const form = document.getElementById('automover-settings');
 
-      // --- Validation ---
-      const intervalValid = validateField(intervalInput, { min: 2 }, 'interval-warning');
-      const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
-      const stopThresholdValid = validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning');
-      const ageDaysInput = document.getElementById('age_days');
-      const sizeMbInput = document.getElementById('size_mb');
-      const ageDaysValid = !document.getElementById('age_based_filter').checked ||
-        validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
-      const sizeMbValid = !document.getElementById('size_based_filter').checked ||
-        validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
-      const qbitValid = validateQbitFields();
-      const webhookValid = validateWebhook();
+  // --- Validation ---
+  const intervalValid = validateField(intervalInput, { min: 2 }, 'interval-warning');
+  const thresholdValid = validateField(thresholdInput, { min: 0, max: 100 }, 'threshold-warning');
+  const stopThresholdValid = validateField(stopThresholdInput, { min: 0, max: 100 }, 'stop-threshold-warning');
+  const ageDaysInput = document.getElementById('age_days');
+  const sizeMbInput = document.getElementById('size_mb');
+  const ageDaysValid = !document.getElementById('age_based_filter').checked ||
+    validateField(ageDaysInput, { min: 1 }, 'age-days-warning');
+  const sizeMbValid = !document.getElementById('size_based_filter').checked ||
+    validateField(sizeMbInput, { min: 1 }, 'size-mb-warning');
+  const qbitValid = validateQbitFields();
+  const webhookValid = validateWebhook();
 
-      // --- Cron validation ---
-      let cronValid = true;
-      if (modeSelect.value === 'cron') {
-        const cronParts = cronInput.value.trim().split(/\s+/);
-        cronValid = cronParts.length === 5;
-        document.getElementById('cron-warning').style.display = cronValid ? 'none' : 'block';
-        cronInput.classList.toggle('invalid', !cronValid);
+  // --- Build cron string from dropdowns ---
+  let cronExpression = '';
+  if (modeSelect.value === 'cron') {
+    const cronModeSelect = document.getElementById('cron_mode');
+
+    if (cronModeSelect.value === 'hourly') {
+      const freq = parseInt(document.getElementById('hourly_frequency').value, 10);
+      cronExpression = `0 */${freq} * * *`;
+
+    } else if (cronModeSelect.value === 'daily') {
+      const dailyTime = document.getElementById('daily_time').value;
+      const [hour, minute] = dailyTime.split(':');
+      cronExpression = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * *`;
+
+    } else if (cronModeSelect.value === 'weekly') {
+      const weeklyDay = document.getElementById('weekly_day').value;
+      const weeklyTime = document.getElementById('weekly_time').value;
+      const [hour, minute] = weeklyTime.split(':');
+      const dayMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+      cronExpression = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * ${dayMap[weeklyDay]}`;
+
+    } else if (cronModeSelect.value === 'monthly') {
+      const monthlyDay = document.getElementById('monthly_day').value;
+      const monthlyTime = document.getElementById('monthly_time').value;
+      const [hour, minute] = monthlyTime.split(':');
+      cronExpression = `${parseInt(minute, 10)} ${parseInt(hour, 10)} ${parseInt(monthlyDay, 10)} * *`;
+
+    } else if (cronModeSelect.value === 'custom') {
+      const customCron = document.getElementById('custom_cron').value.trim();
+      cronExpression = customCron;
+    }
+  }
+
+  // --- Cron validation ---
+  let cronValid = true;
+  if (modeSelect.value === 'cron') {
+    const cronParts = cronExpression.trim().split(/\s+/);
+    cronValid = cronParts.length === 5;
+    const cronWarning = document.getElementById('cron-warning');
+    if (cronWarning) cronWarning.style.display = cronValid ? 'none' : 'block';
+  }
+
+  // --- Final validation check ---
+  if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
+    sizeMbValid && qbitValid && cronValid && webhookValid)) {
+    form.classList.add('shake');
+    setTimeout(() => form.classList.remove('shake'), 300);
+    return;
+  }
+
+  // --- Build parameters for save_settings.php ---
+  const params = new URLSearchParams({
+    POOL_NAME: document.getElementById('pool').value,
+    THRESHOLD: thresholdInput.value,
+    INTERVAL: intervalInput.value,
+    DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+    ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+    AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
+    AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
+    AGE_DAYS: ageDaysInput.value,
+    SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
+    SIZE_MB: sizeMbInput.value,
+    EXCLUSIONS_ENABLED: document.getElementById('enable_exclusions').checked ? 'yes' : 'no',
+    QBITTORRENT_SCRIPT: document.getElementById('qbit_script').checked ? 'yes' : 'no',
+    QBITTORRENT_HOST: document.getElementById('qbit_host').value.trim(),
+    QBITTORRENT_USERNAME: document.getElementById('qbit_user').value.trim(),
+    QBITTORRENT_PASSWORD: document.getElementById('qbit_pass').value.trim(),
+    QBITTORRENT_DAYS_FROM: document.getElementById('qbit_days_from').value.trim(),
+    QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value.trim(),
+    QBITTORRENT_STATUS: document.getElementById('qbit_status').value.trim(),
+    HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
+    FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
+    CONTAINER_NAMES: document.getElementById('container_names').value.trim(),
+    ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
+    HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
+    ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
+    MODE: modeSelect.value,
+    CRON_EXPRESSION: cronExpression,
+    STOP_THRESHOLD: stopThresholdInput.value,
+    ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
+    WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || '',
+    MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no',
+    STOP_ALL_CONTAINERS: stopAll,
+    ENABLE_TRIM: document.getElementById('enable_trim_toggle').checked ? 'yes' : 'no',
+    ENABLE_SCRIPTS: document.getElementById('enable_scripts').checked ? 'yes' : 'no',
+    PRE_SCRIPT: document.getElementById('pre_script').value.trim(),
+    POST_SCRIPT: document.getElementById('post_script').value.trim(),
+  });
+
+  // ➕ Add new scheduling fields so they persist in settings.cfg
+  if (modeSelect.value === 'cron') {
+    params.set("CRON_MODE", document.getElementById("cron_mode").value);
+    params.set("HOURLY_FREQUENCY", document.getElementById("hourly_frequency")?.value || "");
+    params.set("DAILY_TIME", document.getElementById("daily_time")?.value || "");
+    params.set("WEEKLY_DAY", document.getElementById("weekly_day")?.value || "");
+    params.set("WEEKLY_TIME", document.getElementById("weekly_time")?.value || "");
+    params.set("MONTHLY_DAY", document.getElementById("monthly_day")?.value || "");
+    params.set("MONTHLY_TIME", document.getElementById("monthly_time")?.value || "");
+    params.set("CUSTOM_CRON", document.getElementById("custom_cron")?.value.trim() || "");
+  }
+
+  // --- Step 1: Save settings ---
+  fetch('/plugins/automover/helpers/save_settings.php?' + params.toString(), { method: 'GET' })
+    .then(res => res.json())
+    .then(saveData => {
+      if (saveData.status === 'error') {
+        alert('❌ Save failed: ' + (saveData.message || 'Unknown error'));
+        throw new Error('Save failed');
       }
 
-      // --- Final validation check ---
-      if (!(intervalValid && thresholdValid && stopThresholdValid && ageDaysValid &&
-        sizeMbValid && qbitValid && cronValid && webhookValid)) {
-        form.classList.add('shake');
-        setTimeout(() => form.classList.remove('shake'), 300);
+      // --- Step 2: Start cron only if save succeeded ---
+      const startForm = new URLSearchParams({
+        csrf_token: csrfToken,
+        MODE: modeSelect.value,
+        INTERVAL: intervalInput.value,
+        CRON_EXPRESSION: cronExpression
+      });
+
+      return fetch('/plugins/automover/helpers/start_cron.php', {
+        method: 'POST',
+        body: startForm
+      });
+    })
+    .then(res => res.json())
+    .then(cronData => {
+      if (!cronData || cronData.status !== 'ok') {
+        alert('⚠️ Settings saved, but failed to start schedule: ' + (cronData?.message || 'Unknown error'));
         return;
       }
 
-      // --- Build parameters for save_settings.php ---
-      const params = new URLSearchParams({
-        POOL_NAME: document.getElementById('pool').value,
-        THRESHOLD: thresholdInput.value,
-        INTERVAL: intervalInput.value,
-        DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-        ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-        AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
-        AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
-        AGE_DAYS: ageDaysInput.value,
-        SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
-        SIZE_MB: sizeMbInput.value,
-        EXCLUSIONS_ENABLED: document.getElementById('enable_exclusions').checked ? 'yes' : 'no',
-        QBITTORRENT_SCRIPT: document.getElementById('qbit_script').checked ? 'yes' : 'no',
-        QBITTORRENT_HOST: document.getElementById('qbit_host').value.trim(),
-        QBITTORRENT_USERNAME: document.getElementById('qbit_user').value.trim(),
-        QBITTORRENT_PASSWORD: document.getElementById('qbit_pass').value.trim(),
-        QBITTORRENT_DAYS_FROM: document.getElementById('qbit_days_from').value.trim(),
-        QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value.trim(),
-        QBITTORRENT_STATUS: document.getElementById('qbit_status').value.trim(),
-        HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
-        FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
-        CONTAINER_NAMES: document.getElementById('container_names').value.trim(),
-        ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
-        HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
-        ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
-        MODE: modeSelect.value,
-        CRON_EXPRESSION: cronInput.value,
-        STOP_THRESHOLD: stopThresholdInput.value,
-        ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
-        WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || '',
-        MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no',
-        STOP_ALL_CONTAINERS: stopAll,
-        ENABLE_TRIM: document.getElementById('enable_trim_toggle').checked ? 'yes' : 'no',
-        ENABLE_SCRIPTS: document.getElementById('enable_scripts').checked ? 'yes' : 'no',
-        PRE_SCRIPT: document.getElementById('pre_script').value.trim(),
-        POST_SCRIPT: document.getElementById('post_script').value.trim(),
-      });
-
-      // --- Step 1: Save settings ---
-      fetch('/plugins/automover/helpers/save_settings.php?' + params.toString(), { method: 'GET' })
-        .then(res => res.json())
-        .then(saveData => {
-          if (saveData.status === 'error') {
-            alert('❌ Save failed: ' + (saveData.message || 'Unknown error'));
-            throw new Error('Save failed');
-          }
-
-          // --- Step 2: Start cron only if save succeeded ---
-          const startForm = new URLSearchParams({
-            csrf_token: csrfToken,
-            MODE: modeSelect.value,
-            INTERVAL: intervalInput.value,
-            CRON_EXPRESSION: cronInput.value
-          });
-
-          return fetch('/plugins/automover/helpers/start_cron.php', {
-            method: 'POST',
-            body: startForm
-          });
-        })
-        .then(res => res.json())
-        .then(cronData => {
-          if (!cronData || cronData.status !== 'ok') {
-            alert('⚠️ Settings saved, but failed to start schedule: ' + (cronData?.message || 'Unknown error'));
-            return;
-          }
-
-          // Success animation
-          confirmBadge.style.display = 'block';
-          confirmBadge.style.opacity = '1';
-          confirmBadge.style.animation = 'flash 0.4s ease';
-          setTimeout(() => {
-            confirmBadge.style.opacity = '0';
-            confirmBadge.style.animation = '';
-            setTimeout(() => {
-              confirmBadge.style.display = 'none';
-            }, 400);
-          }, 2000);
-        })
-        .catch(err => {
-          console.error('Save + Start error:', err);
-          alert('❌ Save or Start failed — check console for details.');
-        });
+      // Success animation
+      confirmBadge.style.display = 'block';
+      confirmBadge.style.opacity = '1';
+      confirmBadge.style.animation = 'flash 0.4s ease';
+      setTimeout(() => {
+        confirmBadge.style.opacity = '0';
+        confirmBadge.style.animation = '';
+        setTimeout(() => {
+          confirmBadge.style.display = 'none';
+        }, 400);
+      }, 2000);
+    })
+    .catch(err => {
+      console.error('Save + Start error:', err);
+      alert('❌ Save or Start failed — check console for details.');
     });
+});
 
     // Initial counts
     function refreshExclusionCount() {
