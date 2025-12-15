@@ -2348,123 +2348,130 @@ if (file_exists("/etc/unraid-version")) {
         });
     });
 
-    // --- Interval + Cron Dropdown Toggle
-    (function waitForIntervalToggle() {
-      function initIntervalToggle() {
-        const modeSelect = document.getElementById('interval_mode');
-        const intervalRow = document.getElementById('interval-minutes-row');
-        const cronRow = document.getElementById('cron-expression-row');
-        const intervalInput = document.getElementById('interval');
+// --- Interval + Cron Dropdown Toggle
+(function waitForIntervalToggle() {
+  function initIntervalToggle() {
+    const modeSelect     = document.getElementById('interval_mode');
+    const intervalRow    = document.getElementById('interval-minutes-row');
+    const cronRow        = document.getElementById('cron-expression-row');
+    const intervalInput  = document.getElementById('interval');
 
-        // Selectors for all modes
-        const cronModeSelect = document.getElementById('cron_mode');
-        const dailyOptions = document.getElementById('daily-options');
-        const weeklyOptions = document.getElementById('weekly-options');
-        const hourlyOptions = document.getElementById('hourly-options');
-        const monthlyOptions = document.getElementById('monthly-options');
-        const customOptions = document.getElementById('custom-options');
+    // Cron selectors
+    const cronModeSelect = document.getElementById('cron_mode');
+    const dailyOptions   = document.getElementById('daily-options');
+    const weeklyOptions  = document.getElementById('weekly-options');
+    const hourlyOptions  = document.getElementById('hourly-options');
+    const monthlyOptions = document.getElementById('monthly-options');
+    const customOptions  = document.getElementById('custom-options');
 
-        const dailyTime = document.getElementById('daily_time');
-        const weeklyDay = document.getElementById('weekly_day');
-        const weeklyTime = document.getElementById('weekly_time');
-        const hourlyFreq = document.getElementById('hourly_frequency');
-        const monthlyDay = document.getElementById('monthly_day');
-        const monthlyTime = document.getElementById('monthly_time');
-        const customCron = document.getElementById('custom_cron');
+    const dailyTime   = document.getElementById('daily_time');
+    const weeklyDay   = document.getElementById('weekly_day');
+    const weeklyTime  = document.getElementById('weekly_time');
+    const hourlyFreq  = document.getElementById('hourly_frequency');
+    const monthlyDay  = document.getElementById('monthly_day');
+    const monthlyTime = document.getElementById('monthly_time');
+    const customCron  = document.getElementById('custom_cron');
 
-        if (!modeSelect || !intervalRow || !cronRow) return false;
+    if (!modeSelect || !intervalRow || !cronRow) return false;
 
-        // Toggle between minutes vs cron
-        function toggleMode(mode) {
-          if (mode === 'minutes') {
-            intervalRow.style.display = 'flex';
-            cronRow.style.display = 'none';
-            intervalInput.disabled = false;
-          } else {
-            intervalRow.style.display = 'none';
-            cronRow.style.display = 'flex';
-            intervalInput.disabled = true;
-          }
-        }
+    // Toggle between minutes vs cron
+    function toggleMode(mode) {
+      if (mode === 'minutes') {
+        intervalRow.style.display = 'flex';
+        cronRow.style.display     = 'none';
+        intervalInput.disabled    = false;
 
-        // Toggle which cron sub-options are visible
-        function toggleCronOptions(value) {
-          if (!cronModeSelect) return;
-          dailyOptions.style.display = (value === 'daily') ? 'block' : 'none';
-          weeklyOptions.style.display = (value === 'weekly') ? 'block' : 'none';
-          hourlyOptions.style.display = (value === 'hourly') ? 'block' : 'none';
-          monthlyOptions.style.display = (value === 'monthly') ? 'block' : 'none';
-          customOptions.style.display = (value === 'custom') ? 'block' : 'none';
-          updateCronExpression();
-        }
-
-        // Build cron string from dropdowns
-        function updateCronExpression() {
-          let cronString = "";
-
-          if (cronModeSelect?.value === "hourly" && hourlyFreq) {
-            const freq = parseInt(hourlyFreq.value, 10);
-            cronString = `0 */${freq} * * *`;
-          }
-          else if (cronModeSelect?.value === "daily" && dailyTime) {
-            const [hour, minute] = dailyTime.value.split(":");
-            cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * *`;
-          }
-          else if (cronModeSelect?.value === "weekly" && weeklyDay && weeklyTime) {
-            const [hour, minute] = weeklyTime.value.split(":");
-            const dayMap = {
-              Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
-              Thursday: 4, Friday: 5, Saturday: 6
-            };
-            cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * ${dayMap[weeklyDay.value]}`;
-          }
-          else if (cronModeSelect?.value === "monthly" && monthlyDay && monthlyTime) {
-            const [hour, minute] = monthlyTime.value.split(":");
-            const day = parseInt(monthlyDay.value, 10);
-            cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} ${day} * *`;
-          }
-          else if (cronModeSelect?.value === "custom" && customCron) {
-            cronString = customCron.value.trim();
-          }
-
-          // Store cron string in hidden input
-          let hidden = document.getElementById("cron_expression_hidden");
-          if (!hidden) {
-            hidden = document.createElement("input");
-            hidden.type = "hidden";
-            hidden.id = "cron_expression_hidden";
-            hidden.name = "CRON_EXPRESSION";
-            cronRow.appendChild(hidden);
-          }
-          hidden.value = cronString;
-        }
-
-        // Initialize visibility
-        toggleMode(modeSelect.value);
+        // hide all cron sub-options
+        dailyOptions.style.display   = 'none';
+        weeklyOptions.style.display  = 'none';
+        hourlyOptions.style.display  = 'none';
+        monthlyOptions.style.display = 'none';
+        customOptions.style.display  = 'none';
+      } else {
+        intervalRow.style.display = 'none';
+        cronRow.style.display     = 'flex';
+        intervalInput.disabled    = true;
         toggleCronOptions(cronModeSelect?.value);
+      }
+    }
 
-        // Event listeners
-        modeSelect.addEventListener('change', (e) => toggleMode(e.target.value));
-        cronModeSelect?.addEventListener('change', (e) => toggleCronOptions(e.target.value));
+    // Toggle which cron sub-options are visible
+    function toggleCronOptions(value) {
+      if (!cronModeSelect) return;
+      dailyOptions.style.display   = (value === 'daily')   ? 'block' : 'none';
+      weeklyOptions.style.display  = (value === 'weekly')  ? 'block' : 'none';
+      hourlyOptions.style.display  = (value === 'hourly')  ? 'block' : 'none';
+      monthlyOptions.style.display = (value === 'monthly') ? 'block' : 'none';
+      customOptions.style.display  = (value === 'custom')  ? 'block' : 'none';
+      updateCronExpression();
+    }
 
-        dailyTime?.addEventListener('change', updateCronExpression);
-        weeklyDay?.addEventListener('change', updateCronExpression);
-        weeklyTime?.addEventListener('change', updateCronExpression);
-        hourlyFreq?.addEventListener('change', updateCronExpression);
-        monthlyDay?.addEventListener('change', updateCronExpression);
-        monthlyTime?.addEventListener('change', updateCronExpression);
-        customCron?.addEventListener('input', updateCronExpression);
+    // Build cron string from dropdowns
+    function updateCronExpression() {
+      let cronString = "";
 
-        return true;
+      if (cronModeSelect?.value === "hourly" && hourlyFreq) {
+        const freq = parseInt(hourlyFreq.value, 10);
+        cronString = `0 */${freq} * * *`;
+      }
+      else if (cronModeSelect?.value === "daily" && dailyTime) {
+        const [hour, minute] = dailyTime.value.split(":");
+        cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * *`;
+      }
+      else if (cronModeSelect?.value === "weekly" && weeklyDay && weeklyTime) {
+        const [hour, minute] = weeklyTime.value.split(":");
+        const dayMap = {
+          Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
+          Thursday: 4, Friday: 5, Saturday: 6
+        };
+        cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} * * ${dayMap[weeklyDay.value]}`;
+      }
+      else if (cronModeSelect?.value === "monthly" && monthlyDay && monthlyTime) {
+        const [hour, minute] = monthlyTime.value.split(":");
+        const day = parseInt(monthlyDay.value, 10);
+        cronString = `${parseInt(minute, 10)} ${parseInt(hour, 10)} ${day} * *`;
+      }
+      else if (cronModeSelect?.value === "custom" && customCron) {
+        cronString = customCron.value.trim();
       }
 
-      if (!initIntervalToggle()) {
-        const observer = new MutationObserver(() => {
-          if (initIntervalToggle()) observer.disconnect();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+      // Store cron string in hidden input
+      let hidden = document.getElementById("cron_expression_hidden");
+      if (!hidden) {
+        hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.id = "cron_expression_hidden";
+        hidden.name = "CRON_EXPRESSION";
+        cronRow.appendChild(hidden);
       }
-    })();
+      hidden.value = cronString;
+    }
+
+    // Initialize visibility
+    toggleMode(modeSelect.value);
+
+    // Event listeners
+    modeSelect.addEventListener('change', (e) => toggleMode(e.target.value));
+    cronModeSelect?.addEventListener('change', (e) => toggleCronOptions(e.target.value));
+
+    dailyTime?.addEventListener('change', updateCronExpression);
+    weeklyDay?.addEventListener('change', updateCronExpression);
+    weeklyTime?.addEventListener('change', updateCronExpression);
+    hourlyFreq?.addEventListener('change', updateCronExpression);
+    monthlyDay?.addEventListener('change', updateCronExpression);
+    monthlyTime?.addEventListener('change', updateCronExpression);
+    customCron?.addEventListener('input', updateCronExpression);
+
+    return true;
+  }
+
+  if (!initIntervalToggle()) {
+    const observer = new MutationObserver(() => {
+      if (initIntervalToggle()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+})();
 
     // === Toggle HASH_PATH dropdown visibility based on ENABLE_JDUPES ===
     const enableJdupesCheckbox = document.getElementById('ENABLE_JDUPES');
