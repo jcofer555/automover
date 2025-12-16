@@ -1266,7 +1266,7 @@ if (file_exists("/etc/unraid-version")) {
 <div class="form-pair" id="cron-expression-row">
   <label for="cron_mode">
     <span class="automovertip" title="Select scheduling selection">
-      Scheduling Selection:
+      Scheduling:
     </span>
   </label>
   <div class="input-wrapper">
