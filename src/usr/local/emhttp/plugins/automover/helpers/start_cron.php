@@ -3,46 +3,25 @@ $cfgPath  = '/boot/config/plugins/automover/settings.cfg';
 $cronFile = '/boot/config/plugins/automover/automover.cron';
 $response = ['status' => 'ok'];
 
-$MODE            = $_POST['MODE'] ?? 'minutes';
-$INTERVAL        = intval($_POST['INTERVAL'] ?? 60);
+// Grab all posted values
+$CRON_MODE       = $_POST['CRON_MODE'] ?? 'minutes';
+$MINUTES_FREQ    = intval($_POST['MINUTES_FREQUENCY'] ?? 2);
+$HOURLY_FREQ     = $_POST['HOURLY_FREQUENCY'] ?? '';
+$DAILY_TIME      = $_POST['DAILY_TIME'] ?? '';
+$WEEKLY_DAY      = $_POST['WEEKLY_DAY'] ?? '';
+$WEEKLY_TIME     = $_POST['WEEKLY_TIME'] ?? '';
+$MONTHLY_DAY     = $_POST['MONTHLY_DAY'] ?? '';
+$MONTHLY_TIME    = $_POST['MONTHLY_TIME'] ?? '';
+$CUSTOM_CRON     = $_POST['CUSTOM_CRON'] ?? '';
 $CRON_EXPRESSION = trim($_POST['CRON_EXPRESSION'] ?? '');
 
-// Build cron entry depending on mode
-if ($MODE === 'cron' && !empty($CRON_EXPRESSION)) {
+// Build cron entry directly from CRON_EXPRESSION
+if (!empty($CRON_EXPRESSION)) {
     $cronEntry = "$CRON_EXPRESSION /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
 } else {
-    // INTERVAL MODE: convert minutes to proper cron
-    if ($INTERVAL < 60) {
-        // every X minutes
-        $minutes = max(1, $INTERVAL);
-        $cronEntry = "*/{$minutes} * * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
-    } elseif ($INTERVAL < 1440) {
-        // every X hours
-        $hours = max(1, floor($INTERVAL / 60));
-        $minute = $INTERVAL % 60;
-        $cronEntry = sprintf("%d */%d * * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n", $minute, $hours);
-    } elseif ($INTERVAL < 10080) {
-        // every X days
-        $days = max(1, floor($INTERVAL / 1440));
-        $hour = floor(($INTERVAL % 1440) / 60);
-        $minute = $INTERVAL % 60;
-        $cronEntry = sprintf("%d %d */%d * * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n", $minute, $hour, $days);
-    } elseif ($INTERVAL < 43200) {
-        // every X weeks (7-day multiples)
-        $weeks = max(1, floor($INTERVAL / 10080));
-        $day = 0; // Sunday
-        $hour = floor(($INTERVAL % 1440) / 60);
-        $minute = $INTERVAL % 60;
-        $cronEntry = sprintf("%d %d * * %d /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n", $minute, $hour, $day);
-    } else {
-        // every X months (approx 30-day multiples)
-        $months = max(1, floor($INTERVAL / 43200));
-        $day = 1;
-        $hour = 0;
-        $minute = 0;
-        $cronEntry = sprintf("%d %d %d */%d * /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n",
-            $minute, $hour, $day, $months);
-    }
+    http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => 'Missing cron expression']);
+    exit;
 }
 
 // Write new cron and update system
@@ -51,14 +30,29 @@ if (file_put_contents($cronFile, $cronEntry) === false) {
     echo json_encode(['status' => 'error', 'message' => 'Failed to write cron file']);
     exit;
 }
-
 exec('update_cron');
 
-// Persist mode and values in settings.cfg
+// Persist values in settings.cfg
 $settings = parse_ini_file($cfgPath) ?: [];
-$settings['MODE'] = $MODE;
-$settings['INTERVAL'] = $INTERVAL;
-$settings['CRON_EXPRESSION'] = $CRON_EXPRESSION;
+
+// Merge all posted keys into settings
+foreach ($_POST as $key => $val) {
+    $settings[$key] = $val;
+}
+
+// Ensure scheduling fields are set explicitly
+$settings['CRON_MODE']         = $CRON_MODE;
+$settings['MINUTES_FREQUENCY'] = $MINUTES_FREQ;
+$settings['HOURLY_FREQUENCY']  = $HOURLY_FREQ;
+$settings['DAILY_TIME']        = $DAILY_TIME;
+$settings['WEEKLY_DAY']        = $WEEKLY_DAY;
+$settings['WEEKLY_TIME']       = $WEEKLY_TIME;
+$settings['MONTHLY_DAY']       = $MONTHLY_DAY;
+$settings['MONTHLY_TIME']      = $MONTHLY_TIME;
+$settings['CUSTOM_CRON']       = $CUSTOM_CRON;
+$settings['CRON_EXPRESSION']   = $CRON_EXPRESSION;
+
+// Rebuild config text
 $cfgOut = '';
 foreach ($settings as $k => $v) {
     $cfgOut .= "$k=\"$v\"\n";

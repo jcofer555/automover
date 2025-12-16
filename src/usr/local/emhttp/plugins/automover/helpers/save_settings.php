@@ -8,7 +8,6 @@ $cmd = '/usr/local/emhttp/plugins/automover/helpers/save_settings.sh';
 $args = [
     $_GET['POOL_NAME'] ?? '',
     $_GET['THRESHOLD'] ?? '',
-    $_GET['INTERVAL'] ?? '',
     $_GET['DRY_RUN'] ?? '',
     $_GET['ALLOW_DURING_PARITY'] ?? '',
     $_GET['AUTOSTART'] ?? '',
@@ -30,8 +29,8 @@ $args = [
     $_GET['ENABLE_JDUPES'] ?? '',
     $_GET['HASH_PATH'] ?? '',
     $_GET['ENABLE_CLEANUP'] ?? '',
-    $_GET['MODE'] ?? '',
     $_GET['CRON_MODE'] ?? '',
+    $_GET['MINUTES_FREQUENCY'] ?? '',
     $_GET['HOURLY_FREQUENCY'] ?? '',
     $_GET['DAILY_TIME'] ?? '',
     $_GET['WEEKLY_DAY'] ?? '',
