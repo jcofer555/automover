@@ -1306,34 +1306,28 @@ if (file_exists("/etc/unraid-version")) {
   </div>
 </div>
 
-    <!-- Hourly Options -->
-    <div id="hourly-options" style="display:none; margin-top:10px;">
-      <div class="form-pair">
-        <label for="hourly_frequency">
-          <span class="automovertip" title="Select hourly frequency">
-            Select Frequency:
-          </span>
-        </label>
-        <div class="input-wrapper">
-          <span class="automovertip" title="Select hourly frequency">
-            <select id="hourly_frequency" name="HOURLY_FREQUENCY" class="short-input">
-              <option value="1" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '' )==='1' ) ? 'selected' : '' ; ?>>Every
-                1 Hour</option>
-              <option value="2" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '' )==='2' ) ? 'selected' : '' ; ?>>Every
-                2 Hours</option>
-              <option value="3" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '' )==='3' ) ? 'selected' : '' ; ?>>Every
-                3 Hours</option>
-              <option value="4" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '' )==='4' ) ? 'selected' : '' ; ?>>Every
-                4 Hours</option>
-              <option value="6" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '' )==='6' ) ? 'selected' : '' ; ?>>Every
-                6 Hours</option>
-              <option value="8" <?php echo (($settings['HOURLY_FREQUENCY'] ?? '' )==='8' ) ? 'selected' : '' ; ?>>Every
-                8 Hours</option>
-            </select>
-          </span>
-        </div>
-      </div>
+<!-- Hourly Options -->
+<div id="hourly-options" style="display:none; margin-top:10px;">
+  <div class="form-pair">
+    <label for="hourly_frequency">
+      <span class="automovertip" title="Select hourly frequency">
+        Select Frequency:
+      </span>
+    </label>
+    <div class="input-wrapper">
+      <span class="automovertip" title="Select hourly frequency">
+        <select id="hourly_frequency" name="HOURLY_FREQUENCY" class="short-input">
+          <?php
+          for ($i = 1; $i <= 23; $i++) {
+              $selected = (($settings['HOURLY_FREQUENCY'] ?? '') === (string)$i) ? 'selected' : '';
+              echo "<option value=\"$i\" $selected>Every $i Hour" . ($i > 1 ? 's' : '') . "</option>";
+          }
+          ?>
+        </select>
+      </span>
     </div>
+  </div>
+</div>
 
     <!-- Daily Options -->
     <div id="daily-options" style="display:none; margin-top:10px;">
