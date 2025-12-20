@@ -18,10 +18,11 @@
 - Option to have notifications sent to unraid or discord
 - Two schedule modes interval and cron expression to choose from
 - Option to have start and finish notifications sent to unraid or discord
-- Option to do a manual move using rsync where you pick the source and destination
+- Option to run a seperate script pre move and/or post move
+- Option to run trim after moving is done
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
 - Jdupes option built in to re-hardlink any files after every move
-- Manual rsync option usin the manual move checkbox
+- Manual rsync options using the manual move checkbox
 - Option to stop containers before moves and start them back after finish
 - Ability to force turbo write on during move
 - Ability to manually set file/folder excludes
@@ -31,4 +32,4 @@
 - Logging available in the webui
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="392" alt="image" src="https://github.com/user-attachments/assets/cc1108cf-c76f-41fb-9251-6301fa924879" />
+<img width="1000" height="392" alt="image" src="https://github.com/user-attachments/assets/669bb54b-ff11-48cd-8994-2e86c2ed15ba" />
