@@ -5,7 +5,7 @@ $response = ['status' => 'ok'];
 
 // Grab all posted values
 $CRON_MODE       = $_POST['CRON_MODE'] ?? 'minutes';
-$MINUTES_FREQ    = intval($_POST['MINUTES_FREQUENCY'] ?? 2);
+$MINUTES_FREQ    = intval($_POST['MINUTES_FREQUENCY'] ?? 60);
 $HOURLY_FREQ     = $_POST['HOURLY_FREQUENCY'] ?? '';
 $DAILY_TIME      = $_POST['DAILY_TIME'] ?? '';
 $WEEKLY_DAY      = $_POST['WEEKLY_DAY'] ?? '';
