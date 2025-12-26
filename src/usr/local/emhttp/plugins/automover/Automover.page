@@ -34,7 +34,7 @@ $defaults = [
     'HASH_PATH' => '/mnt/user/appdata',
     'ENABLE_CLEANUP' => 'no',
     'CRON_MODE' => 'minutes',
-    'MINUTES_FREQUENCY' => '60',
+    'MINUTES_FREQUENCY' => '30',
     'HOURLY_FREQUENCY' => '',
     'DAILY_TIME' => '',
     'WEEKLY_DAY' => '',
@@ -1299,9 +1299,9 @@ if (file_exists("/etc/unraid-version")) {
           $raw = $settings['MINUTES_FREQUENCY'] ?? '';
           $freq = intval($raw);
 
-          // If missing, invalid, or < 2 → default to 60
+          // If missing, invalid, or < 2 → default to 30
           if ($freq < 2) {
-            $freq = 60;
+            $freq = 30;
           }
         ?>
 
