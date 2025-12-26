@@ -55,7 +55,7 @@ upgradepkg --install-new "$PACKAGE_TXZ"
 upgradepkg --install-new "/boot/config/plugins/{{ name }}/jdupes-1.30.0-x86_64-2_slackdce.txz"
 upgradepkg --install-new "/boot/config/plugins/{{ name }}/libjodycode-4.0.1-x86_64-2_slackdce.txz"
 
-# Ordered config keys
+# Ordered config keys (new cron-only model)
 ordered_keys=(
     "POOL_NAME"
     "THRESHOLD"
@@ -139,7 +139,7 @@ MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
 
 if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
   if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
-    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover. \nConsider uninstalling one to avoid incompatibility issues."
+    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues."
   fi
 fi
 
@@ -147,71 +147,29 @@ fi
 find /boot/config/plugins/{{ name }}/ -maxdepth 1 -type f -name "{{ package_name }}-*.txz" ! -name "{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz" -delete
 
 # ==========================================================
-#  HANDLE AUTOSTART + CRON GENERATION
+#  HANDLE AUTOSTART + CRON GENERATION (NEW CRON-ONLY MODEL)
 # ==========================================================
+CRON_CMD="/usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1"
+
 if [ "$AUTOSTART" == "no" ]; then
     rm -f "$CRON_FILE"
-    echo ""
-    echo "----------------------------------------------------"
-    echo " {{ name }} has been installed."
-    echo " Version: {{ env['PLUGIN_VERSION'] }}"
-    echo "----------------------------------------------------"
-    echo ""
 else
-    MODE="${MODE:-minutes}"
-    INTERVAL=${INTERVAL:-60}
-    CRON_EXPRESSION="${CRON_EXPRESSION:-}"
-    CRON_CMD="/usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1"
-
-    # Build cron entry based on MODE
-    if [ "$MODE" = "cron" ] && [ -n "$CRON_EXPRESSION" ]; then
-        cronEntry="${CRON_EXPRESSION} ${CRON_CMD}"
+    if [ -n "$CRON_EXPRESSION" ]; then
+        echo "${CRON_EXPRESSION} ${CRON_CMD}" > "$CRON_FILE"
     else
-        # INTERVAL mode — convert minutes into cron schedule
-        if [ "$INTERVAL" -lt 60 ]; then
-            # every X minutes
-            minutes=$(( INTERVAL > 0 ? INTERVAL : 1 ))
-            cronEntry="*/${minutes} * * * * ${CRON_CMD}"
-        elif [ "$INTERVAL" -lt 1440 ]; then
-            # every X hours
-            hours=$(( INTERVAL / 60 ))
-            [ "$hours" -lt 1 ] && hours=1
-            minute=$(( INTERVAL % 60 ))
-            cronEntry="$(printf "%d */%d * * * %s" "$minute" "$hours" "$CRON_CMD")"
-        elif [ "$INTERVAL" -lt 10080 ]; then
-            # every X days
-            days=$(( INTERVAL / 1440 ))
-            [ "$days" -lt 1 ] && days=1
-            hour=$(( (INTERVAL % 1440) / 60 ))
-            minute=$(( INTERVAL % 60 ))
-            cronEntry="$(printf "%d %d */%d * * %s" "$minute" "$hour" "$days" "$CRON_CMD")"
-        elif [ "$INTERVAL" -lt 43200 ]; then
-            # every X weeks (7-day multiples)
-            weeks=$(( INTERVAL / 10080 ))
-            [ "$weeks" -lt 1 ] && weeks=1
-            day=0  # Sunday
-            hour=$(( (INTERVAL % 1440) / 60 ))
-            minute=$(( INTERVAL % 60 ))
-            cronEntry="$(printf "%d %d * * %d %s" "$minute" "$hour" "$day" "$CRON_CMD")"
-        else
-            # every X months (~30-day multiples)
-            months=$(( INTERVAL / 43200 ))
-            [ "$months" -lt 1 ] && months=1
-            cronEntry="$(printf "0 0 1 */%d * %s" "$months" "$CRON_CMD")"
-        fi
+        rm -f "$CRON_FILE"
     fi
-
-    # Write to cron file and apply
-    echo "$cronEntry" > "$CRON_FILE"
     update_cron
-
-    echo ""
-    echo "----------------------------------------------------"
-    echo " {{ name }} has been installed."
-    echo " Version: {{ env['PLUGIN_VERSION'] }}"
-    echo "----------------------------------------------------"
-    echo ""
 fi
+
+echo ""
+echo "----------------------------------------------------"
+echo " {{ name }} has been installed."
+echo " Version: {{ env['PLUGIN_VERSION'] }}"
+echo "----------------------------------------------------"
+echo ""
+echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover."
+echo ""
 
 ]]>
 </INLINE>
