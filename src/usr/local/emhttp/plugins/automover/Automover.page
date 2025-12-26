@@ -3423,8 +3423,17 @@ fetch('/plugins/automover/helpers/save_settings.php?' + params.toString(), { met
           }
         }).catch(() => { });
     }
-    refreshExclusionCount();
-  });
+refreshExclusionCount();
+
+// --- Normalize minutes_frequency on page load ---
+const minutesField = document.getElementById('minutes_frequency');
+let freq = parseInt(minutesField.value, 10);
+
+if (!freq || isNaN(freq) || freq < 2) {
+    minutesField.value = 60;
+}
+
+});
 
   // Keep pool-usage warning + CA update check
   document.addEventListener("DOMContentLoaded", () => {
