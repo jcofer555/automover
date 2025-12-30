@@ -139,7 +139,7 @@ MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
 
 if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
   if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
-    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues."
+    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues"
   fi
 fi
 
@@ -168,7 +168,10 @@ echo " {{ name }} has been installed."
 echo " Version: {{ env['PLUGIN_VERSION'] }}"
 echo "----------------------------------------------------"
 echo ""
-echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover."
+echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover"
+echo ""
+echo ""
+echo "⚠️ It's suggested to disable unraids built in mover schedule at settings > scheduler this requires unraid 7.2.1+"
 echo ""
 
 ]]>
