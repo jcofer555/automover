@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2025.12.27.03"
+  version="2025.12.30.01"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2025.12.30.01
+
+- Added message at install to suggest disabling unraids built in mover schedule
+
 ### 2025.12.27.03
 
 - Fix for install/upgrade cron
@@ -23,10 +27,6 @@
 ### 2025.12.26.03
 
 - If you were on version 2025.12.15.04 or earlier you need to re-setup your schedule/internal settings at settings -> automover after updating
-
-### 2025.12.17.01
-
-- Expanded hourly options to offer every increment
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -41,9 +41,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.12.27.03-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2025.12.27.03/unraid-automover-2025.12.27.03-noarch-1.txz</URL>
-<SHA256>70cb0082d35647d0ad9073c15506b0206b02e4cbbe7fef8a42f658843e38621f</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2025.12.30.01-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2025.12.30.01/unraid-automover-2025.12.30.01-noarch-1.txz</URL>
+<SHA256>b4b71297eb33db3d74b2169612730ef8ea597a786697ee3a44dc8e431cc8e37b</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -56,7 +56,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.12.27.03-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2025.12.30.01-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -151,12 +151,12 @@ MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
 
 if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
   if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
-    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues."
+    echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues"
   fi
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.12.27.03-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2025.12.30.01-noarch-1.txz" -delete
 
 # ==========================================================
 #  HANDLE AUTOSTART + CRON GENERATION (NEW CRON-ONLY MODEL)
@@ -177,10 +177,13 @@ fi
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2025.12.27.03"
+echo " Version: 2025.12.30.01"
 echo "----------------------------------------------------"
 echo ""
-echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover."
+echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover"
+echo ""
+echo ""
+echo "⚠️ It's suggested to disable unraids built in mover schedule at settings > scheduler this requires unraid 7.2.1+"
 echo ""
 
 ]]>
