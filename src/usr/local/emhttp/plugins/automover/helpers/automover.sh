@@ -1253,16 +1253,15 @@ fi
 # ==========================================================
 if [[ "$ENABLE_TRIM" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == true ]]; then
     set_status "Running ssd trim"
-    echo "Starting ssd trim" >> "$LAST_RUN_FILE"
 
     # Execute TRIM using php wrapper
     /usr/local/emhttp/plugins/dynamix/scripts/ssd_trim cron >/dev/null 2>&1
     exit_code=$?
 
     if [[ $exit_code -eq 0 ]]; then
-        echo "Finished ssd trim" >> "$LAST_RUN_FILE"
+        echo "Ssd trim finished" >> "$LAST_RUN_FILE"
     else
-        echo "Failed ssd trim" >> "$LAST_RUN_FILE"
+        echo "Ssd trim failed" >> "$LAST_RUN_FILE"
     fi
 
 elif [[ "$ENABLE_TRIM" == "yes" && "$DRY_RUN" == "yes" ]]; then
