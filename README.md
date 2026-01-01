@@ -3,7 +3,6 @@
 **Monitor pool disks, move files from pool only when thresholds are exceeded, and log what's been moved.**
 
 ## Features ##
-
 - Monitor selected pool disks only (cache, other pools — excludes array)
 - Enable dry-run mode to simulate triggers
 - Selected pool's usage % is displayed
@@ -16,7 +15,8 @@
 - Option to trim ssd disks after files are moved
 - Option to run a script pre move and/or post move
 - Option to have notifications sent to unraid or discord
-- Two schedule modes interval and cron expression to choose from
+- Ability to set cpu and i/o priorities
+- Scheduling options available (minutes, hourly, daily, weekly, monthly)
 - Option to have start and finish notifications sent to unraid or discord
 - Option to run a seperate script pre move and/or post move
 - Option to run trim after moving is done
@@ -30,6 +30,7 @@
 - Ability to exclude files from moving unless they are X amount of days or older
 - Ability to exclude files from moving unless they are at least X MB in size or larger
 - Logging available in the webui
+- Recommend disabling unraids built in mover schedule at settings > scheduler which requires unraid 7.2.1+
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="392" alt="image" src="https://github.com/user-attachments/assets/669bb54b-ff11-48cd-8994-2e86c2ed15ba" />
+<img width="1000" height="414" alt="image" src="https://github.com/user-attachments/assets/89fc5123-219f-424e-82d1-9a24089afa72" />
