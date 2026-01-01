@@ -383,9 +383,55 @@ for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
            QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
            FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP \
            MODE CRON_EXPRESSION STOP_THRESHOLD ENABLE_NOTIFICATIONS STOP_ALL_CONTAINERS \
-           ENABLE_TRIM ENABLE_SCRIPTS PRE_SCRIPT POST_SCRIPT; do
+           ENABLE_TRIM ENABLE_SCRIPTS PRE_SCRIPT POST_SCRIPT \
+           PROCESS_PRIORITY IO_PRIORITY PRIORITIES; do
   eval "$var=\$(echo \${$var} | tr -d '\"')"
 done
+
+# ==========================
+# Normalize priority values
+# ==========================
+
+# PRIORITIES flag: only "yes" enables priority wrapper
+if [[ "$PRIORITIES" != "yes" ]]; then
+  PROCESS_PRIORITY=""
+  IO_CLASS=""
+  IO_LEVEL=""
+else
+  # CPU nice priority: -20 to 19
+  if [[ -z "$PROCESS_PRIORITY" || ! "$PROCESS_PRIORITY" =~ ^-?[0-9]+$ ]]; then
+    PROCESS_PRIORITY=0
+  elif (( PROCESS_PRIORITY < -20 )); then
+    PROCESS_PRIORITY=-20
+  elif (( PROCESS_PRIORITY > 19 )); then
+    PROCESS_PRIORITY=19
+  fi
+
+  # IO priority:
+  # Allowed:
+  #   idle      → ionice -c3
+  #   be:N      → ionice -c2 -n N
+  #
+case "$IO_PRIORITY" in
+  idle)
+    IO_CLASS=3
+    IO_LEVEL=""
+    ;;
+  be:[0-7])
+    IO_CLASS=2
+    IO_LEVEL="${IO_PRIORITY#be:}"
+    ;;
+  normal|"")
+    IO_CLASS=""
+    IO_LEVEL=""
+    ;;
+  *)
+    # fallback to normal
+    IO_CLASS=""
+    IO_LEVEL=""
+    ;;
+esac
+fi
 
 # ==========================================================
 #  Header
@@ -403,6 +449,20 @@ fi
 } >> "$LAST_RUN_FILE"
 
 log_session_end() {
+if [[ "$moved_anything" == true ]]; then
+    if [[ "$PRIORITIES" == "yes" ]]; then
+        echo "Cpu priority: $PROCESS_PRIORITY" >> "$LAST_RUN_FILE"
+
+        if [[ "$IO_PRIORITY" == "normal" ]]; then
+            echo "I/O priority: normal" >> "$LAST_RUN_FILE"
+        elif [[ "$IO_CLASS" == "3" ]]; then
+            echo "I/O priority: idle" >> "$LAST_RUN_FILE"
+        else
+            echo "I/O priority: best-effort $IO_LEVEL" >> "$LAST_RUN_FILE"
+        fi
+    fi
+fi
+
   end_time=$(date +%s)
   duration=$((end_time - start_time))
   if (( duration < 60 )); then
@@ -453,6 +513,29 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 set_status "Prepping Rsync"
 RSYNC_OPTS=(-aiHAX --numeric-ids --checksum --perms --owner --group)
 [[ "$DRY_RUN" == "yes" ]] && RSYNC_OPTS+=(--dry-run) || RSYNC_OPTS+=(--remove-source-files)
+
+# ==========================================================
+# Build rsync priority wrapper
+# ==========================================================
+RSYNC_WRAPPER=()
+
+if [[ "$PRIORITIES" == "yes" ]]; then
+
+  # CPU priority
+  if [[ -n "$PROCESS_PRIORITY" ]]; then
+    RSYNC_WRAPPER+=(nice -n "$PROCESS_PRIORITY")
+  fi
+
+  # IO priority
+  if [[ -n "$IO_CLASS" ]]; then
+    if [[ "$IO_CLASS" == "3" ]]; then
+      RSYNC_WRAPPER+=(ionice -c3)
+    elif [[ "$IO_CLASS" == "2" ]]; then
+      RSYNC_WRAPPER+=(ionice -c2 -n "$IO_LEVEL")
+    fi
+  fi
+
+fi
 
 # ==========================================================
 #  Pool usage check
@@ -916,7 +999,7 @@ if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]];
 fi
 
 # --- NOW do the move ---
-rsync "${RSYNC_OPTS[@]}" -- "$srcfile" "$dstdir/" >/dev/null 2>&1
+"${RSYNC_WRAPPER[@]}" rsync "${RSYNC_OPTS[@]}" "$srcfile" "$dstdir/" >/dev/null 2>&1
 sync
 sleep 1
 

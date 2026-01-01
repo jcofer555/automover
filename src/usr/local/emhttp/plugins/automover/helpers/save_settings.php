@@ -48,6 +48,9 @@ $args = [
     $_GET['ENABLE_SCRIPTS'] ?? '',
     $_GET['PRE_SCRIPT'] ?? '',
     $_GET['POST_SCRIPT'] ?? '',
+    $_GET['PRIORITIES'] ?? '',
+    $_GET['PROCESS_PRIORITY'] ?? '',
+    $_GET['IO_PRIORITY'] ?? '',
 ];
 
 // Escape each argument for safety

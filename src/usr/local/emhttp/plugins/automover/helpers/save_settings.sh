@@ -46,6 +46,9 @@ ENABLE_TRIM="${39:-no}"
 ENABLE_SCRIPTS="${40:-no}"
 PRE_SCRIPT="${41:-}"
 POST_SCRIPT="${42:-}"
+PRIORITIES="${43:-no}"
+PROCESS_PRIORITY="${44:-0}"
+IO_PRIORITY="${45:-normal}"
 
 # ==========================================================
 #  Normalize and sanitize CONTAINER_NAMES
@@ -102,6 +105,9 @@ fi
   echo "ENABLE_SCRIPTS=\"$ENABLE_SCRIPTS\""
   echo "PRE_SCRIPT=\"$PRE_SCRIPT\""
   echo "POST_SCRIPT=\"$POST_SCRIPT\""
+  echo "PRIORITIES=\"$PRIORITIES\""
+  echo "PROCESS_PRIORITY=\"$PROCESS_PRIORITY\""
+  echo "IO_PRIORITY=\"$IO_PRIORITY\""
 } > "$CONFIG"
 
 echo '{"status":"ok"}'

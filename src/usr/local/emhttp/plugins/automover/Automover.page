@@ -51,7 +51,11 @@ $defaults = [
     'ENABLE_TRIM' => 'no',
     'ENABLE_SCRIPTS' => 'no',
     'PRE_SCRIPT' => '',
-    'POST_SCRIPT' => ''
+    'POST_SCRIPT' => '',
+    'PRIORITIES' => 'no',
+    'PROCESS_PRIORITY' => '0',
+    'IO_PRIORITY' => 'normal',
+
 ];
 
 // Load existing config if present
@@ -1545,6 +1549,61 @@ if (file_exists("/etc/unraid-version")) {
       </div>
     </div>
 
+    <!-- Process Priority -->
+    <div class="form-pair priority-row">
+      <label for="process_priority">
+        <span title="Cpu scheduling priority (-20 = highest priority, 19 = lowest)" class="automovertip">
+          Cpu Priority:
+        </span>
+      </label>
+
+      <div class="input-wrapper">
+        <span title="Cpu scheduling priority (-20 = highest priority, 19 = lowest)" class="automovertip">
+          <select id="process_priority">
+            <?php
+        $proc = $settings['PROCESS_PRIORITY'] ?? '0';
+        for ($i = -20; $i <= 19; $i++) {
+          $sel = ($proc == $i) ? 'selected' : '';
+          echo "<option value=\"$i\" $sel>$i</option>";
+        }
+      ?>
+          </select>
+        </span>
+      </div>
+    </div>
+
+    <!-- IO Priority -->
+    <div class="form-pair priority-row">
+      <label for="io_priority">
+        <span
+          title="I/O scheduling priority (Best effort 0 is highest priority and idle makes it so moving only happens when no other process is performing i/o)"
+          class="automovertip">
+          I/O Priority:
+        </span>
+      </label>
+
+      <div class="input-wrapper">
+        <span
+          title="I/O scheduling priority (Best effort 0 is highest priority and idle makes it so moving only happens when no other process is performing i/o)"
+          class="automovertip">
+          <select id="io_priority">
+            <option value="normal" <?php echo (($settings['IO_PRIORITY'] ?? 'normal' )==='normal' ) ? 'selected' : '' ?>
+              >Normal</option>
+            <?php
+        $io = $settings['IO_PRIORITY'] ?? 'normal';
+        for ($i=0; $i<=7; $i++) {
+          $val = "be:$i";
+          $sel = ($io === $val) ? 'selected' : '';
+          echo "<option value=\"$val\" $sel>Best-effort $i</option>";
+        }
+      ?>
+            <option value="idle" <?php echo (($settings['IO_PRIORITY'] ?? 'normal' )==='idle' ) ? 'selected' : '' ?>
+              >Idle</option>
+          </select>
+        </span>
+      </div>
+    </div>
+
     <!-- Age -->
     <div class="form-pair" id="age-days-container" style="display:none;">
       <label for="age_days" <span title="Only move files older than this many days" class="automovertip">Age
@@ -1899,6 +1958,14 @@ if (file_exists("/etc/unraid-version")) {
           <input type="checkbox" id="enable_trim_toggle" name="ENABLE_TRIM" <?php echo (($settings['ENABLE_TRIM']
             ?? 'no' )==='yes' ) ? 'checked' : '' ; ?>>
           Enable SSD Trim
+        </label>
+      </span>
+
+      <span title="Enable cpu and I/O priority controls" class="automovertip">
+        <label>
+          <input type="checkbox" id="priorities" name="PRIORITIES" <?php echo (($settings['PRIORITIES'] ?? 'no'
+            )==='yes' ) ? 'checked' : '' ; ?>>
+          Cpu & I/O Priorities
         </label>
       </span>
 
@@ -2459,6 +2526,23 @@ if (file_exists("/etc/unraid-version")) {
       }
     })();
 
+    // ===============================
+    // Priority visibility toggle
+    // ===============================
+    function updatePriorityVisibility() {
+      const enabled = document.getElementById("priorities").checked;
+
+      document.querySelectorAll(".priority-row").forEach(row => {
+        row.style.display = enabled ? "" : "none";
+      });
+    }
+
+    // Bind events
+    document.getElementById("priorities").addEventListener("change", updatePriorityVisibility);
+
+    // Initialize on page load
+    window.addEventListener("DOMContentLoaded", updatePriorityVisibility);
+
     // === Toggle HASH_PATH dropdown visibility based on ENABLE_JDUPES ===
     const enableJdupesCheckbox = document.getElementById('ENABLE_JDUPES');
     const hashPathRow = document.getElementById('hashPathRow');
@@ -2820,6 +2904,34 @@ if (file_exists("/etc/unraid-version")) {
       // (your existing AJAX code)
 
     });
+
+    // ===============================
+    // Priority validation
+    // ===============================
+    const prioritiesEnabled = document.getElementById("priorities").checked;
+
+    if (prioritiesEnabled) {
+
+      // CPU priority validation
+      const proc = document.getElementById("process_priority").value;
+      const procInt = parseInt(proc, 10);
+
+      if (isNaN(procInt) || procInt < -20 || procInt > 19) {
+        shake("process_priority");
+        showError("Process Priority must be between -20 and 19");
+        return;
+      }
+
+      // IO priority validation
+      const io = document.getElementById("io_priority").value;
+      const validIO = /^normal$|^idle$|^be:[0-7]$/.test(io);
+
+      if (!validIO) {
+        shake("io_priority");
+        showError("Invalid I/O Priority selection");
+        return;
+      }
+    }
 
     // === Qbittorrent Validation ===
     const qbitHostInput = document.getElementById('qbit_host');
@@ -3264,6 +3376,29 @@ if (file_exists("/etc/unraid-version")) {
       const qbitValid = validateQbitFields();
       const webhookValid = validateWebhook();
 
+      // --- Priority validation ---
+      const prioritiesEnabled = document.getElementById('priorities').checked;
+
+      if (prioritiesEnabled) {
+        const proc = document.getElementById('process_priority').value;
+        const procInt = parseInt(proc, 10);
+
+        if (isNaN(procInt) || procInt < -20 || procInt > 19) {
+          shake("process_priority");
+          showError("Process Priority must be between -20 and 19");
+          return;
+        }
+
+        const io = document.getElementById('io_priority').value;
+        const validIO = /^normal$|^idle$|^be:[0-7]$/.test(io);
+
+        if (!validIO) {
+          shake("io_priority");
+          showError("Invalid I/O Priority selection");
+          return;
+        }
+      }
+
       // --- Build cron string from dropdowns ---
       let cronExpression = '';
       const cronModeSelect = document.getElementById('cron_mode');
@@ -3362,7 +3497,6 @@ if (file_exists("/etc/unraid-version")) {
         ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
         HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
         ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
-        MODE: 'cron', // always cron now
         CRON_EXPRESSION: cronExpression,
         STOP_THRESHOLD: stopThresholdInput.value,
         ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
@@ -3373,6 +3507,9 @@ if (file_exists("/etc/unraid-version")) {
         ENABLE_SCRIPTS: document.getElementById('enable_scripts').checked ? 'yes' : 'no',
         PRE_SCRIPT: document.getElementById('pre_script').value.trim(),
         POST_SCRIPT: document.getElementById('post_script').value.trim(),
+        PRIORITIES: document.getElementById('priorities').checked ? 'yes' : 'no',
+        PROCESS_PRIORITY: document.getElementById('process_priority').value,
+        IO_PRIORITY: document.getElementById('io_priority').value,
       });
 
       // Add new scheduling fields so they persist in settings.cfg
@@ -3398,7 +3535,6 @@ if (file_exists("/etc/unraid-version")) {
           // --- Step 2: Start cron only if save succeeded ---
           const startForm = new URLSearchParams({
             csrf_token: csrfToken,
-            MODE: 'cron',
             CRON_MODE: cronModeSelect.value,
             MINUTES_FREQUENCY: document.getElementById("minutes_frequency")?.value || "",
             HOURLY_FREQUENCY: document.getElementById("hourly_frequency")?.value || "",
@@ -3408,7 +3544,10 @@ if (file_exists("/etc/unraid-version")) {
             MONTHLY_DAY: document.getElementById("monthly_day")?.value || "",
             MONTHLY_TIME: document.getElementById("monthly_time")?.value || "",
             CUSTOM_CRON: document.getElementById("custom_cron")?.value.trim() || "",
-            CRON_EXPRESSION: cronExpression
+            CRON_EXPRESSION: cronExpression,
+            PRIORITIES: document.getElementById('priorities').checked ? 'yes' : 'no',
+            PROCESS_PRIORITY: document.getElementById('process_priority').value,
+            IO_PRIORITY: document.getElementById('io_priority').value
           });
 
           return fetch('/plugins/automover/helpers/start_cron.php', {
