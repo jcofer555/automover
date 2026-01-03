@@ -19,6 +19,8 @@ LOCK_FILE="/tmp/automover/lock.txt"
 rm -f "/tmp/automover/temp_logs/qbittorrent_parser.txt"
 > "/tmp/automover/qbittorrent_paused.txt"
 > "/tmp/automover/qbittorrent_resumed.txt"
+RSYNC_SPEED_FILE="/tmp/automover/temp_logs/rsync_speed.txt"
+> "$RSYNC_SPEED_FILE"
 
 # ==========================================================
 #  Unraid notifications helper
@@ -463,6 +465,11 @@ if [[ "$moved_anything" == true ]]; then
     fi
 fi
 
+if [[ "$moved_anything" == true && -s "$RSYNC_SPEED_FILE" ]]; then
+  avg_speed=$(awk '{sum+=$1; n++} END {if (n>0) printf "%.2f", sum/n; else print 0}' "$RSYNC_SPEED_FILE")
+  echo "Average move speed: ${avg_speed} MB/s" >> "$LAST_RUN_FILE"
+fi
+
   end_time=$(date +%s)
   duration=$((end_time - start_time))
   if (( duration < 60 )); then
@@ -511,7 +518,7 @@ MOUNT_POINT="/mnt/${POOL_NAME}"
 #  Rsync setup
 # ==========================================================
 set_status "Prepping Rsync"
-RSYNC_OPTS=(-aiHAX --numeric-ids --checksum --perms --owner --group)
+RSYNC_OPTS=(-aiHAX --numeric-ids --checksum --perms --owner --group --info=progress2)
 [[ "$DRY_RUN" == "yes" ]] && RSYNC_OPTS+=(--dry-run) || RSYNC_OPTS+=(--remove-source-files)
 
 # ==========================================================
@@ -999,7 +1006,18 @@ if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]];
 fi
 
 # --- NOW do the move ---
-"${RSYNC_WRAPPER[@]}" rsync "${RSYNC_OPTS[@]}" "$srcfile" "$dstdir/" >/dev/null 2>&1
+"${RSYNC_WRAPPER[@]}" rsync "${RSYNC_OPTS[@]}" "$srcfile" "$dstdir/" 2>&1 \
+  | awk '
+      /MB\/s/ {
+        for (i=1;i<=NF;i++) {
+          if ($i ~ /MB\/s/) {
+            gsub(/MB\/s/, "", $i)
+            print $i
+            fflush()
+          }
+        }
+      }
+    ' >> "$RSYNC_SPEED_FILE"
 sync
 sleep 1
 
