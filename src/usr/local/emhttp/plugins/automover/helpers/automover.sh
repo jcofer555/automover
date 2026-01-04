@@ -785,7 +785,6 @@ done
 
   file_count=${#eligible_items[@]}
   (( file_count == 0 )) && { continue; }
-  echo "$src" >> /tmp/automover/temp_logs/cleanup_sources.txt
 
   # ==========================================================
   #  Check for eligible files before moving (pre-move trigger)
@@ -1035,10 +1034,11 @@ fi
   rm -f "$tmpfile"
 
   echo "Finished move of $file_count_moved file(s) for share: $share_name" >> "$LAST_RUN_FILE"
-  if (( file_count_moved > 0 )); then
-    moved_anything=true
-    echo "$share_name" >> "$MOVED_SHARES_FILE"
-  fi
+if (( file_count_moved > 0 )); then
+  moved_anything=true
+  echo "$share_name" >> "$MOVED_SHARES_FILE"
+  echo "$src" >> /tmp/automover/temp_logs/cleanup_sources.txt
+fi
   [[ "$STOP_TRIGGERED" == true ]] && break
 done
 
@@ -1128,82 +1128,84 @@ if [[ "$ENABLE_CLEANUP" == "yes" ]]; then
   set_status "Cleaning Up"
   if [[ "$DRY_RUN" == "yes" ]]; then
     echo "Dry run active — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
-  elif [[ "$moved_anything" == true ]]; then
-    if [[ ! -s /tmp/automover/temp_logs/cleanup_sources.txt ]]; then
-      echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
-    else
-      while IFS= read -r src_path; do
-        [[ -z "$src_path" || ! -d "$src_path" ]] && continue
-        share_name=$(basename "$src_path")
 
-        # force exclude these 4
-        case "$share_name" in
-          appdata|system|domains|isos)
-            echo "Skipping cleanup for excluded share: $share_name" >> "$LAST_RUN_FILE"
-            continue
-            ;;
-        esac
+  elif [[ "$moved_anything" == true && -s /tmp/automover/temp_logs/cleanup_sources.txt ]]; then
 
-        # -------------------------------
-        # Remove dirs bottom‑up, skip exclusions
-        # -------------------------------
-        find "$src_path" -depth -type d | while read -r dir; do
-          if [[ "$dir" == "$src_path" ]]; then
-            # Root folder: remove only if another instance exists elsewhere
-            other_exists=false
-            for mp in /mnt/*; do
-              [[ ! -d "$mp" ]] && continue
-              [[ "$mp/$share_name" == "$src_path" ]] && continue
-              if [[ -d "$mp/$share_name" ]]; then
-                other_exists=true; break
-              fi
-            done
-            [[ "$other_exists" == false ]] && continue
-          fi
+    while IFS= read -r src_path; do
+      [[ -z "$src_path" ]] && continue
+      [[ -d "$src_path" ]] || continue   # ← optional safety guard (Change 4)
 
-          # Skip exclusions
-          skip_dir=false
-          if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
-            for ex in "${EXCLUDED_PATHS[@]}"; do
-              [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
-              dir_check="$dir/"
-              if [[ "$dir_check" == "$ex"* ]]; then
-                skip_dir=true; break
-              fi
-            done
-          fi
-          $skip_dir && continue
+      share_name=$(basename "$src_path")
 
-          rmdir "$dir" 2>/dev/null
-        done
+      # force exclude these 4
+      case "$share_name" in
+        appdata|system|domains|isos)
+          echo "Skipping cleanup for excluded share: $share_name" >> "$LAST_RUN_FILE"
+          continue
+          ;;
+      esac
 
-        # -------------------------------
-        # ZFS datasets cleanup, skip exclusions
-        # -------------------------------
-        if command -v zfs >/dev/null 2>&1; then
-          mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$src_path" '$2 ~ "^"mp {print $1}')
-          for ds in "${datasets[@]}"; do
-            mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
-            skip_ds=false
-            if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
-              for ex in "${EXCLUDED_PATHS[@]}"; do
-                [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
-                mount_check="$mountpoint/"
-                if [[ "$mount_check" == "$ex"* ]]; then
-                  skip_ds=true; break
-                fi
-              done
+      # -------------------------------
+      # Remove dirs bottom-up, skip exclusions
+      # -------------------------------
+      find "$src_path" -depth -type d | while read -r dir; do
+        if [[ "$dir" == "$src_path" ]]; then
+          # Root folder: remove only if another instance exists elsewhere
+          other_exists=false
+          for mp in /mnt/*; do
+            [[ ! -d "$mp" ]] && continue
+            [[ "$mp/$share_name" == "$src_path" ]] && continue
+            if [[ -d "$mp/$share_name" ]]; then
+              other_exists=true; break
             fi
-            $skip_ds && continue
-            if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
-              zfs destroy -f "$ds" >/dev/null 2>&1
+          done
+          [[ "$other_exists" == false ]] && continue
+        fi
+
+        # Skip exclusions
+        skip_dir=false
+        if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+          for ex in "${EXCLUDED_PATHS[@]}"; do
+            [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
+            dir_check="$dir/"
+            if [[ "$dir_check" == "$ex"* ]]; then
+              skip_dir=true; break
             fi
           done
         fi
+        $skip_dir && continue
 
-      done < <(sort -u /tmp/automover/temp_logs/cleanup_sources.txt)
-      echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
-    fi
+        rmdir "$dir" 2>/dev/null
+      done
+
+      # -------------------------------
+      # ZFS datasets cleanup, skip exclusions
+      # -------------------------------
+      if command -v zfs >/dev/null 2>&1; then
+        mapfile -t datasets < <(zfs list -H -o name,mountpoint | awk -v mp="$src_path" '$2 ~ "^"mp {print $1}')
+        for ds in "${datasets[@]}"; do
+          mountpoint=$(zfs get -H -o value mountpoint "$ds" 2>/dev/null)
+          skip_ds=false
+          if [[ "$EXCLUSIONS_ENABLED" == "yes" && ${#EXCLUDED_PATHS[@]} -gt 0 ]]; then
+            for ex in "${EXCLUDED_PATHS[@]}"; do
+              [[ -d "$ex" && "$ex" != */ ]] && ex="$ex/"
+              mount_check="$mountpoint/"
+              if [[ "$mount_check" == "$ex"* ]]; then
+                skip_ds=true; break
+              fi
+            done
+          fi
+          $skip_ds && continue
+          if [[ -d "$mountpoint" && -z "$(ls -A "$mountpoint" 2>/dev/null)" ]]; then
+            zfs destroy -f "$ds" >/dev/null 2>&1
+          fi
+        done
+      fi
+
+    done < <(sort -u /tmp/automover/temp_logs/cleanup_sources.txt)
+
+    echo "Cleanup of empty folders/datasets finished" >> "$LAST_RUN_FILE"
+
   else
     echo "No files moved — skipping cleanup of empty folders/datasets" >> "$LAST_RUN_FILE"
   fi
