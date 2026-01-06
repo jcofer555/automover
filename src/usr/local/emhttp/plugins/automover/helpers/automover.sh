@@ -297,12 +297,20 @@ run_qbit_script() {
 
   # Extract paused torrents
 grep -E "Pausing:|Paused:" "$tmp_out" \
-  | sed -E 's/.*(Pausing:|Paused:)\s*//; s/\s*\[[0-9]+\]\s*$//' \
+  | sed -E 's/.*(Pausing:|Paused:)\s*//; s/\s*
+
+\[[0-9]+\]
+
+\s*$//' \
   >> "$paused_file"
 
   # Extract resumed torrents
 grep -E "Resuming:|Resumed:" "$tmp_out" \
-  | sed -E 's/.*(Resuming:|Resumed:)\s*//; s/\s*\[[0-9]+\]\s*$//' \
+  | sed -E 's/.*(Resuming:|Resumed:)\s*//; s/\s*
+
+\[[0-9]+\]
+
+\s*$//' \
   >> "$resumed_file"
 
   echo "Qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
@@ -434,6 +442,21 @@ case "$IO_PRIORITY" in
     ;;
 esac
 fi
+
+# ==========================================================
+#  Helper: wait for file handle release
+# ==========================================================
+wait_for_release() {
+  local file="$1"
+  # Try up to 10 times (5 seconds total) to see file become unused
+  for i in {1..10}; do
+    if ! fuser "$file" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
 
 # ==========================================================
 #  Header
@@ -673,6 +696,8 @@ STOP_TRIGGERED=false
 SHARE_CFG_DIR="/boot/config/shares"
 pre_move_done="no"
 sent_start_notification="no"
+qbit_paused=false
+skip_qbit_script=false
 
 for cfg in "$SHARE_CFG_DIR"/*.cfg; do
   [[ -f "$cfg" ]] || continue
@@ -771,10 +796,10 @@ for relpath in "${all_filtered_items[@]}"; do
 
   #
   # ===========================
-  # In-use File Check
+  # In-use File Check (with wait)
   # ===========================
   #
-  if fuser "$srcfile" >/dev/null 2>&1; then
+  if ! wait_for_release "$srcfile"; then
     grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
     continue
   fi
@@ -806,8 +831,8 @@ for relpath in "${all_filtered_items[@]}"; do
     $skip_file && continue
   fi
 
-  # Skip if file in use
-  if fuser "$srcfile" >/dev/null 2>&1; then
+  # Skip if file in use (with wait)
+  if ! wait_for_release "$srcfile"; then
     grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
     continue
   fi
@@ -831,84 +856,6 @@ if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" &&
   sent_start_notification="yes"
 fi
 
-# Detect if qBittorrent script host/port overlaps with a stopped container
-skip_qbit_script=false
-if [[ -n "$CONTAINER_NAMES" && -n "$QBITTORRENT_HOST" ]]; then
-  if [[ "$QBITTORRENT_HOST" == *:* ]]; then
-    qbit_port="${QBITTORRENT_HOST##*:}"
-  else
-    qbit_port=""
-  fi
-
-  IFS=',' read -ra CONTAINERS <<< "$CONTAINER_NAMES"
-  for container in "${CONTAINERS[@]}"; do
-    cname=$(echo "$container" | xargs)
-    [[ -z "$cname" ]] && continue
-
-    lcname=$(echo "$cname" | tr '[:upper:]' '[:lower:]')
-    if [[ "$lcname" == *qbittorrent* ]]; then
-      skip_qbit_script=true
-      echo "Qbittorrent container is in stop containers list — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
-      break
-    fi
-
-    if [[ -n "$qbit_port" ]]; then
-      ports=$(docker inspect --format='{{range $p, $conf := .HostConfig.PortBindings}}{{(index $conf 0).HostPort}} {{end}}' "$cname" 2>/dev/null)
-      for port in $ports; do
-        if [[ "$port" == "$qbit_port" ]]; then
-          skip_qbit_script=true
-          echo "Qbittorrent container is in stop containers list — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
-          break 2
-        fi
-      done
-    fi
-  done
-
-  # --- Extra check: dynamic parent + PID mapping ---
-  if [[ "$skip_qbit_script" == false && -n "$qbit_port" ]]; then
-    parents=()
-    for cid in $(docker ps -q); do
-      netmode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$cid")
-      if [[ "$netmode" == container:* ]]; then
-        parent=${netmode#container:}
-        parents+=("$parent")
-      fi
-    done
-    parents=($(printf "%s\n" "${parents[@]}" | sort -u))
-
-    for parent in "${parents[@]}"; do
-      parent_id=$(docker inspect -f '{{.Id}}' "$parent" 2>/dev/null)
-      parent_pid=$(docker inspect -f '{{.State.Pid}}' "$parent" 2>/dev/null)
-      [[ -z "$parent_pid" || "$parent_pid" == "0" ]] && continue
-
-      listener_pids=$(nsenter -t "$parent_pid" -n ss -ltnp 2>/dev/null \
-        | grep ":$qbit_port " | grep -o 'pid=[0-9]\+' | cut -d= -f2 | sort -u)
-
-      if [[ -n "$listener_pids" ]]; then
-        for cid in $(docker ps -q); do
-          netmode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$cid")
-          cname=$(docker inspect -f '{{.Name}}' "$cid" | sed 's#^/##')
-          if [[ "$netmode" == "container:$parent" || "$netmode" == "container:$parent_id" ]]; then
-            cpids=$(docker top "$cname" -eo pid 2>/dev/null | awk 'NR>1 {print $1}')
-            for lp in $listener_pids; do
-              if echo "$cpids" | grep -q "^$lp$"; then
-                for stopped in "${CONTAINERS[@]}"; do
-                  stopped=$(echo "$stopped" | xargs)
-                  if [[ "$cname" == "$stopped" ]]; then
-                    skip_qbit_script=true
-                    echo "Qbittorrent container is in stop containers list — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
-                    break 4
-                  fi
-                done
-              fi
-            done
-          fi
-        done
-      fi
-    done
-  fi
-fi
-
     # --- Enable turbo write ---
     if [[ "$FORCE_RECONSTRUCTIVE_WRITE" == "yes" && "$DRY_RUN" != "yes" ]]; then
       set_status "Enabling Turbo Write"
@@ -919,19 +866,31 @@ fi
       echo "Enabled reconstructive write mode (turbo write)" >> "$LAST_RUN_FILE"
       turbo_write_enabled=true
     fi
-    # --- Stop managed containers ---
-manage_containers stop
 
-# --- qBittorrent dependency check + pause ---
-if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" && "$skip_qbit_script" == false ]]; then
-  if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
-    echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
-    command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
+# --- qBittorrent container running check + pause BEFORE stopping containers ---
+if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
+  if docker ps --format '{{.Names}}' | grep -qi '^qbittorrent$'; then
+    skip_qbit_script=false
+
+    if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
+      echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
+      command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
+    fi
+
+    set_status "Pausing Torrents"
+    run_qbit_script pause
+    qbit_paused=true
+
+    # Allow time for qBittorrent to release file handles globally
+    sleep 2
+  else
+    skip_qbit_script=true
+    echo "Qbittorrent container not running — skipping qbittorrent pause" >> "$LAST_RUN_FILE"
   fi
-  set_status "Pausing Torrents"
-  run_qbit_script pause
-  qbit_paused=true
 fi
+
+    # --- Stop managed containers (AFTER qbit pause) ---
+manage_containers stop
 
 # --- Clear mover log only once when the first move begins ---
 if [[ "$pre_move_done" != "yes" && "$eligible_count" -ge 1 ]]; then
@@ -981,8 +940,8 @@ copy_empty_dirs "$src" "$dst"
       done
       $skip_file && continue
     fi
-    # Skip if file is currently in use
-    if fuser "$srcfile" >/dev/null 2>&1; then
+    # Skip if file is currently in use (with wait)
+    if ! wait_for_release "$srcfile"; then
       grep -qxF "$srcfile" "$IN_USE_FILE" 2>/dev/null || echo "$srcfile" >> "$IN_USE_FILE"
       continue
     fi
@@ -1316,7 +1275,6 @@ mkdir -p "$(dirname "$AUTOMOVER_LOG")"
 # ==========================================================
 # Final automover_log handling with proper DRY RUN behavior
 # ==========================================================
-
 if [[ "$DRY_RUN" == "yes" ]]; then
   :
 else
