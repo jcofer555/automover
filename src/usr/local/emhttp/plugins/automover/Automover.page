@@ -350,6 +350,7 @@ if (file_exists("/etc/unraid-version")) {
     width: 75px;
   }
 
+  #version-text,
   #status-text,
   #last-run-text {
     color: var(--status-green);
@@ -1199,9 +1200,22 @@ if (file_exists("/etc/unraid-version")) {
   }
 </style>
 
+<?php
+$plg = "/boot/config/plugins/automover.plg";
+$version = "unknown";
+
+if (is_file($plg)) {
+    $xml = @simplexml_load_file($plg);
+    if ($xml && isset($xml['version'])) {
+        $version = (string)$xml['version'];
+    }
+}
+?>
+
 <div id="automover-wrapper">
   <form id="automover-settings">
     <div class="status-container">
+      <div class="status-row"><span class="status-label">Version:</span><span id="version-text"><?= $version ?></span></div>
       <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
       <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run
           available</span></div>
