@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2026.01.08.02"
+  version="2026.01.08.03"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,7 +16,7 @@
 <CHANGES>
 <![CDATA[
 
-### 2026.01.08.02
+### 2026.01.08.03
 
 - Fix for qbittorrent pause race condition with in-use check
 - Added version to webui
@@ -42,9 +42,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.01.08.02-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2026.01.08.02/unraid-automover-2026.01.08.02-noarch-1.txz</URL>
-<SHA256>35228772136f076438108402f75931aa7d8d7d42f542e24ba4d433a35d322739</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.01.08.03-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2026.01.08.03/unraid-automover-2026.01.08.03-noarch-1.txz</URL>
+<SHA256>3d9c3c90c718cbfcd19c1f33aebce734529e1b3c0601a5693cc2f59c904ae942</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -57,7 +57,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.01.08.02-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.01.08.03-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -160,7 +160,7 @@ if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.01.08.02-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.01.08.03-noarch-1.txz" -delete
 
 # ==========================================================
 #  HANDLE AUTOSTART + CRON GENERATION (NEW CRON-ONLY MODEL)
@@ -181,7 +181,7 @@ fi
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2026.01.08.02"
+echo " Version: 2026.01.08.03"
 echo "----------------------------------------------------"
 echo ""
 echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover"
