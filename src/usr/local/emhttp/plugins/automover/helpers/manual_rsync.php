@@ -134,7 +134,7 @@ if ($isDry) {
 file_put_contents(
     $last,
     "------------------------------------------------\n" .
-    "Automover session started - " . date("Y-m-d H:i:s") . "\n" .
+    "Session started - " . date("Y-m-d H:i:s") . "\n" .
     "Manually rsyncing $src_clean -> $dst_clean using mode: $modeName\n",
     FILE_APPEND
 );
@@ -360,7 +360,7 @@ if ($notify) {
 // Footer log
 // ==========================================================
 file_put_contents($last,
-    "Automover session finished - " . date("Y-m-d H:i:s") . "\n\n",
+    "Session finished - " . date("Y-m-d H:i:s") . "\n\n",
     FILE_APPEND
 );
 

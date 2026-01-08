@@ -28,7 +28,7 @@ foreach ($lines as $line) {
     }
 
     // Preserve "no files moved" and "dry run" lines for display
-    if (strpos($lower, 'no files moved for this run') !== false) {
+    if (strpos($lower, 'no files moved for this move') !== false) {
         $matched[] = $line;
         $noMoveDetected = true;
         continue;
@@ -93,13 +93,13 @@ $collecting = false;
 for ($i = count($lastRunLines) - 1; $i >= 0; $i--) {
     $line = $lastRunLines[$i];
 
-    if (stripos($line, 'Automover session finished') !== false) {
+    if (stripos($line, 'Session finished') !== false) {
         $collecting = true;
     }
 
     if ($collecting) {
         array_unshift($sessionBlock, $line);
-        if (stripos($line, 'Automover session started') !== false) {
+        if (stripos($line, 'Session started') !== false) {
             break; // full session block captured
         }
     }

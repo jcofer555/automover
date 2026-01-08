@@ -297,6 +297,7 @@ if (file_exists("/etc/unraid-version")) {
     cursor: pointer;
     margin-right: 10px;
     padding: 8px 15px;
+    background-color:#111
   }
 
   .checkbox-row {
@@ -1146,8 +1147,11 @@ if (file_exists("/etc/unraid-version")) {
     margin-right: auto;
   }
 
+  #moveNowBtn,
+  #save-settings,
   #stop-button {
     border: none;
+    background-color:#111
   }
 
   .form-check {
@@ -4102,7 +4106,7 @@ if (file_exists("/etc/unraid-version")) {
       btn.addEventListener("click", () => {
         // Immediately disable the clicked button
         btn.disabled = true;
-        btn.style.backgroundColor = "#000";
+        btn.style.backgroundColor = "#111";
         btn.style.opacity = "0.6";
         btn.style.cursor = "not-allowed";
 
@@ -4110,7 +4114,7 @@ if (file_exists("/etc/unraid-version")) {
         actionButtons.forEach(other => {
           if (other && other !== btn) {
             other.disabled = true;
-            other.style.backgroundColor = "#000";
+            other.style.backgroundColor = "#111";
             other.style.opacity = "0.6";
             other.style.cursor = "not-allowed";
           }

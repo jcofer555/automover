@@ -138,7 +138,7 @@ Per share summary:"
 • ${share}: ${SHARE_COUNTS[$share]} file(s)"
       done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
     fi
-    send_discord_message "Automover session finished" "$notif_body" 65280
+    send_discord_message "Session finished" "$notif_body" 65280
   else
     notif_body_html="$notif_body"
     notif_cfg="/boot/config/plugins/dynamix/dynamix.cfg"
@@ -174,7 +174,7 @@ Per share summary:"
         done < <(printf '%s\n' "${!SHARE_COUNTS[@]}" | LC_ALL=C sort)
       fi
     fi
-    unraid_notify "Automover session finished" "$notif_body_html" "normal" 1
+    unraid_notify "Session finished" "$notif_body_html" "normal" 1
   fi
 }
 
@@ -465,7 +465,7 @@ start_time=$(date +%s)
 
 {
   echo "------------------------------------------------"
-  echo "Automover session started - $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "Session started - $(date '+%Y-%m-%d %H:%M:%S')"
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
   # --- Log exclusions state when Move Now is pressed ---
 if [[ "$MOVE_NOW" == true && "$EXCLUSIONS_ENABLED" == "yes" ]]; then
@@ -506,7 +506,7 @@ fi
     secs=$((duration % 60))
     echo "Duration: ${hours}h ${mins}m ${secs}s" >> "$LAST_RUN_FILE"
   fi
-  echo "Automover session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
+  echo "Session finished - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LAST_RUN_FILE"
   echo "" >> "$LAST_RUN_FILE"
 }
 
@@ -844,7 +844,7 @@ done
 if [[ "$pre_move_done" != "yes" && "$eligible_count" -ge 1 ]]; then
   # --- Send start notification only once when actual move begins ---
 if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" && "$eligible_count" -ge 1 ]]; then
-  title="Automover session started"
+  title="Session started"
   message="Automover is beginning to move eligible files."
 
   if [[ -n "$WEBHOOK_URL" ]]; then
@@ -869,27 +869,49 @@ fi
 
 # --- qBittorrent container running check + pause BEFORE stopping containers ---
 if [[ "$QBITTORRENT_SCRIPT" == "yes" && "$DRY_RUN" != "yes" ]]; then
-  if docker ps --format '{{.Names}}' | grep -qi '^qbittorrent$'; then
-    skip_qbit_script=false
 
-    if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
-      echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
-      command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
+  skip_qbit_script=false
+
+  # Parse CONTAINER_NAMES exactly like manage_containers does
+  IFS=',' read -ra STOP_LIST <<< "$CONTAINER_NAMES"
+
+  # Detect if any container in the stop list uses a qbittorrent-related image
+  for c in "${STOP_LIST[@]}"; do
+    c=$(echo "$c" | xargs)   # trim whitespace
+    [[ -z "$c" ]] && continue
+
+    repo=$(docker inspect --format '{{.Config.Image}}' "$c" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+
+    if [[ "$repo" == *qbittorrent* ]]; then
+      skip_qbit_script=true
+      echo "Qbittorrent container in stop list — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
+      break
     fi
+  done
 
-    set_status "Pausing Torrents"
-    run_qbit_script pause
-    qbit_paused=true
+  if [[ "$skip_qbit_script" == false ]]; then
+    # Only run pause if no qbittorrent-related container is being stopped
+    if docker ps --format '{{.Names}}' | grep -qi '^qbittorrent$'; then
 
-    # Allow time for qBittorrent to release file handles globally
-    sleep 2
-  else
-    skip_qbit_script=true
-    echo "Qbittorrent container not running — skipping qbittorrent pause" >> "$LAST_RUN_FILE"
+      if ! python3 -m pip show qbittorrent-api >/dev/null 2>&1; then
+        echo "Installing qbittorrent-api" >> "$LAST_RUN_FILE"
+        command -v pip3 >/dev/null 2>&1 && pip3 install qbittorrent-api -q >/dev/null 2>&1
+      fi
+
+      set_status "Pausing Torrents"
+      run_qbit_script pause
+      qbit_paused=true
+
+      # Allow time for qBittorrent to release file handles globally
+      sleep 2
+    else
+      skip_qbit_script=true
+      echo "Qbittorrent container not running — skipping qbittorrent pause/resume" >> "$LAST_RUN_FILE"
+    fi
   fi
 fi
 
-    # --- Stop managed containers (AFTER qbit pause) ---
+# --- Stop managed containers (AFTER qbit pause) ---
 manage_containers stop
 
 # --- Clear mover log only once when the first move begins ---
