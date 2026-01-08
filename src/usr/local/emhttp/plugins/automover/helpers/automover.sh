@@ -16,7 +16,8 @@ mkdir -p /tmp/automover/temp_logs
 LOCK_FILE="/tmp/automover/lock.txt"
 > "$IN_USE_FILE"
 > "/tmp/automover/temp_logs/cleanup_sources.txt"
-rm -f "/tmp/automover/temp_logs/qbittorrent_parser.txt"
+rm -f "/tmp/automover/temp_logs/qbittorrent_pause.txt"
+rm -f "/tmp/automover/temp_logs/qbittorrent_resume.txt"
 > "/tmp/automover/qbittorrent_paused.txt"
 > "/tmp/automover/qbittorrent_resumed.txt"
 RSYNC_SPEED_FILE="/tmp/automover/temp_logs/rsync_speed.txt"
@@ -275,14 +276,17 @@ run_qbit_script() {
   local python_script="/usr/local/emhttp/plugins/automover/helpers/qbittorrent_script.py"
   local paused_file="/tmp/automover/qbittorrent_paused.txt"
   local resumed_file="/tmp/automover/qbittorrent_resumed.txt"
-  local tmp_out="/tmp/automover/temp_logs/qbittorrent_parser.txt"
+  local tmp_out="/tmp/automover/temp_logs/qbittorrent_${action}.txt"
+  local status_filter="$QBITTORRENT_STATUS"  # default
 
-  # make sure temp_logs dir exists
   mkdir -p /tmp/automover/temp_logs
-
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
 
-  # Capture full output into tmp_out AND apply filtered grep to LAST_RUN_FILE
+  # override status filter for resume
+  if [[ "$action" == "resume" ]]; then
+    status_filter="paused"
+  fi
+
   python3 "$python_script" \
     --host "$QBITTORRENT_HOST" \
     --user "$QBITTORRENT_USERNAME" \
@@ -290,28 +294,28 @@ run_qbit_script() {
     --cache-mount "/mnt/$POOL_NAME" \
     --days_from "$QBITTORRENT_DAYS_FROM" \
     --days_to "$QBITTORRENT_DAYS_TO" \
-    --status-filter "$QBITTORRENT_STATUS" \
-    "--$action" 2>&1 | tee "$tmp_out" \
+    --status-filter "$status_filter" \
+    "--$action" 2>&1 | tee -a "$tmp_out" \
       | grep -E '^(Running qBittorrent|Paused|Resumed|Pausing|Resuming|qBittorrent)' \
       >> "$LAST_RUN_FILE"
 
   # Extract paused torrents
-grep -E "Pausing:|Paused:" "$tmp_out" \
-  | sed -E 's/.*(Pausing:|Paused:)\s*//; s/\s*
+  grep -E "Pausing:|Paused:" "$tmp_out" \
+    | sed -E 's/.*(Pausing:|Paused:)[[:space:]]*//; s/[[:space:]]*\[[0-9]+\][[:space:]]*$//' \
+    >> "$paused_file"
 
-\[[0-9]+\]
-
-\s*$//' \
-  >> "$paused_file"
+  if [[ "$action" == "pause" ]] && ! grep -qE "Pausing:|Paused:" "$tmp_out"; then
+    echo "[INFO] Pause attempted but no torrents were paused" >> "$paused_file"
+  fi
 
   # Extract resumed torrents
-grep -E "Resuming:|Resumed:" "$tmp_out" \
-  | sed -E 's/.*(Resuming:|Resumed:)\s*//; s/\s*
+  grep -E "Resuming:|Resumed:" "$tmp_out" \
+    | sed -E 's/.*(Resuming:|Resumed:)[[:space:]]*//; s/[[:space:]]*\[[0-9]+\][[:space:]]*$//' \
+    >> "$resumed_file"
 
-\[[0-9]+\]
-
-\s*$//' \
-  >> "$resumed_file"
+  if [[ "$action" == "resume" ]] && ! grep -qE "Resuming:|Resumed:" "$tmp_out"; then
+    echo "[INFO] Resume attempted but no torrents were resumed" >> "$resumed_file"
+  fi
 
   echo "Qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
 }
@@ -453,7 +457,7 @@ wait_for_release() {
     if ! fuser "$file" >/dev/null 2>&1; then
       return 0
     fi
-    sleep 0.5
+    sleep 2
   done
   return 1
 }
@@ -464,7 +468,7 @@ wait_for_release() {
 start_time=$(date +%s)
 
 {
-  echo "------------------------------------------------"
+  echo "--------------------------------------------"
   echo "Session started - $(date '+%Y-%m-%d %H:%M:%S')"
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
   # --- Log exclusions state when Move Now is pressed ---
@@ -1087,6 +1091,7 @@ fi
 # ==========================================================
 if [[ "$qbit_paused" == true && "$QBITTORRENT_SCRIPT" == "yes" && "$skip_qbit_script" == false ]]; then
   set_status "Resuming Torrents"
+  sleep 10
   run_qbit_script resume
 fi
 
