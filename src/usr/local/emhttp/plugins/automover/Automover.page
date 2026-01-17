@@ -2114,7 +2114,7 @@ if (is_file($plg)) {
     <div style="display:flex; gap:10px; margin-top:10px;">
 
       <span
-        title="Uses rsync -aH /src/ /dst/ as the command which only copies to destination new or modified while preserving hardlinks"
+        title="Uses rsync -aH /src/ /dst/ as the command which only copies to destination new or modified files while preserving hardlinks"
         class="automovertip">
         <label class="form-check">
           <input type="checkbox" id="manual_copy">

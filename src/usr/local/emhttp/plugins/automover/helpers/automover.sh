@@ -277,7 +277,7 @@ run_qbit_script() {
   local paused_file="/tmp/automover/qbittorrent_paused.txt"
   local resumed_file="/tmp/automover/qbittorrent_resumed.txt"
   local tmp_out="/tmp/automover/temp_logs/qbittorrent_${action}.txt"
-  local status_filter="$QBITTORRENT_STATUS"  # default
+  local status_filter="$QBITTORRENT_STATUS"
 
   mkdir -p /tmp/automover/temp_logs
   [[ ! -f "$python_script" ]] && echo "Qbittorrent script not found: $python_script" >> "$LAST_RUN_FILE" && return
@@ -305,7 +305,7 @@ run_qbit_script() {
     >> "$paused_file"
 
   if [[ "$action" == "pause" ]] && ! grep -qE "Pausing:|Paused:" "$tmp_out"; then
-    echo "[INFO] Pause attempted but no torrents were paused" >> "$paused_file"
+    echo "Pause attempted but no torrents were paused" >> "$paused_file"
   fi
 
   # Extract resumed torrents
@@ -314,10 +314,20 @@ run_qbit_script() {
     >> "$resumed_file"
 
   if [[ "$action" == "resume" ]] && ! grep -qE "Resuming:|Resumed:" "$tmp_out"; then
-    echo "[INFO] Resume attempted but no torrents were resumed" >> "$resumed_file"
+    echo "Resume attempted but no torrents were resumed" >> "$resumed_file"
   fi
 
-  echo "Qbittorrent $action of torrents" >> "$LAST_RUN_FILE"
+  # Count affected torrents, skipping informational lines
+  local count=0
+  if [[ "$action" == "pause" ]]; then
+    count=$(grep -v "Pause attempted but no torrents were paused" "$paused_file" 2>/dev/null \
+            | grep -cve '^\s*$' || echo 0)
+  else
+    count=$(grep -v "Resume attempted but no torrents were resumed" "$resumed_file" 2>/dev/null \
+            | grep -cve '^\s*$' || echo 0)
+  fi
+
+  echo "Qbittorrent $action of $count torrents" >> "$LAST_RUN_FILE"
 }
 
 # ==========================================================
@@ -978,10 +988,25 @@ copy_empty_dirs "$src" "$dst"
     fi
  
 # -------------------------------
-# Stop threshold check BEFORE move
+# Stop threshold check BEFORE move (ZFS-aware)
 # -------------------------------
 if [[ "$MOVE_NOW" == false && "$DRY_RUN" != "yes" && "$STOP_THRESHOLD" -gt 0 ]]; then
-  FINAL_USED=$(df --output=pcent "$MOUNT_POINT" | awk 'NR==2 {gsub("%",""); print}')
+
+  # Detect if this pool is ZFS
+  POOL_NAME=$(basename "$MOUNT_POINT")
+  ZFS_CAP=$(zpool list -H -o name,cap 2>/dev/null \
+              | awk -v pool="$POOL_NAME" '$1 == pool {gsub("%","",$2); print $2}')
+
+  if [[ -n "$ZFS_CAP" ]]; then
+      # ZFS pool → use ZFS-reported capacity
+      FINAL_USED="$ZFS_CAP"
+  else
+      # Non-ZFS fallback
+      FINAL_USED=$(df --output=pcent "$MOUNT_POINT" \
+                      | awk 'NR==2 {gsub("%",""); print}')
+  fi
+
+  # Stop threshold check
   if [[ -n "$FINAL_USED" && "$FINAL_USED" -le "$STOP_THRESHOLD" ]]; then
     echo "Move stopped — pool usage reached stop threshold: ${FINAL_USED}% (<= ${STOP_THRESHOLD}%)" >> "$LAST_RUN_FILE"
     STOP_TRIGGERED=true
