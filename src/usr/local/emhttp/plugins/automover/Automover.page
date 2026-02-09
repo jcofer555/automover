@@ -1938,7 +1938,7 @@ if (is_file($plg)) {
         </label>
       </span>
 
-      <span title="Enable to remove empty folders and datasets from shares that are moved" class="automovertip">
+      <span title="Enable to remove empty folders and datasets from the pool selected" class="automovertip">
         <label>
           <input type="checkbox" id="enable_cleanup" <?php echo ($settings['ENABLE_CLEANUP'] ?? '' )==='yes' ? 'checked'
             : '' ?>> Enable Cleanup
