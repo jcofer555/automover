@@ -2073,13 +2073,13 @@ if (is_file($plg)) {
 
       <div class="log-header-row">
         <div class="toast-wrapper">
-          <span title="Clear the vm backup and restore log" class="vm-backup-and-restoretip">
+          <span title="Clear the automover log" class="automovertip">
             <button type="button" id="clear-last-run-log">Clear Log</button>
           </span>
           <div id="toast-last" class="toast-inline"></div>
         </div>
 
-        <span title="Copy vm backup and restore log to clipboard" class="vm-backup-and-restoretip">
+        <span title="Copy automover log to clipboard" class="automovertip">
           <button type="button" id="copy-last-run-log">Copy</button>
         </span>
       </div>
