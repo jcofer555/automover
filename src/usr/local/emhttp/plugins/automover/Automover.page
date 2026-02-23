@@ -297,7 +297,7 @@ if (file_exists("/etc/unraid-version")) {
     cursor: pointer;
     margin-right: 10px;
     padding: 8px 15px;
-    background-color:#111
+    background-color: #111
   }
 
   .checkbox-row {
@@ -1152,7 +1152,7 @@ if (file_exists("/etc/unraid-version")) {
   #save-settings,
   #stop-button {
     border: none;
-    background-color:#111
+    background-color: #111
   }
 
   .form-check {
@@ -1198,6 +1198,54 @@ if (file_exists("/etc/unraid-version")) {
     box-sizing: border-box;
     word-wrap: break-word;
   }
+
+  /* Anchor buttons to log */
+  #log-wrapper {
+    position: relative;
+  }
+
+  /* Scrollable log */
+  #last-run-log {
+    white-space: pre-wrap;
+  }
+
+  /* Buttons pinned inside log */
+  #log-scroll-buttons {
+    position: absolute;
+    right: 24px;
+    bottom: 68px;
+    display: none;
+    /* JS controls visibility */
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+  }
+
+  /* Compact button style (Unraid-safe override) */
+  #log-scroll-buttons>button {
+    width: 24px;
+    min-width: 24px;
+    max-width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background: #111;
+    color: #ccc;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.85;
+  }
+
+  #log-scroll-buttons>button:hover {
+    opacity: 1;
+  }
+
+  #log-scroll-buttons>button:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
 </style>
 
 <?php
@@ -1218,7 +1266,9 @@ if (is_file($plg)) {
       <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
       <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run
           available</span></div>
-    <div class="status-row"><span class="status-label">Version:</span><span id="version-text"><?= $version ?></span></div>
+      <div class="status-row"><span class="status-label">Version:</span><span id="version-text">
+          <?= $version ?>
+        </span></div>
     </div>
 
     <div class="form-group">
@@ -2019,17 +2069,29 @@ if (is_file($plg)) {
   </div>
 
   <div id="last-run-container">
-    <div class="log-header-row">
-      <h3>Last Run Details</h3>
-      <div class="toast-wrapper">
-        <span title="Clear the last run details log" class="automovertip">
-          <button id="clear-last-run-log">Clear Log</button>
+    <form id="log-section-form">
+
+      <div class="log-header-row">
+        <div class="toast-wrapper">
+          <span title="Clear the vm backup and restore log" class="vm-backup-and-restoretip">
+            <button type="button" id="clear-last-run-log">Clear Log</button>
+          </span>
+          <div id="toast-last" class="toast-inline"></div>
+        </div>
+
+        <span title="Copy vm backup and restore log to clipboard" class="vm-backup-and-restoretip">
+          <button type="button" id="copy-last-run-log">Copy</button>
         </span>
-        <div id="toast-last" class="toast-inline"></div>
       </div>
-    </div>
-    <pre id="last-run-log">Loading last run log</pre>
+
+      <pre id="last-run-log">Automover log not found</pre>
+      <div id="log-scroll-buttons">
+        <button type="button" id="scroll-log-top">↑</button>
+        <button type="button" id="scroll-log-bottom">↓</button>
+      </div>
   </div>
+
+  </form>
 </div>
 
 <!-- Modal -->
@@ -2042,7 +2104,7 @@ if (is_file($plg)) {
 
     <div class="grid" id="picker-grid"></div>
 
-    <!-- ✅ Footer updated with Close button on bottom-right -->
+    <!-- Footer updated with Close button on bottom-right -->
     <div class="footer" style="display:flex; justify-content:space-between; margin-top:10px; align-items:flex-end;">
       <!-- Left side: Add/Remove buttons -->
       <div style="display:flex; flex-direction:column; gap:2px; line-height:1;">
@@ -4352,4 +4414,113 @@ if (is_file($plg)) {
     newFolderRow.style.display = "none";
     newFolderInput.style.borderColor = "";
   }
+</script>
+
+<script>
+  function loadLastRunLog() {
+    const logEl = document.getElementById('last-run-log');
+
+    fetch('/plugins/automover/helpers/fetch_last_run_log.php')
+      .then(resp => resp.text())
+      .then(text => {
+        logEl.textContent = text || 'Log is empty';
+      })
+      .catch(err => {
+        console.error('Failed to load log', err);
+        logEl.textContent = 'Failed to load log';
+      });
+  }
+
+  // Load log on page load
+  document.addEventListener('DOMContentLoaded', loadLastRunLog);
+
+  // Copy button logic
+  document.getElementById('copy-last-run-log').addEventListener('click', function () {
+    const logEl = document.getElementById('last-run-log');
+    const text = logEl.innerText || logEl.textContent;
+
+    if (!text || text.trim() === '' || text.includes('not found')) {
+      alert('Log is empty or not loaded yet');
+      return;
+    }
+
+    // Try Clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showCopiedFeedback(this);
+      }).catch(err => {
+        console.warn('Clipboard API failed, using fallback', err);
+        fallbackCopyText(text, this);
+      });
+    } else {
+      fallbackCopyText(text, this);
+    }
+  });
+
+  // Fallback for older browsers or Clipboard API failure
+  function fallbackCopyText(text, btn) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      showCopiedFeedback(btn);
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+      alert('Failed to copy log');
+    }
+    document.body.removeChild(textarea);
+  }
+
+  // Visual feedback
+  function showCopiedFeedback(btn) {
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.disabled = false;
+    }, 1200);
+  }
+</script>
+
+<script>
+  const logEl = document.getElementById('last-run-log');
+  const btnTop = document.getElementById('scroll-log-top');
+  const btnBottom = document.getElementById('scroll-log-bottom');
+  const btnContainer = document.getElementById('log-scroll-buttons');
+
+  function updateScrollButtons() {
+    const hasOverflow = logEl.scrollHeight > logEl.clientHeight + 5;
+
+    // Only show buttons if scrolling is possible
+    btnContainer.style.display = hasOverflow ? 'flex' : 'none';
+
+    if (!hasOverflow) return;
+
+    const atTop = logEl.scrollTop <= 0;
+    const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 1;
+
+    btnTop.disabled = atTop;
+    btnBottom.disabled = atBottom;
+  }
+
+  btnTop.addEventListener('click', () => {
+    logEl.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  btnBottom.addEventListener('click', () => {
+    logEl.scrollTo({ top: logEl.scrollHeight, behavior: 'smooth' });
+  });
+
+  // Update on scroll
+  logEl.addEventListener('scroll', updateScrollButtons);
+
+  // Update when log content changes
+  const observer = new MutationObserver(updateScrollButtons);
+  observer.observe(logEl, { childList: true, subtree: true });
+
+  // Initial evaluation
+  updateScrollButtons();
 </script>
