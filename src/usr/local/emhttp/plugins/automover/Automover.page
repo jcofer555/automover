@@ -2323,7 +2323,7 @@ if (is_file($plg)) {
       .catch(() => { document.getElementById('status-text').textContent = 'No details available'; });
   }
   updateStatus();
-  setInterval(updateStatus, 5000);
+  setInterval(updateStatus, 1000);
 
   // === Poll for Automover completion (done flag) ===
   function checkAutomoverDone() {
@@ -2347,8 +2347,8 @@ if (is_file($plg)) {
       .catch(() => { });
   }
 
-  // run every 5s like your status updates
-  setInterval(checkAutomoverDone, 5000);
+  // run every 1s like your status updates
+  setInterval(checkAutomoverDone, 1000);
 
   // Disable only Save & Start and Move Now
   function checkAutomoverLock() {
@@ -2380,10 +2380,10 @@ if (is_file($plg)) {
       .catch(() => { });
   }
 
-  // Run once immediately, then every 5s (same as status polling)
+  // Run once immediately, then every 1s (same as status polling)
   document.addEventListener('DOMContentLoaded', () => {
     checkAutomoverLock();
-    setInterval(checkAutomoverLock, 5000);
+    setInterval(checkAutomoverLock, 1000);
   });
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -2843,7 +2843,7 @@ if (is_file($plg)) {
       poolSelect.addEventListener('change', () => { currentPoolSelection = poolSelect.value; });
     }
     updatePoolUsage();
-    setInterval(updatePoolUsage, 5000);
+    setInterval(updatePoolUsage, 1000);
 
     // Logs
     const filterInput = document.getElementById('log-filter');
@@ -2884,7 +2884,7 @@ if (is_file($plg)) {
         });
     }
     loadMoverLog();
-    setInterval(loadMoverLog, 5000);
+    setInterval(loadMoverLog, 1000);
 
     // Stop
     document.getElementById('stop-button').addEventListener('click', function () {
