@@ -2860,7 +2860,7 @@ if (is_file($plg)) {
         .catch(() => { document.getElementById('last-run-log').textContent = 'Error loading last run log.'; });
     }
     loadLastRunLog();
-    setInterval(loadLastRunLog, 5000);
+    setInterval(loadLastRunLog, 1000);
 
     function loadMoverLog() {
       const keyword = filterInput.value.trim();
