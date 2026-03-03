@@ -52,9 +52,9 @@ if (file_exists($bootFail)) {
 
     // Base Status
     if ($arrayStopped) {
-        $status = 'Array Is Not Started While Automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
+        $status = 'Array Is Not Started While automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
     } elseif ($parityRunning) {
-        $status = 'Parity Check Happening While Automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
+        $status = 'Parity Check Happening While automover Is ' . ($automoverRunning ? 'Running' : 'Stopped');
     } else {
         $status = $automoverRunning ? 'Running' : 'Stopped';
     }

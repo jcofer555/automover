@@ -10,52 +10,57 @@ $cfgPath = '/boot/config/plugins/automover/settings.cfg';
 
 // Define all default keys and their order
 $defaults = [
-    'POOL_NAME' => 'cache',
-    'THRESHOLD' => 0,
-    'DRY_RUN' => 'no',
-    'ALLOW_DURING_PARITY' => 'no',
-    'AUTOSTART' => 'no',
-    'AGE_BASED_FILTER' => 'no',
-    'AGE_DAYS' => 1,
-    'SIZE_BASED_FILTER' => 'no',
-    'SIZE_MB' => 1,
-    'EXCLUSIONS_ENABLED' => 'no',
-    'QBITTORRENT_SCRIPT' => 'no',
-    'QBITTORRENT_HOST' => '',
-    'QBITTORRENT_USERNAME' => '',
-    'QBITTORRENT_PASSWORD' => '',
-    'QBITTORRENT_DAYS_FROM' => '0',
-    'QBITTORRENT_DAYS_TO' => '2',
-    'QBITTORRENT_STATUS' => 'completed',
-    'HIDDEN_FILTER' => 'no',
-    'FORCE_RECONSTRUCTIVE_WRITE' => 'no',
-    'CONTAINER_NAMES' => '',
-    'ENABLE_JDUPES' => 'no',
-    'HASH_PATH' => '/mnt/user/appdata',
-    'ENABLE_CLEANUP' => 'no',
-    'CRON_MODE' => 'minutes',
-    'MINUTES_FREQUENCY' => '30',
-    'HOURLY_FREQUENCY' => '',
-    'DAILY_TIME' => '',
-    'WEEKLY_DAY' => '',
-    'WEEKLY_TIME' => '',
-    'MONTHLY_DAY' => '',
-    'MONTHLY_TIME' => '',
-    'CUSTOM_CRON' => '',
-    'CRON_EXPRESSION' => '',
-    'STOP_THRESHOLD' => 0,
-    'ENABLE_NOTIFICATIONS' => 'no',
-    'WEBHOOK_URL' => '',
-    'MANUAL_MOVE' => 'no',
-    'STOP_ALL_CONTAINERS' => 'no',
-    'ENABLE_TRIM' => 'no',
-    'ENABLE_SCRIPTS' => 'no',
-    'PRE_SCRIPT' => '',
-    'POST_SCRIPT' => '',
-    'PRIORITIES' => 'no',
-    'PROCESS_PRIORITY' => '0',
-    'IO_PRIORITY' => 'normal',
-
+    'AGE_BASED_FILTER'          => 'no',
+    'AGE_DAYS'                  => 1,
+    'ALLOW_DURING_PARITY'       => 'no',
+    'AUTOSTART'                 => 'no',
+    'CONTAINER_NAMES'           => '',
+    'CRON_EXPRESSION'           => '',
+    'CRON_MODE'                 => 'minutes',
+    'CUSTOM_CRON'               => '',
+    'DAILY_TIME'                => '',
+    'DRY_RUN'                   => 'no',
+    'ENABLE_CLEANUP'            => 'no',
+    'ENABLE_JDUPES'             => 'no',
+    'ENABLE_NOTIFICATIONS'      => 'no',
+    'ENABLE_SCRIPTS'            => 'no',
+    'ENABLE_TRIM'               => 'no',
+    'EXCLUSIONS_ENABLED'        => 'no',
+    'FORCE_RECONSTRUCTIVE_WRITE'=> 'no',
+    'HASH_PATH'                 => '/mnt/user/appdata',
+    'HIDDEN_FILTER'             => 'no',
+    'HOURLY_FREQUENCY'          => '',
+    'IO_PRIORITY'               => 'normal',
+    'MANUAL_MOVE'               => 'no',
+    'MINUTES_FREQUENCY'         => '30',
+    'MONTHLY_DAY'               => '',
+    'MONTHLY_TIME'              => '',
+    'NOTIFICATION_SERVICE'      => '',
+    'POOL_NAME'                 => 'cache',
+    'POST_SCRIPT'               => '',
+    'PRE_SCRIPT'                => '',
+    'PRIORITIES'                => 'no',
+    'PROCESS_PRIORITY'          => '0',
+    'PUSHOVER_USER_KEY'          => '',
+    'QBITTORRENT_DAYS_FROM'     => '0',
+    'QBITTORRENT_DAYS_TO'       => '2',
+    'QBITTORRENT_HOST'          => '',
+    'QBITTORRENT_PASSWORD'      => '',
+    'QBITTORRENT_SCRIPT'        => 'no',
+    'QBITTORRENT_STATUS'        => 'completed',
+    'QBITTORRENT_USERNAME'      => '',
+    'SIZE_BASED_FILTER'         => 'no',
+    'SIZE_MB'                   => 1,
+    'STOP_ALL_CONTAINERS'       => 'no',
+    'STOP_THRESHOLD'            => 0,
+    'THRESHOLD'                 => 0,
+    'WEBHOOK_DISCORD'           => '',
+    'WEBHOOK_GOTIFY'            => '',
+    'WEBHOOK_NTFY'              => '',
+    'WEBHOOK_PUSHOVER'          => '',
+    'WEBHOOK_SLACK'             => '',
+    'WEEKLY_DAY'                => '',
+    'WEEKLY_TIME'               => '',
 ];
 
 // Load existing config if present
@@ -443,7 +448,7 @@ if (file_exists("/etc/unraid-version")) {
   }
 
   .field-warning {
-    color: red;
+    color: yellow;
     display: none;
     font-size: 12px;
     margin-top: 4px;
@@ -1246,29 +1251,45 @@ if (file_exists("/etc/unraid-version")) {
     opacity: 0.25;
     cursor: default;
   }
+
+  /* Inline help system */
+  label.fbb-has-help,
+  span.fbb-has-help {
+    cursor: help;
+  }
+
+  .fbb-help-text {
+    background: #0d1a2e;
+    border-left: 3px solid var(--primary-blue);
+    border-radius: 4px;
+    color: #cde4f5;
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    padding: 7px 10px;
+    max-width: 500px;
+    box-sizing: border-box;
+  }
+
+  #logtoast {
+    display: none;
+    background: yellow;
+    color: #000;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-top: -6px;
+    font-weight: bold;
+  }
 </style>
-
-<?php
-$plg = "/boot/config/plugins/automover.plg";
-$version = "unknown";
-
-if (is_file($plg)) {
-    $xml = @simplexml_load_file($plg);
-    if ($xml && isset($xml['version'])) {
-        $version = (string)$xml['version'];
-    }
-}
-?>
 
 <div id="automover-wrapper">
   <form id="automover-settings">
     <div class="status-container">
-      <div class="status-row"><span class="status-label">Status:</span><span id="status-text">Stopped</span></div>
-      <div class="status-row"><span class="status-label">Last Run:</span><span id="last-run-text">No last run
+      <div class="status-row"><span class="status-label automovertip"
+          title="Current state of the automover service">Status:</span><span id="status-text">Stopped</span></div>
+      <div class="status-row"><span class="status-label automovertip"
+          title="When the automover last finished a session">Last Run:</span><span id="last-run-text">No last run
           available</span></div>
-      <div class="status-row"><span class="status-label">Version:</span><span id="version-text">
-          <?= $version ?>
-        </span></div>
     </div>
 
     <div class="form-group">
@@ -1276,18 +1297,18 @@ if (is_file($plg)) {
         <button type="button" id="save-settings">Save & Start</button>
       </span>
 
-      <span title="Stop Automover service and stop moving" class="automovertip">
+      <span title="Stop automover service and stop moving" class="automovertip">
         <button type="button" id="stop-button">Stop</button>
       </span>
 
-      <span title="Run Automover immediately, ignoring filters" class="automovertip">
+      <span title="Run automover immediately, ignoring filters" class="automovertip">
         <button type="button" id="moveNowBtn">Move Now</button>
       </span>
     </div>
 
     <div id="move-now-confirmation" style="display:none;">✅ Moving Now</div>
-    <div id="save-confirmation" style="display:none;">✅ Saved & Started Automover</div>
-    <div id="stop-confirmation" style="display:none;">✅ Stopping Automover</div>
+    <div id="save-confirmation" style="display:none;">✅ Saved & Started automover</div>
+    <div id="stop-confirmation" style="display:none;">✅ Stopping automover</div>
 
     <div id="save-messages" style="display:none;background:#111;border-radius:6px;font-family:monospace;color:red;">
     </div>
@@ -1567,20 +1588,149 @@ if (is_file($plg)) {
       </div>
     </div>
 
-    <!-- Webhook URL -->
-    <div class="form-pair" id="webhook_row" style="display:none;">
-      <label for="webhook_url">
-        <span title="Optional: Discord Webhook URL for notifications" class="automovertip">Discord Webhook:</span>
-      </label>
-      <div class="input-wrapper">
-        <span title="Optional: Discord Webhook URL for notifications" class="automovertip">
-          <input type="text" id="webhook_url" placeholder="https://discord.com/api/webhooks/yourwebhookid"
-            value="<?php echo htmlspecialchars($settings['WEBHOOK_URL'] ?? '') ?>">
-        </span>
-        <div id="webhook-warning" class="field-warning">
-          ⚠️ Needs entered like this https://discord.com/api/webhooks/yourwebhookid
+    <!-- Notification Services -->
+    <div id="notification_services_row" style="display:none; margin-top:8px;">
+
+      <div class="form-pair">
+        <label>
+          <span title="Select which notification services to use" class="automovertip">
+            Service:
+          </span>
+        </label>
+        <div class="input-wrapper">
+          <?php
+        $activeServices = array_map('trim', explode(',', $settings['NOTIFICATION_SERVICE'] ?? ''));
+        $services = ['discord','gotify','ntfy','pushover','slack','unraid'];
+      ?>
+          <div id="notification-service-wrapper"
+            style="position:relative; width:200px; min-width:fit-content; max-width:100%;">
+
+            <!-- Collapsed trigger -->
+            <div id="notification-service-trigger" style="
+      border: 1px solid var(--primary-blue);
+      border-radius: 5px;
+      background: #111;
+      color: #ccc;
+      font-size: 13px;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+      width: 200px;
+      min-width: fit-content;
+      box-sizing: border-box;
+  ">Select service(s)</div>
+
+            <!-- Dropdown panel -->
+            <div id="notification-service-checkboxes" style="
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 9999;
+      border: 1px solid var(--primary-blue);
+      border-radius: 5px;
+      background: #111;
+      padding: 4px 0;
+      width: 200px;
+      min-width: fit-content;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  ">
+              <?php foreach ($services as $svc): ?>
+              <label
+                style="display:flex; align-items:center; gap:8px; color:var(--primary-blue); font-weight:bold; cursor:pointer; padding:4px 10px;">
+                <input type="checkbox" class="notification-service-cb" data-service="<?php echo $svc; ?>"
+                  style="margin:0; width:16px; height:16px; flex-shrink:0;" <?php echo in_array($svc, $activeServices)
+                  ? 'checked' : '' ; ?>>
+                <?php echo ucfirst($svc); ?>
+              </label>
+              <?php endforeach; ?>
+            </div>
+
+          </div>
         </div>
       </div>
+
+      <!-- Discord -->
+      <div class="form-pair webhook-field-row" id="webhook-discord-row" style="display:none;">
+        <label>
+          <span title="Enter your Discord webhook URL e.g. https://discord.com/api/webhooks/WEBHOOK or just WEBHOOK"
+            class="automovertip">Discord Webhook URL:</span>
+        </label>
+        <div class="input-wrapper">
+          <input type="text" id="webhook_discord" placeholder="https://discord.com/api/webhooks/WEBHOOK"
+            value="<?php echo htmlspecialchars($settings['WEBHOOK_DISCORD'] ?? ''); ?>">
+          <div id="webhook-discord-warning" class="field-warning">⚠️ Must start with https://discord.com/api/webhooks/
+          </div>
+        </div>
+      </div>
+
+      <!-- Gotify -->
+      <div class="form-pair webhook-field-row" id="webhook-gotify-row" style="display:none;">
+        <label>
+          <span
+            title="Enter your Gotify server message URL e.g. https://gotify.example.com/message?token=TOKEN or just TOKEN"
+            class="automovertip">Gotify URL:</span>
+        </label>
+        <div class="input-wrapper">
+          <input type="text" id="webhook_gotify" placeholder="https://gotify.example.com/message?token=TOKEN"
+            value="<?php echo htmlspecialchars($settings['WEBHOOK_GOTIFY'] ?? ''); ?>">
+          <div id="webhook-gotify-warning" class="field-warning">⚠️ Must start with http:// or https://</div>
+        </div>
+      </div>
+
+      <!-- Ntfy -->
+      <div class="form-pair webhook-field-row" id="webhook-ntfy-row" style="display:none;">
+        <label>
+          <span title="Enter your Ntfy topic URL e.g. https://ntfy.sh/yourtopic or just yourtopic"
+            class="automovertip">Ntfy URL:</span>
+        </label>
+        <div class="input-wrapper">
+          <input type="text" id="webhook_ntfy" placeholder="https://ntfy.sh/yourtopic"
+            value="<?php echo htmlspecialchars($settings['WEBHOOK_NTFY'] ?? ''); ?>">
+          <div id="webhook-ntfy-warning" class="field-warning">⚠️ Must start with http:// or https://</div>
+        </div>
+      </div>
+
+      <!-- Pushover -->
+      <div class="form-pair webhook-field-row" id="webhook-pushover-row" style="display:none;">
+        <label>
+          <span
+            title="Pushover App Token URL', tooltip: 'Enter your Pushover app token e.g. https://api.pushover.net/APPTOKEN or just APPTOKEN"
+            class="automovertip">Pushover App Token URL:</span>
+        </label>
+        <div class="input-wrapper">
+          <input type="text" id="webhook_pushover" placeholder="https://api.pushover.net/YOURAPPTOKEN"
+            value="<?php echo htmlspecialchars($settings['WEBHOOK_PUSHOVER'] ?? ''); ?>">
+          <div id="webhook-pushover-warning" class="field-warning">⚠️ Pushover token is required</div>
+        </div>
+      </div>
+
+      <!-- Pushover User Key -->
+      <div class="form-pair webhook-field-row" id="pushover-userkey-row" style="display:none;">
+        <label>
+          <span title="Your Pushover user key from pushover.net/dashboard" class="automovertip">Pushover User
+            Key:</span>
+        </label>
+        <div class="input-wrapper">
+          <input type="text" id="pushover_user_key" placeholder="user key from pushover.net/dashboard"
+            value="<?php echo htmlspecialchars($settings['PUSHOVER_USER_KEY'] ?? ''); ?>">
+          <div id="pushover-userkey-warning" class="field-warning">⚠️ Pushover user key is required</div>
+        </div>
+      </div>
+
+      <!-- Slack -->
+      <div class="form-pair webhook-field-row" id="webhook-slack-row" style="display:none;">
+        <label>
+          <span title="Enter your Slack webhook URL e.g. https://hooks.slack.com/services/ID or just ID"
+            class="automovertip">Slack Webhook URL:</span>
+        </label>
+        <div class="input-wrapper">
+          <input type="text" id="webhook_slack" placeholder="https://hooks.slack.com/services/ID"
+            value="<?php echo htmlspecialchars($settings['WEBHOOK_SLACK'] ?? ''); ?>">
+          <div id="webhook-slack-warning" class="field-warning">⚠️ Must start with https://hooks.slack.com/</div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Container Names -->
@@ -1688,7 +1838,8 @@ if (is_file($plg)) {
 
     <!-- Size -->
     <div class="form-pair" id="size-mb-container" style="display:none;">
-      <label for="size_mb" <span title="Only move files larger than this size (in MB)" class="automovertip">Min Size
+      <label for="size_mb" <span title="Only move files larger than this size (in MB)" class="automovertip">Min
+        Size
         (MB):</span>
       </label>
       <div class="input-wrapper">
@@ -1768,7 +1919,8 @@ if (is_file($plg)) {
       </div>
 
       <div class="form-pair">
-        <label for="qbit_status" <span title="Which status of torrents to act on" class="automovertip">Status:</span>
+        <label for="qbit_status" <span title="Which status of torrents to act on"
+          class="automovertip">Status:</span>
         </label>
         <span title="Which status of torrents to act on" class="automovertip">
           <select id="qbit_status">
@@ -1911,12 +2063,14 @@ if (is_file($plg)) {
     <!-- Post Script Path -->
     <div class="form-pair" id="post-script-row" style="display:none;">
       <label for="post_script">
-        <span title="Script to run at the end of the session regardless if anything moves or not" class="automovertip">
+        <span title="Script to run at the end of the session regardless if anything moves or not"
+          class="automovertip">
           Post-Move Script:
         </span>
       </label>
       <div class="input-wrapper">
-        <span title="Script to run at the end of the session regardless if anything moves or not" class="automovertip">
+        <span title="Script to run at the end of the session regardless if anything moves or not"
+          class="automovertip">
           <input type="text" id="post_script" placeholder="/mnt/user/scripts/post_move.sh"
             value="<?php echo htmlspecialchars($settings['POST_SCRIPT'] ?? ''); ?>">
         </span>
@@ -1925,7 +2079,7 @@ if (is_file($plg)) {
 
     <!-- Checkboxes row -->
     <div class="checkbox-row">
-      <span title="Start Automover automatically when Unraid boots" class="automovertip">
+      <span title="Start automover automatically when Unraid boots" class="automovertip">
         <label>
           <input type="checkbox" id="autostart" <?php echo ($settings['AUTOSTART'] ?? '' )==='yes' ? 'checked' : '' ?>>
           Autostart on Boot
@@ -1939,7 +2093,7 @@ if (is_file($plg)) {
         </label>
       </span>
 
-      <span title="Allow Automover to run even when Unraid is doing a parity check" class="automovertip">
+      <span title="Allow automover to run even when Unraid is doing a parity check" class="automovertip">
         <label>
           <input type="checkbox" id="allow_during_parity" <?php echo ($settings['ALLOW_DURING_PARITY'] ?? '' )==='yes'
             ? 'checked' : '' ?>> Allow During Parity
@@ -2004,7 +2158,7 @@ if (is_file($plg)) {
         </label>
       </span>
 
-      <span title="Send Unraid system notifications when Automover starts and finishes" class="automovertip">
+      <span title="Send Unraid system notifications when automover starts and finishes" class="automovertip">
         <label>
           <input type="checkbox" id="enable_notifications" <?php echo ($settings['ENABLE_NOTIFICATIONS'] ?? '' )==='yes'
             ? 'checked' : '' ?>>
@@ -2071,7 +2225,7 @@ if (is_file($plg)) {
   <div id="last-run-container">
     <form id="log-section-form">
 
-      <div class="log-header-row">
+      <div class="log-header-row" style="display:flex; align-items:center; gap:8px;">
         <div class="toast-wrapper">
           <span title="Clear the automover log" class="automovertip">
             <button type="button" id="clear-last-run-log">Clear Log</button>
@@ -2079,12 +2233,14 @@ if (is_file($plg)) {
           <div id="toast-last" class="toast-inline"></div>
         </div>
 
+        <div id="logtoast">Log copied</div>
+
         <span title="Copy automover log to clipboard" class="automovertip">
           <button type="button" id="copy-last-run-log">Copy</button>
         </span>
       </div>
 
-      <pre id="last-run-log">Automover log not found</pre>
+      <pre id="last-run-log">automover log not found</pre>
       <div id="log-scroll-buttons">
         <button type="button" id="scroll-log-top">↑</button>
         <button type="button" id="scroll-log-bottom">↓</button>
@@ -2325,8 +2481,8 @@ if (is_file($plg)) {
   updateStatus();
   setInterval(updateStatus, 1000);
 
-  // === Poll for Automover completion (done flag) ===
-  function checkAutomoverDone() {
+  // === Poll for automover completion (done flag) ===
+  function checkautomoverDone() {
     fetch('/plugins/automover/helpers/check_done.php', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
@@ -2348,10 +2504,10 @@ if (is_file($plg)) {
   }
 
   // run every 1s like your status updates
-  setInterval(checkAutomoverDone, 1000);
+  setInterval(checkautomoverDone, 1000);
 
   // Disable only Save & Start and Move Now
-  function checkAutomoverLock() {
+  function checkautomoverLock() {
     fetch('/plugins/automover/helpers/check_lock.php', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
@@ -2382,8 +2538,8 @@ if (is_file($plg)) {
 
   // Run once immediately, then every 1s (same as status polling)
   document.addEventListener('DOMContentLoaded', () => {
-    checkAutomoverLock();
-    setInterval(checkAutomoverLock, 1000);
+    checkautomoverLock();
+    setInterval(checkautomoverLock, 1000);
   });
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -2415,56 +2571,49 @@ if (is_file($plg)) {
       manualMoveSection.style.display = this.checked ? 'block' : 'none';
     });
 
-    // === Live validation for Discord Webhook URL (prefix-based) ===
-    const webhookInput = document.getElementById('webhook_url');
-    const webhookWarning = document.getElementById('webhook-warning');
 
-    if (webhookInput && webhookWarning) {
-      webhookInput.addEventListener('input', function () {
-        const value = this.value.trim();
-
-        // empty is allowed
-        let valid = (value === '');
-
-        // allow either discord.com or discordapp.com prefix
-        if (value.startsWith('https://discord.com/api/webhooks/') ||
-          value.startsWith('https://discordapp.com/api/webhooks/')) {
-          valid = true;
-        }
-
-        if (!valid) {
-          this.classList.add('invalid');
-          webhookWarning.style.display = 'block';
-          webhookWarning.style.opacity = '1';
-        } else {
-          this.classList.remove('invalid');
-          webhookWarning.style.opacity = '0';
-          setTimeout(() => {
-            webhookWarning.style.display = 'none';
-          }, 200);
-        }
-      });
-    }
-
-    // === Discord Webhook visibility control (safe) ===
+    // === Multi-service notification visibility ===
     const enableNotificationsCheckbox = document.getElementById('enable_notifications');
+    const notificationServicesRow = document.getElementById('notification_services_row');
 
-    // try both dash and underscore, in case HTML used one or the other
-    const webhookRow =
-      document.getElementById('webhook-row') ||
-      document.getElementById('webhook_row');
+    function getSelectedServices(prefix) {
+      return Array.from(document.querySelectorAll('.notification-service-cb:checked'))
+        .map(cb => cb.dataset.service);
+    }
 
-    if (enableNotificationsCheckbox && webhookRow) {
-      // set initial state on load
-      webhookRow.style.display = enableNotificationsCheckbox.checked ? 'flex' : 'none';
-
-      // update on change
-      enableNotificationsCheckbox.addEventListener('change', function () {
-        webhookRow.style.display = this.checked ? 'flex' : 'none';
+    function updateWebhookFieldVisibility() {
+      const services = getSelectedServices();
+      const fields = {
+        discord: document.getElementById('webhook-discord-row'),
+        gotify: document.getElementById('webhook-gotify-row'),
+        ntfy: document.getElementById('webhook-ntfy-row'),
+        pushover: document.getElementById('webhook-pushover-row'),
+        pushoverUserKey: document.getElementById('pushover-userkey-row'),
+        slack: document.getElementById('webhook-slack-row'),
+      };
+      Object.entries(fields).forEach(([svc, row]) => {
+        if (fields.pushoverUserKey) fields.pushoverUserKey.style.display = services.includes('pushover') ? 'flex' : 'none';
+        if (row) row.style.display = services.includes(svc) ? 'flex' : 'none';
       });
     }
 
+    function toggleNotificationServices() {
+      if (!enableNotificationsCheckbox || !notificationServicesRow) return;
+      notificationServicesRow.style.display = enableNotificationsCheckbox.checked ? 'block' : 'none';
+      if (enableNotificationsCheckbox.checked) updateWebhookFieldVisibility();
+    }
 
+    if (enableNotificationsCheckbox) {
+      enableNotificationsCheckbox.addEventListener('change', toggleNotificationServices);
+      toggleNotificationServices();
+    }
+
+    document.querySelectorAll('.notification-service-cb').forEach(cb => {
+      cb.addEventListener('change', updateWebhookFieldVisibility);
+    });
+
+    // Initialize webhook field visibility on load
+    updateWebhookFieldVisibility();
 
     moveNowBtn.addEventListener('click', () => {
       // Trigger the move action (you may already have this logic elsewhere)
@@ -2499,6 +2648,25 @@ if (is_file($plg)) {
           alert('Move Now failed');
         });
     });
+
+    // === Notification service dropdown toggle ===
+    const notifTrigger = document.getElementById('notification-service-trigger');
+    const notifDropdown = document.getElementById('notification-service-checkboxes');
+
+    if (notifTrigger && notifDropdown) {
+      notifTrigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        notifDropdown.style.display = notifDropdown.style.display === 'none' ? 'block' : 'none';
+      });
+
+      document.addEventListener('click', function () {
+        notifDropdown.style.display = 'none';
+      });
+
+      notifDropdown.addEventListener('click', function (e) {
+        e.stopPropagation();
+      });
+    }
 
     // --- Scheduling Dropdown Toggle ---
     (function waitForSchedulingToggle() {
@@ -3117,44 +3285,109 @@ if (is_file($plg)) {
     });
 
     function validateWebhook() {
-      const enableNotifications = document.getElementById('enable_notifications');
-      const webhookRow = document.getElementById('webhook-row');
-      const webhookInput = document.getElementById('webhook_url');
-      const webhookWarning = document.getElementById('webhook-warning');
+      if (!enableNotificationsCheckbox || !enableNotificationsCheckbox.checked) return true;
 
-      // Show/hide field depending on notifications
-      if (enableNotifications && webhookRow) {
-        webhookRow.style.display = enableNotifications.checked ? 'flex' : 'none';
-      }
+      const services = getSelectedServices();
+      if (services.length === 0) return true;
 
-      if (!enableNotifications.checked) return true; // skip validation if notifications disabled
-      if (!webhookInput) return true;
+      let valid = true;
 
-      const val = webhookInput.value.trim();
-      if (val === '') {
-        webhookInput.classList.remove('invalid');
-        webhookWarning.style.display = 'none';
-        return true; // empty is allowed
-      }
+      const checks = {
+        discord: { id: 'webhook_discord', warn: 'webhook-discord-warning', test: v => v === '' || v.startsWith('https://discord.com/api/webhooks/') || v.startsWith('https://discordapp.com/api/webhooks/') },
+        gotify: { id: 'webhook_gotify', warn: 'webhook-gotify-warning', test: v => v === '' || v.startsWith('http://') || v.startsWith('https://') },
+        ntfy: { id: 'webhook_ntfy', warn: 'webhook-ntfy-warning', test: v => v === '' || v.startsWith('http://') || v.startsWith('https://') },
+        pushover: { id: 'webhook_pushover', warn: 'webhook-pushover-warning', test: v => v !== '' },
+        pushoverUserKey: { id: 'pushover_user_key', warn: 'pushover-userkey-warning', test: v => v !== '' },
+        slack: { id: 'webhook_slack', warn: 'webhook-slack-warning', test: v => v === '' || v.startsWith('https://hooks.slack.com/') },
+      };
 
-      const valid = val.startsWith('https://discord.com/api/webhooks/');
-      webhookInput.classList.toggle('invalid', !valid);
-      webhookWarning.style.display = valid ? 'none' : 'block';
+      services.forEach(svc => {
+        const cfg = checks[svc];
+        if (!cfg) return; // unraid has no webhook field
+        const input = document.getElementById(cfg.id);
+        const warning = document.getElementById(cfg.warn);
+        if (!input) return;
+        const val = input.value.trim();
+        const ok = cfg.test(val);
+        input.classList.toggle('invalid', !ok);
+        if (warning) warning.style.display = ok ? 'none' : 'block';
+        if (!ok) valid = false;
+      });
+
       return valid;
     }
 
-    // ===== Exclusions picker (helper + csrf_token) =====
-    const modal = document.getElementById('exclusion-modal');
-    const grid = document.getElementById('picker-grid');
-    const crumbs = document.getElementById('crumbs');
-    const btnUp = document.getElementById('btn-up');
-    const btnClose = document.getElementById('btn-close');
-    const btnAdd = document.getElementById('btn-add');
-    const btnRemove = document.getElementById('btn-remove');
-    const toast = document.getElementById('picker-toast');
-    let currentPath = '/mnt';
+    // === Webhook URL normalization ===
+    const SERVICE_CONFIG = {
+      discord: {
+        prefix: 'https://discord.com/api/webhooks/',
+        prefixes: ['https://discord.com/api/webhooks/', 'https://discordapp.com/api/webhooks/'],
+        normalize: v => (v.startsWith('https://discord.com/api/webhooks/') || v.startsWith('https://discordapp.com/api/webhooks/')) ? v : 'https://discord.com/api/webhooks/' + v,
+        validate: v => v === '' || v.startsWith('https://discord.com/api/webhooks/') || v.startsWith('https://discordapp.com/api/webhooks/'),
+      },
+      gotify: {
+        prefix: 'https://gotify.net/message?token=',
+        prefixes: ['http://', 'https://'],
+        normalize: v => (v.startsWith('http://') || v.startsWith('https://')) ? v : 'https://gotify.net/message?token=' + v,
+        validate: v => v === '' || v.startsWith('http://') || v.startsWith('https://'),
+      },
+      ntfy: {
+        prefix: 'https://ntfy.sh/',
+        prefixes: ['http://', 'https://'],
+        normalize: v => (v.startsWith('http://') || v.startsWith('https://')) ? v : 'https://ntfy.sh/' + v,
+        validate: v => v === '' || v.startsWith('http://') || v.startsWith('https://'),
+      },
+      pushover: {
+        prefix: '',
+        prefixes: [],
+        normalize: v => v,
+        validate: v => v !== '',
+      },
+      slack: {
+        prefix: 'https://hooks.slack.com/',
+        prefixes: ['https://hooks.slack.com/'],
+        normalize: v => v.startsWith('https://hooks.slack.com/') ? v : 'https://hooks.slack.com/services/' + v,
+        validate: v => v === '' || v.startsWith('https://hooks.slack.com/'),
+      },
+    };
 
-    let toastQueueDelay = 0; // keeps a running delay so toasts stagger
+    function normalizeWebhookUrl(service, value) {
+      const cfg = SERVICE_CONFIG[service];
+      if (!cfg || value.trim() === '') return value;
+      return cfg.normalize(value.trim());
+    }
+
+    function validateWebhookUrl(service, value) {
+      const cfg = SERVICE_CONFIG[service];
+      if (!cfg) return true;
+      return cfg.validate(value.trim());
+    }
+
+    // Attach blur normalization and live validation to each webhook input
+    Object.keys(SERVICE_CONFIG).forEach(svc => {
+      const input = document.getElementById('webhook_' + svc);
+      const warning = document.getElementById('webhook-' + svc + '-warning');
+      if (!input) return;
+
+      // Normalize on blur
+      input.addEventListener('blur', function () {
+        const normalized = normalizeWebhookUrl(svc, this.value);
+        if (normalized !== this.value) this.value = normalized;
+        if (warning) {
+          const ok = validateWebhookUrl(svc, this.value);
+          input.classList.toggle('invalid', !ok);
+          warning.style.display = ok ? 'none' : 'block';
+        }
+      });
+
+      // Live validation on input
+      input.addEventListener('input', function () {
+        if (!warning) return;
+        const ok = validateWebhookUrl(svc, this.value);
+        input.classList.toggle('invalid', !ok);
+        warning.style.display = ok ? 'none' : 'block';
+      });
+    });
 
     function showToast(msg, type = 'ok') {
       const container = document.getElementById('toast-container');
@@ -3554,54 +3787,58 @@ if (is_file($plg)) {
 
       // --- Build parameters for save_settings.php ---
       const params = new URLSearchParams({
-        POOL_NAME: document.getElementById('pool').value,
-        THRESHOLD: thresholdInput.value,
-        DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
-        ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
-        AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
         AGE_BASED_FILTER: document.getElementById('age_based_filter').checked ? 'yes' : 'no',
         AGE_DAYS: ageDaysInput.value,
-        SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
-        SIZE_MB: sizeMbInput.value,
-        EXCLUSIONS_ENABLED: document.getElementById('enable_exclusions').checked ? 'yes' : 'no',
-        QBITTORRENT_SCRIPT: document.getElementById('qbit_script').checked ? 'yes' : 'no',
-        QBITTORRENT_HOST: document.getElementById('qbit_host').value.trim(),
-        QBITTORRENT_USERNAME: document.getElementById('qbit_user').value.trim(),
-        QBITTORRENT_PASSWORD: document.getElementById('qbit_pass').value.trim(),
-        QBITTORRENT_DAYS_FROM: document.getElementById('qbit_days_from').value.trim(),
-        QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value.trim(),
-        QBITTORRENT_STATUS: document.getElementById('qbit_status').value.trim(),
-        HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
-        FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
+        ALLOW_DURING_PARITY: document.getElementById('allow_during_parity').checked ? 'yes' : 'no',
+        AUTOSTART: document.getElementById('autostart').checked ? 'yes' : 'no',
         CONTAINER_NAMES: document.getElementById('container_names').value.trim(),
-        ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
-        HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
-        ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
         CRON_EXPRESSION: cronExpression,
-        STOP_THRESHOLD: stopThresholdInput.value,
+        CRON_MODE: cronModeSelect.value,
+        CUSTOM_CRON: document.getElementById('custom_cron')?.value.trim() || '',
+        DAILY_TIME: document.getElementById('daily_time')?.value || '',
+        DRY_RUN: document.getElementById('dry_run').checked ? 'yes' : 'no',
+        ENABLE_CLEANUP: document.getElementById('enable_cleanup').checked ? 'yes' : 'no',
+        ENABLE_JDUPES: document.getElementById('ENABLE_JDUPES').checked ? 'yes' : 'no',
         ENABLE_NOTIFICATIONS: document.getElementById('enable_notifications').checked ? 'yes' : 'no',
-        WEBHOOK_URL: document.getElementById('webhook_url')?.value.trim() || '',
-        MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no',
-        STOP_ALL_CONTAINERS: stopAll,
-        ENABLE_TRIM: document.getElementById('enable_trim_toggle').checked ? 'yes' : 'no',
         ENABLE_SCRIPTS: document.getElementById('enable_scripts').checked ? 'yes' : 'no',
-        PRE_SCRIPT: document.getElementById('pre_script').value.trim(),
+        ENABLE_TRIM: document.getElementById('enable_trim_toggle').checked ? 'yes' : 'no',
+        EXCLUSIONS_ENABLED: document.getElementById('enable_exclusions').checked ? 'yes' : 'no',
+        FORCE_RECONSTRUCTIVE_WRITE: document.getElementById('force_reconstructive_write').checked ? 'yes' : 'no',
+        HASH_PATH: document.getElementById('HASH_PATH')?.value || '',
+        HIDDEN_FILTER: document.getElementById('hidden_filter').checked ? 'yes' : 'no',
+        HOURLY_FREQUENCY: document.getElementById('hourly_frequency')?.value || '',
+        IO_PRIORITY: document.getElementById('io_priority').value,
+        MANUAL_MOVE: document.getElementById('manual_move_toggle').checked ? 'yes' : 'no',
+        MINUTES_FREQUENCY: document.getElementById('minutes_frequency')?.value || '',
+        MONTHLY_DAY: document.getElementById('monthly_day')?.value || '',
+        MONTHLY_TIME: document.getElementById('monthly_time')?.value || '',
+        NOTIFICATION_SERVICE: getSelectedServices().join(','),
+        POOL_NAME: document.getElementById('pool').value,
         POST_SCRIPT: document.getElementById('post_script').value.trim(),
+        PRE_SCRIPT: document.getElementById('pre_script').value.trim(),
         PRIORITIES: document.getElementById('priorities').checked ? 'yes' : 'no',
         PROCESS_PRIORITY: document.getElementById('process_priority').value,
-        IO_PRIORITY: document.getElementById('io_priority').value,
+        PUSHOVER_USER_KEY: document.getElementById('pushover_user_key')?.value.trim() || '',
+        QBITTORRENT_DAYS_FROM: document.getElementById('qbit_days_from').value.trim(),
+        QBITTORRENT_DAYS_TO: document.getElementById('qbit_days_to').value.trim(),
+        QBITTORRENT_HOST: document.getElementById('qbit_host').value.trim(),
+        QBITTORRENT_PASSWORD: document.getElementById('qbit_pass').value.trim(),
+        QBITTORRENT_SCRIPT: document.getElementById('qbit_script').checked ? 'yes' : 'no',
+        QBITTORRENT_STATUS: document.getElementById('qbit_status').value.trim(),
+        QBITTORRENT_USERNAME: document.getElementById('qbit_user').value.trim(),
+        SIZE_BASED_FILTER: document.getElementById('size_based_filter').checked ? 'yes' : 'no',
+        SIZE_MB: sizeMbInput.value,
+        STOP_ALL_CONTAINERS: stopAll,
+        STOP_THRESHOLD: stopThresholdInput.value,
+        THRESHOLD: thresholdInput.value,
+        WEBHOOK_DISCORD: document.getElementById('webhook_discord')?.value.trim() || '',
+        WEBHOOK_GOTIFY: document.getElementById('webhook_gotify')?.value.trim() || '',
+        WEBHOOK_NTFY: document.getElementById('webhook_ntfy')?.value.trim() || '',
+        WEBHOOK_PUSHOVER: document.getElementById('webhook_pushover')?.value.trim() || '',
+        WEBHOOK_SLACK: document.getElementById('webhook_slack')?.value.trim() || '',
+        WEEKLY_DAY: document.getElementById('weekly_day')?.value || '',
+        WEEKLY_TIME: document.getElementById('weekly_time')?.value || '',
       });
-
-      // Add new scheduling fields so they persist in settings.cfg
-      params.set("CRON_MODE", cronModeSelect.value);
-      params.set("MINUTES_FREQUENCY", document.getElementById("minutes_frequency")?.value || "");
-      params.set("HOURLY_FREQUENCY", document.getElementById("hourly_frequency")?.value || "");
-      params.set("DAILY_TIME", document.getElementById("daily_time")?.value || "");
-      params.set("WEEKLY_DAY", document.getElementById("weekly_day")?.value || "");
-      params.set("WEEKLY_TIME", document.getElementById("weekly_time")?.value || "");
-      params.set("MONTHLY_DAY", document.getElementById("monthly_day")?.value || "");
-      params.set("MONTHLY_TIME", document.getElementById("monthly_time")?.value || "");
-      params.set("CUSTOM_CRON", document.getElementById("custom_cron")?.value.trim() || "");
 
       // --- Step 1: Save settings ---
       fetch('/plugins/automover/helpers/save_settings.php?' + params.toString(), { method: 'GET' })
@@ -3678,7 +3915,7 @@ if (is_file($plg)) {
     setTimeout(() => { checkPoolUsage(poolSelect.value); }, 250);
   });
   if (typeof caPluginUpdateCheck === "function") {
-    caPluginUpdateCheck("automover.plg", { name: "Automover" });
+    caPluginUpdateCheck("automover.plg", { name: "automover" });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -3700,8 +3937,20 @@ if (is_file($plg)) {
     }
   });
 
-  $('.automovertip').tooltipster({
-    maxWidth: 300
+  $(document).on('mouseenter', '.automovertip', function () {
+    const $el = $(this);
+    const isButtonWrapper = $el.is('span') && $el.children('button').length > 0;
+    const isCheckboxLabel = $el.is('label') && $el.find('input[type="checkbox"]').length > 0;
+    const isCheckboxWrapper = $el.is('span') && $el.find('input[type="checkbox"]').length > 0;
+    const isButton = $el.is('button');
+    const isInsideTable = $el.closest('table').length > 0;
+    if (!isButtonWrapper && !isCheckboxLabel && !isCheckboxWrapper && !isButton && !isInsideTable) return;
+    if (!$el.hasClass('tooltipstered')) {
+      const tipContent = $el.attr('title') || $el.data('tooltip') || '';
+      $el.tooltipster({ maxWidth: 300, content: tipContent });
+      $el.removeAttr('title');
+      setTimeout(() => { if ($el.is(':hover')) $el.tooltipster('open'); }, 500);
+    }
   });
 
   function showToast(toastEl, message, type = "ok") {
@@ -3831,7 +4080,7 @@ if (is_file($plg)) {
 
     // Start Manual Rsync
     document.getElementById("start-manual-rsync").addEventListener("click", () => {
-      // Immediately disable Automover buttons when manual move starts
+      // Immediately disable automover buttons when manual move starts
       ['save-settings', 'moveNowBtn'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -4436,6 +4685,9 @@ if (is_file($plg)) {
 
   // Copy button logic
   document.getElementById('copy-last-run-log').addEventListener('click', function () {
+    const toast = document.getElementById('logtoast');
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 2000);
     const logEl = document.getElementById('last-run-log');
     const text = logEl.innerText || logEl.textContent;
 
@@ -4523,4 +4775,137 @@ if (is_file($plg)) {
 
   // Initial evaluation
   updateScrollButtons();
+</script>
+
+<script>
+  // ── Unraid-style inline help icons ──────────────────────────────────────
+  $(document).ready(function () {
+
+    let _fbbLastClick = 0;
+    let _fbbF1Open = false;
+
+    function attachHelp($trigger, helpText, $insertAfter) {
+      const helpId = 'fbb-help-' + Math.random().toString(36).substr(2, 9);
+
+      const $helpDiv = $(
+        '<div class="fbb-help-text" id="' + helpId + '" style="display:none;">' +
+        helpText + '</div>'
+      );
+
+      $insertAfter.after($helpDiv);
+      $helpDiv.data('fbb-guard', $insertAfter);
+      $trigger.addClass('fbb-has-help');
+
+      $trigger.on('click', function () {
+        _fbbLastClick = Date.now();
+        const $help = $('#' + helpId);
+        if ($help.is(':visible')) {
+          $help.slideUp(150);
+        } else {
+          $help.slideDown(150);
+        }
+      });
+    }
+
+    window._fbbAttachHelp = attachHelp;
+
+    function processHelpLabels($scope) {
+
+      // Pattern 1: correct HTML — span is a direct child of label
+      $scope.find('label > span[class*="betatip"][title]').each(function () {
+        const $span = $(this);
+        const helpText = $span.attr('title');
+        if (!helpText) return;
+        $span.removeAttr('title').attr('class', '');
+        const $label = $span.closest('label');
+        if ($label.hasClass('fbb-has-help')) return;
+        const $formPair = $label.closest('.form-pair');
+        const $insertAfter = $formPair.length ? $formPair : $label;
+        attachHelp($label, helpText, $insertAfter);
+      });
+
+      // Pattern 2: malformed HTML — browser puts title/class on the label itself
+      // e.g. <label for="x" <span title="..." class="automovertip">Text:</label>
+      $scope.find('label[class*="betatip"][title]').each(function () {
+        const $label = $(this);
+        if ($label.hasClass('fbb-has-help')) return;
+        const helpText = $label.attr('title');
+        if (!helpText) return;
+        // Remove title and strip any betatip class from label
+        $label.removeAttr('title');
+        $label.attr('class', function (i, cls) {
+          return cls.split(' ').filter(function (c) { return !c.includes('tip'); }).join(' ');
+        });
+        const $formPair = $label.closest('.form-pair');
+        const $insertAfter = $formPair.length ? $formPair : $label;
+        attachHelp($label, helpText, $insertAfter);
+      });
+
+    }
+
+    window._fbbProcessLabels = processHelpLabels;
+
+    // Process all labels on page load
+    processHelpLabels($(document));
+
+    // Status labels — .status-label spans with title
+    $('span.status-label.automovertip[title]').each(function () {
+      const $span = $(this);
+      const helpText = $span.attr('title');
+      if (!helpText) return;
+      $span.removeAttr('title').removeClass('automovertip');
+      const $statusRow = $span.closest('.status-row');
+      const $insertAfter = $statusRow.length ? $statusRow : $span;
+      attachHelp($span, helpText, $insertAfter);
+    });
+
+    // Strip tooltipster class/title from remaining input and select wrapper spans
+    $('span.automovertip').each(function () {
+      if ($(this).children('button').length > 0) return;
+      if ($(this).find('input[type="checkbox"]').length > 0) return;
+      $(this).removeAttr('title').removeClass('automovertip');
+    });
+
+    // Strip from multiselect divs
+    $('div.automovertip').each(function () {
+      if ($(this).closest('table').length > 0) return;
+      $(this).removeAttr('title').removeClass('automovertip');
+    });
+
+    // Strip native browser tooltip from the exclusions readonly input
+    $('#exclusions-field').removeAttr('title');
+
+    // Strip any leftover native title from labels that were processed above
+    // (catches cases where browser put title on label AND a sibling span)
+    $('label[title]').not('.fbb-has-help').each(function () {
+      $(this).removeAttr('title');
+    });
+
+    // F1 — open all / close all toggle
+    $(document).on('keydown', function (e) {
+      if (e.key !== 'F1') return;
+      e.preventDefault();
+
+      if (_fbbF1Open) {
+        $('.fbb-help-text').slideUp(150);
+        _fbbF1Open = false;
+      } else {
+        $('.fbb-help-text').each(function () {
+          const $guard = $(this).data('fbb-guard');
+          if ($guard && !$guard.is(':visible')) return;
+          $(this).slideDown(150);
+        });
+        _fbbF1Open = true;
+      }
+    });
+
+    // Close all help texts when clicking outside
+    $(document).on('click', function () {
+      if (Date.now() - _fbbLastClick < 150) return;
+      $('.fbb-help-text').slideUp(150);
+      _fbbF1Open = false;
+    });
+
+  });
+  // ── End inline help icons ────────────────────────────────────────────────
 </script>

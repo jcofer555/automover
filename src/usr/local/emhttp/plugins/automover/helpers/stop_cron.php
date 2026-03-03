@@ -11,7 +11,7 @@ if (file_exists($cronFile)) {
         exec("update_cron");
         echo json_encode([
             "status" => "success",
-            "message" => "Automover cron stopped"
+            "message" => "automover cron stopped"
         ]);
     } else {
         echo json_encode([
@@ -22,7 +22,7 @@ if (file_exists($cronFile)) {
 } else {
     echo json_encode([
         "status" => "success",
-        "message" => "Automover was already stopped"
+        "message" => "automover was already stopped"
     ]);
 }
 ?>

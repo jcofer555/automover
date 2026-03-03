@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie, $posted)) {
 // ==========================================================
 // Set status to stopping
 // ==========================================================
-file_put_contents($status, "Stopping Automover…");
+file_put_contents($status, "Stopping automover…");
 
 // ==========================================================
 // Kill automover shell scripts and rsync operations
@@ -32,7 +32,7 @@ exec("pkill -f 'automover.sh' 2>/dev/null");
 exec("pkill -f 'rsync -aH' 2>/dev/null");
 exec("pkill -f 'rsync --dry-run' 2>/dev/null");
 
-// Kill any find/fuser processes Automover may have spawned
+// Kill any find/fuser processes automover may have spawned
 exec("pkill -f 'fuser -m' 2>/dev/null");
 exec("pkill -f 'find .*automover' 2>/dev/null");
 

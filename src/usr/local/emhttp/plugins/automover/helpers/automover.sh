@@ -2,7 +2,7 @@
 SCRIPT_NAME="automover"
 LAST_RUN_FILE="/tmp/automover/last_run.log"
 CFG_PATH="/boot/config/plugins/automover/settings.cfg"
-AUTOMOVER_LOG="/tmp/automover/files_moved.log"
+automover_LOG="/tmp/automover/files_moved.log"
 EXCLUSIONS_FILE="/boot/config/plugins/automover/exclusions.txt"
 IN_USE_FILE="/tmp/automover/in_use_files.txt"
 STATUS_FILE="/tmp/automover/temp_logs/status.txt"
@@ -33,9 +33,9 @@ unraid_notify() {
   local delay="${4:-0}"
 
   if (( delay > 0 )); then
-    echo "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s '$title' -d '$message' -i '$level'" | at now + "$delay" minutes
+    echo "/usr/local/emhttp/webGui/scripts/notify -e 'automover' -s '$title' -d '$message' -i '$level'" | at now + "$delay" minutes
   else
-    /usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s "$title" -d "$message" -i "$level"
+    /usr/local/emhttp/webGui/scripts/notify -e 'automover' -s "$title" -d "$message" -i "$level"
   fi
 }
 
@@ -104,7 +104,7 @@ send_summary_notification() {
 
   declare -A SHARE_COUNTS
   total_moved=0
-  if [[ -f "$AUTOMOVER_LOG" && -s "$AUTOMOVER_LOG" ]]; then
+  if [[ -f "$automover_LOG" && -s "$automover_LOG" ]]; then
     while IFS='>' read -r _ dst; do
       dst=$(echo "$dst" | xargs)
       [[ -z "$dst" ]] && continue
@@ -112,7 +112,7 @@ send_summary_notification() {
       [[ -z "$share" ]] && continue
       ((SHARE_COUNTS["$share"]++))
       ((total_moved++))
-    done < <(grep -E ' -> ' "$AUTOMOVER_LOG")
+    done < <(grep -E ' -> ' "$automover_LOG")
   fi
 
   end_time=$(date +%s)
@@ -127,7 +127,7 @@ send_summary_notification() {
     runtime="${hours}h ${mins}m"
   fi
 
-  notif_body="Automover finished moving ${total_moved} file(s) in ${runtime}."
+  notif_body="automover finished moving ${total_moved} file(s) in ${runtime}."
 
   if [[ -n "$WEBHOOK_URL" ]]; then
     if (( ${#SHARE_COUNTS[@]} > 0 )); then
@@ -393,7 +393,7 @@ if [[ "$1" == "--pool" && -n "$2" ]]; then
 fi
 
 # ==========================================================
-#  Skip scheduled runs if Automover is stopped (unless Move Now)
+#  Skip scheduled runs if automover is stopped (unless Move Now)
 # ==========================================================
 if [[ "$MOVE_NOW" != true ]]; then
   if [[ -f "$STATUS_FILE" && "$(cat "$STATUS_FILE")" == "Stopped" ]]; then
@@ -477,14 +477,23 @@ wait_for_release() {
 # ==========================================================
 start_time=$(date +%s)
 
+# --- Get plugin version from .plg ---
+PLG_FILE="/boot/config/plugins/automover.plg"
+if [[ -f "$PLG_FILE" ]]; then
+    version=$(grep -oP 'version="\K[^"]+' "$PLG_FILE" | head -n1)
+else
+    version="unknown"
+fi
+
 {
   echo "--------------------------------------------"
   echo "Session started - $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "Plugin version: $version"
   [[ "$MOVE_NOW" == true ]] && echo "Move now triggered — filters disabled"
   # --- Log exclusions state when Move Now is pressed ---
-if [[ "$MOVE_NOW" == true && "$EXCLUSIONS_ENABLED" == "yes" ]]; then
-  echo "Exclusions Enabled" >> "$LAST_RUN_FILE"
-fi
+  if [[ "$MOVE_NOW" == true && "$EXCLUSIONS_ENABLED" == "yes" ]]; then
+    echo "Exclusions Enabled"
+  fi
 } >> "$LAST_RUN_FILE"
 
 log_session_end() {
@@ -697,7 +706,7 @@ copy_empty_dirs() {
             mkdir -p "$dst_dir"
             chown "$src_owner:$src_group" "$dst_dir"
             chmod "$src_perms" "$dst_dir"
-            echo "Created empty directory: $dst_dir" >> "$AUTOMOVER_LOG"
+            echo "Created empty directory: $dst_dir" >> "$automover_LOG"
         fi
     done
 }
@@ -859,7 +868,7 @@ if [[ "$pre_move_done" != "yes" && "$eligible_count" -ge 1 ]]; then
   # --- Send start notification only once when actual move begins ---
 if [[ "$ENABLE_NOTIFICATIONS" == "yes" && "$sent_start_notification" != "yes" && "$eligible_count" -ge 1 ]]; then
   title="Session started"
-  message="Automover is beginning to move eligible files."
+  message="automover is beginning to move eligible files."
 
   if [[ -n "$WEBHOOK_URL" ]]; then
     send_discord_message "$title" "$message" 16776960  # yellow/orange color
@@ -930,8 +939,8 @@ manage_containers stop
 
 # --- Clear mover log only once when the first move begins ---
 if [[ "$pre_move_done" != "yes" && "$eligible_count" -ge 1 ]]; then
-  if [[ -f "$AUTOMOVER_LOG" ]]; then
-    rm -f "$AUTOMOVER_LOG"
+  if [[ -f "$automover_LOG" ]]; then
+    rm -f "$automover_LOG"
   fi
 fi
 pre_move_done="yes"
@@ -1032,12 +1041,12 @@ sleep 1
 
 if [[ "$DRY_RUN" == "yes" ]]; then
   # Log what WOULD be moved
-  echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
+  echo "$srcfile -> $dstfile" >> "$automover_LOG"
 else
   # Real move
   if [[ -f "$dstfile" ]]; then
     ((file_count_moved++))
-    echo "$srcfile -> $dstfile" >> "$AUTOMOVER_LOG"
+    echo "$srcfile -> $dstfile" >> "$automover_LOG"
   fi
 fi
   done < "$tmpfile"
@@ -1322,7 +1331,7 @@ if [[ "$ENABLE_JDUPES" == "yes" && "$DRY_RUN" != "yes" && "$moved_anything" == t
     fi
 
     # get list of moved files (dest side)
-    grep -E -- ' -> ' "$AUTOMOVER_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
+    grep -E -- ' -> ' "$automover_LOG" | awk -F'->' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' > "$TEMP_LIST"
 
     if [[ ! -s "$TEMP_LIST" ]]; then
       echo "No moved files found, skipping jdupes step" >> "$LAST_RUN_FILE"
@@ -1397,7 +1406,7 @@ fi
 # ==========================================================
 #  Final check and backup handling
 # ==========================================================
-mkdir -p "$(dirname "$AUTOMOVER_LOG")"
+mkdir -p "$(dirname "$automover_LOG")"
 
 # ==========================================================
 # Final automover_log handling with proper DRY RUN behavior
@@ -1405,11 +1414,11 @@ mkdir -p "$(dirname "$AUTOMOVER_LOG")"
 if [[ "$DRY_RUN" == "yes" ]]; then
   :
 else
-  if [[ "$moved_anything" == "true" && -s "$AUTOMOVER_LOG" ]]; then
-    cp -f "$AUTOMOVER_LOG" "${AUTOMOVER_LOG%/*}/files_moved_prev.log"
+  if [[ "$moved_anything" == "true" && -s "$automover_LOG" ]]; then
+    cp -f "$automover_LOG" "${automover_LOG%/*}/files_moved_prev.log"
   else
-    : > "$AUTOMOVER_LOG"
-    echo "No files moved for this run" >> "$AUTOMOVER_LOG"
+    : > "$automover_LOG"
+    echo "No files moved for this run" >> "$automover_LOG"
   fi
 fi
 

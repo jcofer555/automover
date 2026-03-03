@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie, $posted)) {
 }
 
 // ==========================================================
-// Prevent collision with Automover
+// Prevent collision with automover
 // ==========================================================
 $automover_running = false;
 if (file_exists($lock)) {
@@ -32,7 +32,7 @@ if (file_exists($lock)) {
     }
 }
 if ($automover_running) {
-    echo json_encode(["ok" => false, "error" => "Automover already running"]);
+    echo json_encode(["ok" => false, "error" => "automover already running"]);
     exit;
 }
 
@@ -158,7 +158,7 @@ if ($notify) {
         ]);
         exec("curl -s -X POST -H 'Content-Type: application/json' -d '$json' \"$WEBHOOK_URL\" >/dev/null 2>&1");
     } else {
-        exec("/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s 'Manual rsync started' -d 'Manual rsync operation has started' -i 'normal'");
+        exec("/usr/local/emhttp/webGui/scripts/notify -e 'automover' -s 'Manual rsync started' -d 'Manual rsync operation has started' -i 'normal'");
     }
 }
 
@@ -351,7 +351,7 @@ if ($notify) {
         }
 
         $body_escaped = escapeshellarg($body);
-        $cmd = "/usr/local/emhttp/webGui/scripts/notify -e 'Automover' -s 'Manual rsync finished' -d $body_escaped -i 'normal'";
+        $cmd = "/usr/local/emhttp/webGui/scripts/notify -e 'automover' -s 'Manual rsync finished' -d $body_escaped -i 'normal'";
         exec("echo " . escapeshellarg($cmd) . " | at now + 1 minute");
     }
 }
