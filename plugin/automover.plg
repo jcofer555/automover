@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2026.02.28.01"
+  version="2026.03.02.01"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,11 @@
 <CHANGES>
 <![CDATA[
 
+### 2026.03.02.01
+
+- Changed tooltips from a hover based on the labels, inputs, and selects to when you hover a label you get the pointer with a ? and you click to show it's tooltip or you can press f1 to show all tooltips on the page
+- Changed the notification service options to include more options
+
 ### 2026.02.28.01
 
 - Log display updates faster now
@@ -23,10 +28,6 @@
 ### 2026.02.25.01
 
 - Added copy and up and down arrow buttons to log section
-
-### 2026.02.20.01
-
-- Fix cleanup
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -41,9 +42,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.02.28.01-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2026.02.28.01/unraid-automover-2026.02.28.01-noarch-1.txz</URL>
-<SHA256>f0988abfd0c844d40d2980b8bc2b97d099d86bc61b5a9d964610c662c8bf9a0e</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.03.02.01-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2026.03.02.01/unraid-automover-2026.03.02.01-noarch-1.txz</URL>
+<SHA256>ac8c29998e6c4f342b91915ebabd76f438cbc89245167940b1e6e363be5ed9bc</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -56,7 +57,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.02.28.01-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.03.02.01-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -67,53 +68,62 @@ upgradepkg --install-new "$PACKAGE_TXZ"
 upgradepkg --install-new "/boot/config/plugins/automover/jdupes-1.30.0-x86_64-2_slackdce.txz"
 upgradepkg --install-new "/boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.txz"
 
+# Ensure tmp directory exists
+mkdir -p /tmp/automover
+
 # Ordered config keys (new cron-only model)
 ordered_keys=(
-    "POOL_NAME"
-    "THRESHOLD"
-    "DRY_RUN"
-    "ALLOW_DURING_PARITY"
-    "AUTOSTART"
     "AGE_BASED_FILTER"
     "AGE_DAYS"
-    "SIZE_BASED_FILTER"
-    "SIZE_MB"
-    "EXCLUSIONS_ENABLED"
-    "QBITTORRENT_SCRIPT"
-    "QBITTORRENT_HOST"
-    "QBITTORRENT_USERNAME"
-    "QBITTORRENT_PASSWORD"
-    "QBITTORRENT_DAYS_FROM"
-    "QBITTORRENT_DAYS_TO"
-    "QBITTORRENT_STATUS"
-    "HIDDEN_FILTER"
-    "FORCE_RECONSTRUCTIVE_WRITE"
+    "ALLOW_DURING_PARITY"
+    "AUTOSTART"
     "CONTAINER_NAMES"
-    "ENABLE_JDUPES"
-    "HASH_PATH"
-    "ENABLE_CLEANUP"
+    "CRON_EXPRESSION"
     "CRON_MODE"
-    "MINUTES_FREQUENCY"
-    "HOURLY_FREQUENCY"
+    "CUSTOM_CRON"
     "DAILY_TIME"
-    "WEEKLY_DAY"
-    "WEEKLY_TIME"
+    "DRY_RUN"
+    "ENABLE_CLEANUP"
+    "ENABLE_JDUPES"
+    "ENABLE_NOTIFICATIONS"
+    "ENABLE_SCRIPTS"
+    "ENABLE_TRIM"
+    "EXCLUSIONS_ENABLED"
+    "FORCE_RECONSTRUCTIVE_WRITE"
+    "HASH_PATH"
+    "HIDDEN_FILTER"
+    "HOURLY_FREQUENCY"
+    "IO_PRIORITY"
+    "MANUAL_MOVE"
+    "MINUTES_FREQUENCY"
     "MONTHLY_DAY"
     "MONTHLY_TIME"
-    "CUSTOM_CRON"
-    "CRON_EXPRESSION"
-    "STOP_THRESHOLD"
-    "ENABLE_NOTIFICATIONS"
-    "WEBHOOK_URL"
-    "MANUAL_MOVE"
-    "STOP_ALL_CONTAINERS"
-    "ENABLE_TRIM"
-    "ENABLE_SCRIPTS"
-    "PRE_SCRIPT"
+    "NOTIFICATION_SERVICE"
+    "POOL_NAME"
     "POST_SCRIPT"
+    "PRE_SCRIPT"
     "PRIORITIES"
     "PROCESS_PRIORITY"
-    "IO_PRIORITY"
+    "PUSHOVER_USER_KEY"
+    "QBITTORRENT_DAYS_FROM"
+    "QBITTORRENT_DAYS_TO"
+    "QBITTORRENT_HOST"
+    "QBITTORRENT_PASSWORD"
+    "QBITTORRENT_SCRIPT"
+    "QBITTORRENT_STATUS"
+    "QBITTORRENT_USERNAME"
+    "SIZE_BASED_FILTER"
+    "SIZE_MB"
+    "STOP_ALL_CONTAINERS"
+    "STOP_THRESHOLD"
+    "THRESHOLD"
+    "WEBHOOK_DISCORD"
+    "WEBHOOK_GOTIFY"
+    "WEBHOOK_NTFY"
+    "WEBHOOK_PUSHOVER"
+    "WEBHOOK_SLACK"
+    "WEEKLY_DAY"
+    "WEEKLY_TIME"
 )
 
 # ==========================================================
@@ -159,7 +169,10 @@ if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.02.28.01-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.03.02.01-noarch-1.txz" -delete
+
+# Ensure helper scripts are executable
+chmod +x /usr/local/emhttp/plugins/automover/helpers/*
 
 # ==========================================================
 #  HANDLE AUTOSTART + CRON GENERATION (NEW CRON-ONLY MODEL)
@@ -180,7 +193,7 @@ fi
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2026.02.28.01"
+echo " Version: 2026.03.02.01"
 echo "----------------------------------------------------"
 echo ""
 echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover"
