@@ -1919,8 +1919,7 @@ if (file_exists("/etc/unraid-version")) {
       </div>
 
       <div class="form-pair">
-        <label for="qbit_status" <span title="Which status of torrents to act on"
-          class="automovertip">Status:</span>
+        <label for="qbit_status" <span title="Which status of torrents to act on" class="automovertip">Status:</span>
         </label>
         <span title="Which status of torrents to act on" class="automovertip">
           <select id="qbit_status">
@@ -2063,14 +2062,12 @@ if (file_exists("/etc/unraid-version")) {
     <!-- Post Script Path -->
     <div class="form-pair" id="post-script-row" style="display:none;">
       <label for="post_script">
-        <span title="Script to run at the end of the session regardless if anything moves or not"
-          class="automovertip">
+        <span title="Script to run at the end of the session regardless if anything moves or not" class="automovertip">
           Post-Move Script:
         </span>
       </label>
       <div class="input-wrapper">
-        <span title="Script to run at the end of the session regardless if anything moves or not"
-          class="automovertip">
+        <span title="Script to run at the end of the session regardless if anything moves or not" class="automovertip">
           <input type="text" id="post_script" placeholder="/mnt/user/scripts/post_move.sh"
             value="<?php echo htmlspecialchars($settings['POST_SCRIPT'] ?? ''); ?>">
         </span>
@@ -3389,6 +3386,19 @@ if (file_exists("/etc/unraid-version")) {
       });
     });
 
+    // ===== Exclusions picker (helper + csrf_token) =====
+    const modal = document.getElementById('exclusion-modal');
+    const grid = document.getElementById('picker-grid');
+    const crumbs = document.getElementById('crumbs');
+    const btnUp = document.getElementById('btn-up');
+    const btnClose = document.getElementById('btn-close');
+    const btnAdd = document.getElementById('btn-add');
+    const btnRemove = document.getElementById('btn-remove');
+    const toast = document.getElementById('picker-toast');
+    let currentPath = '/mnt';
+
+    let toastQueueDelay = 0; // keeps a running delay so toasts stagger
+
     function showToast(msg, type = 'ok') {
       const container = document.getElementById('toast-container');
       if (!container) return;
@@ -3878,7 +3888,22 @@ if (file_exists("/etc/unraid-version")) {
             alert('⚠️ Settings saved, but failed to start schedule: ' + (cronData?.message || 'Unknown error'));
             return;
           }
-          // Success animation…
+          confirmBadge.style.display = 'inline-block';
+          confirmBadge.style.opacity = '1';
+          confirmBadge.style.animation = 'none';
+          void confirmBadge.offsetWidth;
+          confirmBadge.style.animation = 'flash .4s ease';
+
+          setTimeout(() => {
+            confirmBadge.style.opacity = '0';
+            confirmBadge.style.animation = '';
+            setTimeout(() => {
+              confirmBadge.style.display = 'none';
+            }, 400);
+          }, 2000);
+
+          updateStatus();
+          updatePoolUsage();
         })
         .catch(err => {
           console.error('Save + Start error:', err);
