@@ -33,7 +33,7 @@ $settings=$existing;
 $unraid_version='7.1';
 if (file_exists('/etc/unraid-version')) { $d=parse_ini_file('/etc/unraid-version'); if (!empty($d['version'])) $unraid_version=$d['version']; }
 $sib_checks=[
-    'automover_beta'             =>['plg'=>'/boot/config/plugins/automover_beta.plg','page'=>'/usr/local/emhttp/plugins/automover_beta/automover_beta.page','label'=>'Automover (Beta)','url'=>'/Settings/automover_beta'],
+    'automover_beta'             =>['plg'=>'/boot/config/plugins/automover_beta.plg','page'=>'/usr/local/emhttp/plugins/automover_beta/automover_beta.page','label'=>'Automover (Beta)','url'=>'/Settings/automover-beta'],
     'flash-backup'          =>['plg'=>'/boot/config/plugins/flash-backup.plg','page'=>'/usr/local/emhttp/plugins/flash-backup/flash-backup.page','label'=>'Flash Backup','url'=>'/Settings/flash-backup'],
     'flash-backup_beta'     =>['plg'=>'/boot/config/plugins/flash-backup_beta.plg','page'=>'/usr/local/emhttp/plugins/flash-backup_beta/flash-backup_beta.page','label'=>'Flash Backup (Beta)','url'=>'/Settings/flash-backup_beta'],
     'vm-backup-and-restore' =>['plg'=>'/boot/config/plugins/vm-backup-and-restore.plg','page'=>'/usr/local/emhttp/plugins/vm-backup-and-restore/vm-backup-and-restore.page','label'=>'VM Backup & Restore','url'=>'/Settings/vm-backup-and-restore'],
