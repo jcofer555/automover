@@ -1,65 +1,50 @@
 <?php
-header("Content-Type: application/json");
+declare(strict_types=1);
 
-$lock      = "/tmp/automover/lock.txt";
-$status    = "/tmp/automover/temp_logs/status.txt";
-$last      = "/tmp/automover/last_run.log";
+// ── Constants ─────────────────────────────────────────────────────────────────
+const LOCK_FILE   = '/tmp/automover/lock.txt';
+const STATUS_FILE = '/tmp/automover/temp_logs/status.txt';
 
-// ==============================
-// CSRF VALIDATION
-// ==============================
-$cookie = $_COOKIE['csrf_token'] ?? '';
-$posted = $_POST['csrf_token'] ?? '';
+// ── Entry point ───────────────────────────────────────────────────────────────
+header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie, $posted)) {
-    echo json_encode(["ok" => false, "error" => "Invalid CSRF token"]);
+// ── CSRF validation ───────────────────────────────────────────────────────────
+$cookie_str = $_COOKIE['csrf_token'] ?? '';
+$posted_str = $_POST['csrf_token']   ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie_str, $posted_str)) {
+    echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
     exit;
 }
 
-// ==========================================================
-// Set status to stopping
-// ==========================================================
-file_put_contents($status, "Stopping automover…");
+// ── Set stopping status ───────────────────────────────────────────────────────
+file_put_contents(STATUS_FILE, 'Stopping automover…');
 
-// ==========================================================
-// Kill automover shell scripts and rsync operations
-// ==========================================================
+// ── Kill running processes ────────────────────────────────────────────────────
+exec('pkill -f ' . escapeshellarg('automover.sh')    . ' 2>/dev/null');
+exec('pkill -f ' . escapeshellarg('rsync -aH')            . ' 2>/dev/null');
+exec('pkill -f ' . escapeshellarg('rsync --dry-run')      . ' 2>/dev/null');
+exec('pkill -f ' . escapeshellarg('fuser -m')             . ' 2>/dev/null');
+exec('pkill -f ' . escapeshellarg('find .*automover')  . ' 2>/dev/null');
 
-// Kill any automover.sh loops
-exec("pkill -f 'automover.sh' 2>/dev/null");
-
-// Kill any rsync processes started by automover
-exec("pkill -f 'rsync -aH' 2>/dev/null");
-exec("pkill -f 'rsync --dry-run' 2>/dev/null");
-
-// Kill any find/fuser processes automover may have spawned
-exec("pkill -f 'fuser -m' 2>/dev/null");
-exec("pkill -f 'find .*automover' 2>/dev/null");
-
-// ==========================================================
-// Kill process referenced by lock file (if alive)
-// ==========================================================
-if (file_exists($lock)) {
-    $pid = intval(trim(file_get_contents($lock)));
-
-    if ($pid > 0) {
-        // If process is alive, kill it
-        if (posix_kill($pid, 0)) {
-            posix_kill($pid, SIGTERM);
-            usleep(200000); // give it 0.2 sec to clean up
-        }
+// ── Kill process from lock file ───────────────────────────────────────────────
+if (file_exists(LOCK_FILE)) {
+    $pid_int = (int) trim((string) file_get_contents(LOCK_FILE));
+    if ($pid_int > 0 && posix_kill($pid_int, 0)) {
+        posix_kill($pid_int, SIGTERM);
+        usleep(200000);
     }
-
-    @unlink($lock);
+    @unlink(LOCK_FILE);
 }
 
-// ==========================================================
-// Reset status file so WebUI sees everything stopped
-// ==========================================================
-file_put_contents($status, "Stopped");
+// ── Reset status ──────────────────────────────────────────────────────────────
+file_put_contents(STATUS_FILE, 'Stopped');
 
-// ==========================================================
-// Success
-// ==========================================================
-echo json_encode(["ok" => true]);
-?>
+// ── Response ──────────────────────────────────────────────────────────────────
+echo json_encode([
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'ok' => true,
+    ],
+]);

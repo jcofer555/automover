@@ -1,24 +1,41 @@
 <?php
+declare(strict_types=1);
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const SHARES_CFG_DIR = '/boot/config/shares';
+
+// ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
 
-$pool = $_GET['pool'] ?? '';
-$result = ['pool' => $pool, 'in_use' => false, 'shares' => []];
+$pool_str    = $_GET['pool'] ?? '';
+$in_use_bool = false;
+$shares_arr  = [];
 
-if ($pool && is_dir('/boot/config/shares')) {
-    foreach (glob("/boot/config/shares/*.cfg") as $file) {
-        $cfg = parse_ini_file($file);
-        if (!$cfg) continue;
+if ($pool_str !== '' && is_dir(SHARES_CFG_DIR)) {
+    foreach (glob(SHARES_CFG_DIR . '/*.cfg') as $file_str) {
+        $cfg_arr = parse_ini_file($file_str);
+        if (!$cfg_arr) continue;
 
-        $useCache = strtolower($cfg['shareUseCache'] ?? '');
-        $cachePool1 = $cfg['shareCachePool'] ?? '';
-        $cachePool2 = $cfg['shareCachePool2'] ?? '';
+        $use_cache_str  = strtolower($cfg_arr['shareUseCache']  ?? '');
+        $cache_pool1_str = $cfg_arr['shareCachePool']  ?? '';
+        $cache_pool2_str = $cfg_arr['shareCachePool2'] ?? '';
 
-        if (($cachePool1 === $pool || $cachePool2 === $pool) &&
-            ($useCache === 'yes' || $useCache === 'prefer')) {
-            $result['in_use'] = true;
-            $result['shares'][] = basename($file, '.cfg');
+        $pool_matches_bool = ($cache_pool1_str === $pool_str || $cache_pool2_str === $pool_str);
+        $cache_active_bool = ($use_cache_str === 'yes' || $use_cache_str === 'prefer');
+
+        if ($pool_matches_bool && $cache_active_bool) {
+            $in_use_bool  = true;
+            $shares_arr[] = basename($file_str, '.cfg');
         }
     }
 }
 
-echo json_encode($result);
+echo json_encode([
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'pool'   => $pool_str,
+        'in_use' => $in_use_bool,
+        'shares' => $shares_arr,
+    ],
+]);

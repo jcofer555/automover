@@ -1,25 +1,44 @@
 <?php
+declare(strict_types=1);
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const AUTOMOVER_SCRIPT = '/usr/local/emhttp/plugins/automover/helpers/automover.sh';
+
+// ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
 
-$pool   = $_POST['pool'] ?? 'cache';
-$csrf   = $_POST['csrf_token'] ?? '';
-$cookie = $_COOKIE['csrf_token'] ?? $csrf;
+// ── CSRF validation ───────────────────────────────────────────────────────────
+$cookie_str = $_COOKIE['csrf_token'] ?? '';
+$posted_str = $_POST['csrf_token']   ?? '';
 
-// Absolute path to automover script
-$script = '/usr/local/emhttp/plugins/automover/helpers/automover.sh';
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie_str, $posted_str)) {
+    echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
+    exit;
+}
 
-// Verify automover script exists
-if (!file_exists($script)) {
+// ── Input ─────────────────────────────────────────────────────────────────────
+$pool_str = $_POST['pool'] ?? 'cache';
+
+// ── Validation ────────────────────────────────────────────────────────────────
+if (!file_exists(AUTOMOVER_SCRIPT)) {
     echo json_encode(['ok' => false, 'error' => 'automover.sh not found']);
     exit;
 }
 
-// Run automover silently in the background
-$cmd = sprintf(
+// ── Core logic ────────────────────────────────────────────────────────────────
+$cmd_str = sprintf(
     '/bin/bash %s --force-now --pool %s >/dev/null 2>&1 &',
-    escapeshellarg($script),
-    escapeshellarg($pool)
+    escapeshellarg(AUTOMOVER_SCRIPT),
+    escapeshellarg($pool_str)
 );
-exec($cmd);
+exec($cmd_str);
 
-echo json_encode(['ok' => true, 'message' => 'Manual move started']);
+// ── Response ──────────────────────────────────────────────────────────────────
+echo json_encode([
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'ok'      => true,
+        'message' => 'Manual move started',
+    ],
+]);

@@ -1,28 +1,45 @@
 <?php
+declare(strict_types=1);
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const CRON_FILE = '/boot/config/plugins/automover/automover.cron';
+
+// ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
 
-$cronFile = '/boot/config/plugins/automover/automover.cron';
-
-// Try to remove cron file
-if (file_exists($cronFile)) {
-    $result = @unlink($cronFile);
-
-    if ($result) {
-        exec("update_cron");
-        echo json_encode([
-            "status" => "success",
-            "message" => "automover cron stopped"
-        ]);
-    } else {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Failed to remove cron file"
-        ]);
-    }
-} else {
+// ── Core logic ────────────────────────────────────────────────────────────────
+if (!file_exists(CRON_FILE)) {
     echo json_encode([
-        "status" => "success",
-        "message" => "automover was already stopped"
+        'status'    => 'success',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'data'      => [
+            'ok'      => true,
+            'message' => 'automover was already stopped',
+        ],
     ]);
+    exit;
 }
-?>
+
+if (!@unlink(CRON_FILE)) {
+    echo json_encode([
+        'status'    => 'error',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'data'      => [
+            'ok'      => false,
+            'message' => 'Failed to remove cron file',
+        ],
+    ]);
+    exit;
+}
+
+exec('update_cron');
+
+// ── Response ──────────────────────────────────────────────────────────────────
+echo json_encode([
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'ok'      => true,
+        'message' => 'automover cron stopped',
+    ],
+]);

@@ -1,44 +1,51 @@
 <?php
-header("Content-Type: application/json");
+declare(strict_types=1);
 
-$parent = $_POST["parent"] ?? "";
-$name   = $_POST["name"] ?? "";
-$csrf   = $_POST["csrf_token"] ?? "";
+// ── Entry point ───────────────────────────────────────────────────────────────
+header('Content-Type: application/json');
 
-if ($parent === "" || $name === "") {
-    echo json_encode(["ok" => false, "error" => "Missing parent or name"]);
+// ── Input ─────────────────────────────────────────────────────────────────────
+$parent_str = rtrim($_POST['parent'] ?? '', '/');
+$name_str   = $_POST['name']        ?? '';
+
+// ── Validation ────────────────────────────────────────────────────────────────
+if ($parent_str === '' || $name_str === '') {
+    echo json_encode(['ok' => false, 'error' => 'Missing parent or name']);
     exit;
 }
 
-$parent = rtrim($parent, "/");
-$newpath = $parent . "/" . $name;
-
-// Must be directory
-if (!is_dir($parent)) {
-    echo json_encode(["ok" => false, "error" => "Parent does not exist"]);
+if (!is_dir($parent_str)) {
+    echo json_encode(['ok' => false, 'error' => 'Parent does not exist']);
     exit;
 }
 
-if (file_exists($newpath)) {
-    echo json_encode(["ok" => false, "error" => "Folder already exists"]);
+$new_path_str = $parent_str . '/' . $name_str;
+
+if (file_exists($new_path_str)) {
+    echo json_encode(['ok' => false, 'error' => 'Folder already exists']);
     exit;
 }
 
-// Get parent permissions + ownership
-$stat = stat($parent);
-$mode = $stat['mode'] & 0777;   // strip extra bits
-$uid  = $stat['uid'];
-$gid  = $stat['gid'];
+// ── Core logic ────────────────────────────────────────────────────────────────
+$stat_arr  = stat($parent_str);
+$mode_int  = $stat_arr['mode'] & 0777;
+$uid_int   = $stat_arr['uid'];
+$gid_int   = $stat_arr['gid'];
 
-// Create folder
-if (!mkdir($newpath, $mode, true)) {
-    echo json_encode(["ok" => false, "error" => "Failed to create folder"]);
+if (!mkdir($new_path_str, $mode_int, true)) {
+    echo json_encode(['ok' => false, 'error' => 'Failed to create folder']);
     exit;
 }
 
-// Apply correct owner + permissions
-chown($newpath, $uid);
-chgrp($newpath, $gid);
-chmod($newpath, $mode);
+chown($new_path_str, $uid_int);
+chgrp($new_path_str, $gid_int);
+chmod($new_path_str, $mode_int);
 
-echo json_encode(["ok" => true, "path" => $newpath]);
+echo json_encode([
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'ok'   => true,
+        'path' => $new_path_str,
+    ],
+]);

@@ -1,63 +1,69 @@
 <?php
-$cfgPath  = '/boot/config/plugins/automover/settings.cfg';
-$cronFile = '/boot/config/plugins/automover/automover.cron';
-$response = ['status' => 'ok'];
+declare(strict_types=1);
 
-// Grab all posted values
-$CRON_MODE       = $_POST['CRON_MODE'] ?? 'minutes';
-$MINUTES_FREQ    = intval($_POST['MINUTES_FREQUENCY'] ?? 30);
-$HOURLY_FREQ     = $_POST['HOURLY_FREQUENCY'] ?? '';
-$DAILY_TIME      = $_POST['DAILY_TIME'] ?? '';
-$WEEKLY_DAY      = $_POST['WEEKLY_DAY'] ?? '';
-$WEEKLY_TIME     = $_POST['WEEKLY_TIME'] ?? '';
-$MONTHLY_DAY     = $_POST['MONTHLY_DAY'] ?? '';
-$MONTHLY_TIME    = $_POST['MONTHLY_TIME'] ?? '';
-$CUSTOM_CRON     = $_POST['CUSTOM_CRON'] ?? '';
-$CRON_EXPRESSION = trim($_POST['CRON_EXPRESSION'] ?? '');
+// ── Constants ─────────────────────────────────────────────────────────────────
+const CFG_PATH  = '/boot/config/plugins/automover/settings.cfg';
+const CRON_FILE = '/boot/config/plugins/automover/automover.cron';
+const CRON_CMD  = '/usr/local/emhttp/plugins/automover/helpers/automover.sh';
 
-// Build cron entry directly from CRON_EXPRESSION
-if (!empty($CRON_EXPRESSION)) {
-    $cronEntry = "$CRON_EXPRESSION /usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1\n";
-} else {
+// ── Entry point ───────────────────────────────────────────────────────────────
+header('Content-Type: application/json');
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+$cron_expr_str  = trim($_POST['CRON_EXPRESSION'] ?? '');
+$cron_mode_str  = $_POST['CRON_MODE']         ?? 'daily';
+$hourly_str     = $_POST['HOURLY_FREQUENCY']  ?? '';
+$daily_str      = $_POST['DAILY_TIME']        ?? '';
+$weekly_day_str = $_POST['WEEKLY_DAY']        ?? '';
+$weekly_time_str= $_POST['WEEKLY_TIME']       ?? '';
+$monthly_day_str= $_POST['MONTHLY_DAY']       ?? '';
+$monthly_time_str=$_POST['MONTHLY_TIME']      ?? '';
+
+// ── Validation ────────────────────────────────────────────────────────────────
+if ($cron_expr_str === '') {
     http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'Missing cron expression']);
     exit;
 }
 
-// Write new cron and update system
-if (file_put_contents($cronFile, $cronEntry) === false) {
+// ── Write cron file ───────────────────────────────────────────────────────────
+$cron_entry_str = $cron_expr_str . ' ' . CRON_CMD . " &> /dev/null 2>&1\n";
+
+if (file_put_contents(CRON_FILE, $cron_entry_str) === false) {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Failed to write cron file']);
     exit;
 }
+
 exec('update_cron');
 
-// Persist values in settings.cfg
-$settings = parse_ini_file($cfgPath) ?: [];
+// ── Persist settings ──────────────────────────────────────────────────────────
+$settings_arr = parse_ini_file(CFG_PATH) ?: [];
 
-// Merge all posted keys into settings
-foreach ($_POST as $key => $val) {
-    $settings[$key] = $val;
+foreach ($_POST as $key_str => $val_str) {
+    $settings_arr[$key_str] = $val_str;
 }
 
-// Ensure scheduling fields are set explicitly
-$settings['CRON_MODE']         = $CRON_MODE;
-$settings['MINUTES_FREQUENCY'] = $MINUTES_FREQ;
-$settings['HOURLY_FREQUENCY']  = $HOURLY_FREQ;
-$settings['DAILY_TIME']        = $DAILY_TIME;
-$settings['WEEKLY_DAY']        = $WEEKLY_DAY;
-$settings['WEEKLY_TIME']       = $WEEKLY_TIME;
-$settings['MONTHLY_DAY']       = $MONTHLY_DAY;
-$settings['MONTHLY_TIME']      = $MONTHLY_TIME;
-$settings['CUSTOM_CRON']       = $CUSTOM_CRON;
-$settings['CRON_EXPRESSION']   = $CRON_EXPRESSION;
+$settings_arr['CRON_MODE']       = $cron_mode_str;
+$settings_arr['HOURLY_FREQUENCY']= $hourly_str;
+$settings_arr['DAILY_TIME']      = $daily_str;
+$settings_arr['WEEKLY_DAY']      = $weekly_day_str;
+$settings_arr['WEEKLY_TIME']     = $weekly_time_str;
+$settings_arr['MONTHLY_DAY']     = $monthly_day_str;
+$settings_arr['MONTHLY_TIME']    = $monthly_time_str;
+$settings_arr['CRON_EXPRESSION'] = $cron_expr_str;
 
-// Rebuild config text
-$cfgOut = '';
-foreach ($settings as $k => $v) {
-    $cfgOut .= "$k=\"$v\"\n";
+$cfg_out_str = '';
+foreach ($settings_arr as $k_str => $v_str) {
+    $cfg_out_str .= $k_str . '="' . $v_str . '"' . "\n";
 }
-file_put_contents($cfgPath, $cfgOut);
+file_put_contents(CFG_PATH, $cfg_out_str);
 
-header('Content-Type: application/json');
-echo json_encode($response);
+// ── Response ──────────────────────────────────────────────────────────────────
+echo json_encode([
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'ok' => true,
+    ],
+]);

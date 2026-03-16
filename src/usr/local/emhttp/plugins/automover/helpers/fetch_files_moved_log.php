@@ -1,130 +1,126 @@
 <?php
-$logDir = '/tmp/automover';
-$logFile = "$logDir/files_moved.log";
-$prevLog = "$logDir/files_moved_prev.log";
-$lastRunLog = "$logDir/last_run.log";
+declare(strict_types=1);
 
-// ✅ Ensure the /tmp/automover directory exists
-if (!is_dir($logDir)) {
-    @mkdir($logDir, 0755, true);
-}
+// ── Constants ─────────────────────────────────────────────────────────────────
+const LOG_DIR       = '/tmp/automover';
+const MOVED_LOG     = LOG_DIR . '/files_moved.log';
+const PREV_LOG      = LOG_DIR . '/files_moved_prev.log';
+const LAST_RUN_LOG  = LOG_DIR . '/last_run.log';
 
-$keyword = isset($_GET['filter']) ? strtolower(trim($_GET['filter'])) : null;
-
-$lines = file_exists($logFile)
-    ? file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
-    : [];
-
-$matched = [];
-$movedCount = 0;
-$noMoveDetected = false;
-
-// 🔍 Filter and count moved lines
-foreach ($lines as $line) {
-    $lower = strtolower($line);
-
-    if ($keyword && strpos($lower, $keyword) === false) {
-        continue;
-    }
-
-    // Preserve "no files moved" and "dry run" lines for display
-    if (strpos($lower, 'no files moved for this move') !== false) {
-        $matched[] = $line;
-        $noMoveDetected = true;
-        continue;
-    }
-    if (strpos($lower, 'dry run: no files would have been moved') !== false) {
-        $matched[] = $line;
-        $noMoveDetected = true;
-        continue;
-    }
-
-    if (strpos($line, '->') !== false) {
-        $movedCount++;
-        $matched[] = $line;
-    }
-}
-
-// ✅ Reverse to show newest first
-$matched = array_reverse($matched);
-
-// ==========================================================
-// 🧩 Append previous run’s moved file list if no files moved
-// ==========================================================
-if ($noMoveDetected && file_exists($prevLog)) {
-    $matched[] = "";
-    $matched[] = "----- Previous Run Moved Files -----";
-    $prevLines = file($prevLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach (array_reverse($prevLines) as $pline) {
-        if (strpos($pline, '->') !== false) {
-            $matched[] = $pline;
-        }
-    }
-}
-
-// 🔍 Check lastRunLog for dry run or no-op messages
-$lastMessage = "No files moved for this run";
-
-$lastRunLines = file_exists($lastRunLog)
-    ? file($lastRunLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
-    : [];
-
-foreach (array_reverse($lastRunLines) as $line) {
-    if (stripos($line, 'Dry run: No files would have been moved') !== false) {
-        $lastMessage = 'Dry run: No files would have been moved';
-        break;
-    }
-    if (stripos($line, 'No files moved for this run') !== false) {
-        $lastMessage = 'No files moved for this run';
-        break;
-    }
-}
-
-// ✅ Final log text
-$logText = count($matched) > 0
-    ? implode("\n", $matched)
-    : $lastMessage;
-
-// ⏱ Extract duration from the last session block
-$duration = null;
-$sessionBlock = [];
-$collecting = false;
-
-for ($i = count($lastRunLines) - 1; $i >= 0; $i--) {
-    $line = $lastRunLines[$i];
-
-    if (stripos($line, 'Session finished') !== false) {
-        $collecting = true;
-    }
-
-    if ($collecting) {
-        array_unshift($sessionBlock, $line);
-        if (stripos($line, 'Session started') !== false) {
-            break; // full session block captured
-        }
-    }
-}
-
-foreach ($sessionBlock as $line) {
-    if (stripos($line, 'Duration:') === 0) {
-        $duration = trim(substr($line, 9));
-        break;
-    }
-}
-
-// ✅ Only override if duration is truly missing
-if (
-    $duration === null &&
-    ($lastMessage === 'Dry run: No files would have been moved' || $lastMessage === 'No files moved for this run')
-) {
-    $duration = 'Nothing to track yet';
-}
-
+// ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
+
+if (!is_dir(LOG_DIR)) {
+    @mkdir(LOG_DIR, 0755, true);
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+$keyword_str = isset($_GET['filter']) ? strtolower(trim($_GET['filter'])) : '';
+
+// ── Read moved log ────────────────────────────────────────────────────────────
+$lines_arr = file_exists(MOVED_LOG)
+    ? file(MOVED_LOG, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+    : [];
+
+$matched_arr      = [];
+$moved_count_int  = 0;
+$no_move_bool     = false;
+
+foreach ($lines_arr as $line_str) {
+    $lower_str = strtolower($line_str);
+
+    if ($keyword_str !== '' && strpos($lower_str, $keyword_str) === false) {
+        continue;
+    }
+
+    if (strpos($lower_str, 'no files moved for this move') !== false ||
+        strpos($lower_str, 'dry run: no files would have been moved') !== false) {
+        $matched_arr[] = $line_str;
+        $no_move_bool  = true;
+        continue;
+    }
+
+    if (strpos($line_str, '->') !== false) {
+        $moved_count_int++;
+        $matched_arr[] = $line_str;
+    }
+}
+
+$matched_arr = array_reverse($matched_arr);
+
+// ── Append previous run if no files moved ────────────────────────────────────
+if ($no_move_bool && file_exists(PREV_LOG)) {
+    $matched_arr[] = '';
+    $matched_arr[] = '----- Previous Run Moved Files -----';
+    $prev_lines_arr = file(PREV_LOG, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach (array_reverse($prev_lines_arr) as $prev_line_str) {
+        if (strpos($prev_line_str, '->') !== false) {
+            $matched_arr[] = $prev_line_str;
+        }
+    }
+}
+
+// ── Read last run log ─────────────────────────────────────────────────────────
+$last_run_lines_arr = file_exists(LAST_RUN_LOG)
+    ? file(LAST_RUN_LOG, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+    : [];
+
+$last_message_str = 'No files moved for this run';
+
+foreach (array_reverse($last_run_lines_arr) as $line_str) {
+    if (stripos($line_str, 'Dry run: No files would have been moved') !== false) {
+        $last_message_str = 'Dry run: No files would have been moved';
+        break;
+    }
+    if (stripos($line_str, 'No files moved for this run') !== false) {
+        $last_message_str = 'No files moved for this run';
+        break;
+    }
+}
+
+// ── Extract duration from last session block ──────────────────────────────────
+$duration_str    = null;
+$session_arr     = [];
+$collecting_bool = false;
+
+for ($i = count($last_run_lines_arr) - 1; $i >= 0; $i--) {
+    $line_str = $last_run_lines_arr[$i];
+    if (stripos($line_str, 'Session finished') !== false) {
+        $collecting_bool = true;
+    }
+    if ($collecting_bool) {
+        array_unshift($session_arr, $line_str);
+        if (stripos($line_str, 'Session started') !== false) {
+            break;
+        }
+    }
+}
+
+foreach ($session_arr as $line_str) {
+    if (stripos($line_str, 'Duration:') === 0) {
+        $duration_str = trim(substr($line_str, 9));
+        break;
+    }
+}
+
+if ($duration_str === null &&
+    ($last_message_str === 'Dry run: No files would have been moved' ||
+     $last_message_str === 'No files moved for this run')) {
+    $duration_str = 'Nothing to track yet';
+}
+
+// ── Response ──────────────────────────────────────────────────────────────────
+$log_text_str = count($matched_arr) > 0
+    ? implode("\n", $matched_arr)
+    : $last_message_str;
+
 echo json_encode([
-    'log' => $logText,
-    'moved' => $movedCount,
-    'duration' => $duration,
-    'total' => count($matched)
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'log'      => $log_text_str,
+        'moved'    => $moved_count_int,
+        'duration' => $duration_str,
+        'total'    => count($matched_arr),
+    ],
 ]);
-?>

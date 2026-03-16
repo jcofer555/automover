@@ -1,116 +1,136 @@
 <?php
+declare(strict_types=1);
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const EXCLUSIONS_FILE = '/boot/config/plugins/automover/exclusions.txt';
+const HIDE_MNT_ARR    = ['user', 'user0', 'addons', 'remotes', 'disks', 'rootshare'];
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function ensure_exclusions_file(string $path_str): bool {
+    $dir_str = dirname($path_str);
+    if (!is_dir($dir_str)) @mkdir($dir_str, 0777, true);
+    if (!file_exists($path_str)) @file_put_contents($path_str, '');
+    return file_exists($path_str);
+}
+
+function read_lines(string $path_str): array {
+    if (!file_exists($path_str)) return [];
+    $lines_arr = file($path_str, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    return array_values(array_filter(array_map('trim', $lines_arr), fn($l) => $l !== ''));
+}
+
+function write_lines(string $path_str, array $lines_arr): void {
+    $unique_arr = array_values(array_unique($lines_arr));
+    @file_put_contents($path_str, implode("\n", $unique_arr) . (count($unique_arr) ? "\n" : ''));
+}
+
+function normalize_paths(array $paths_arr): array {
+    return array_map(function(string $p_str): string {
+        if (preg_match('#^/mnt/disk[0-9]+/#', $p_str)) {
+            return preg_replace('#^/mnt/disk[0-9]+/#', '/mnt/user0/', $p_str);
+        }
+        return $p_str;
+    }, $paths_arr);
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
 
-$action = $_GET['action'] ?? '';
-$EXC_FILE = '/boot/config/plugins/automover/exclusions.txt';
-$HIDE_MNT = ['user', 'user0', 'addons', 'remotes', 'disks', 'rootshare'];
+$action_str = $_GET['action'] ?? '';
 
-// --- Utility Functions ---
-function ensure_exclusions_file($file) {
-    if (!file_exists(dirname($file))) @mkdir(dirname($file), 0777, true);
-    if (!file_exists($file)) @file_put_contents($file, "");
-    return file_exists($file);
-}
+// ── List directory ────────────────────────────────────────────────────────────
+if ($action_str === 'list_dir') {
+    $path_str = $_GET['path'] ?? '/mnt';
+    if (!str_starts_with($path_str, '/mnt')) $path_str = '/mnt';
 
-function read_lines($file) {
-    if (!file_exists($file)) return [];
-    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
-    return array_values(array_filter(array_map('trim', $lines), fn($l) => $l !== ''));
-}
+    $entries_arr = [];
+    $ls_arr      = [];
+    @exec('ls -1A ' . escapeshellarg($path_str), $ls_arr);
 
-function write_lines($file, $lines) {
-    $unique = array_values(array_unique($lines));
-    @file_put_contents($file, implode("\n", $unique) . (count($unique) ? "\n" : ""));
-    return true;
-}
-
-// --- Actions ---
-if ($action === 'list_dir') {
-    $path = $_GET['path'] ?? '/mnt';
-    if (!str_starts_with($path, '/mnt')) $path = '/mnt';
-    $items = [];
-
-    $output = [];
-    @exec('ls -1A ' . escapeshellarg($path), $output);
-    foreach ($output as $entry) {
-        if ($path === '/mnt' && in_array($entry, $HIDE_MNT, true)) continue;
-        $full = rtrim($path,'/') . '/' . $entry;
-        $isDir = is_dir($full);
-        $items[] = ['name'=>$entry, 'path'=>$full, 'isDir'=>$isDir];
+    foreach ($ls_arr as $entry_str) {
+        if ($path_str === '/mnt' && in_array($entry_str, HIDE_MNT_ARR, true)) continue;
+        $full_str    = rtrim($path_str, '/') . '/' . $entry_str;
+        $is_dir_bool = is_dir($full_str);
+        $entries_arr[] = ['name' => $entry_str, 'path' => $full_str, 'isDir' => $is_dir_bool];
     }
 
-    usort($items, function($a,$b){
-        return $a['isDir'] === $b['isDir'] ? strcasecmp($a['name'],$b['name']) : ($a['isDir'] ? -1 : 1);
-    });
+    usort($entries_arr, fn($a, $b) =>
+        $a['isDir'] === $b['isDir']
+            ? strcasecmp($a['name'], $b['name'])
+            : ($a['isDir'] ? -1 : 1)
+    );
 
-    echo json_encode(['ok'=>true,'path'=>$path,'items'=>$items]);
+    echo json_encode([
+        'status'    => 'success',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'data'      => ['ok' => true, 'path' => $path_str, 'items' => $entries_arr],
+    ]);
     exit;
 }
 
-// --- ADD EXCLUSIONS ---
-if ($action === 'add_exclusions') {
-    $paths = $_POST['paths'] ?? [];
+// ── Add exclusions ────────────────────────────────────────────────────────────
+if ($action_str === 'add_exclusions') {
+    $paths_arr   = normalize_paths($_POST['paths'] ?? []);
+    ensure_exclusions_file(EXCLUSIONS_FILE);
+    $current_arr = read_lines(EXCLUSIONS_FILE);
 
-    // Normalize any /mnt/diskX/... → /mnt/user0/...
-    $normalized = [];
-    foreach ($paths as $p) {
-        if (preg_match('#^/mnt/disk[0-9]+/#', $p)) {
-            $p = preg_replace('#^/mnt/disk[0-9]+/#', '/mnt/user0/', $p);
-        }
-        $normalized[] = $p;
-    }
-    $paths = $normalized;
-
-    ensure_exclusions_file($EXC_FILE);
-    $current = read_lines($EXC_FILE);
-
-    foreach ($paths as $p) {
-        $p = trim($p);
-        if ($p === '') continue;
-        if (!in_array($p, $current, true)) $current[] = $p;
+    foreach ($paths_arr as $p_str) {
+        $p_str = trim($p_str);
+        if ($p_str === '' || in_array($p_str, $current_arr, true)) continue;
+        $current_arr[] = $p_str;
     }
 
-    write_lines($EXC_FILE, $current);
-    echo json_encode(['ok'=>true,'count'=>count($current)]);
+    write_lines(EXCLUSIONS_FILE, $current_arr);
+
+    echo json_encode([
+        'status'    => 'success',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'data'      => ['ok' => true, 'count' => count($current_arr)],
+    ]);
     exit;
 }
 
-// --- REMOVE EXCLUSIONS ---
-if ($action === 'remove_exclusions') {
-    $paths = $_POST['paths'] ?? [];
+// ── Remove exclusions ─────────────────────────────────────────────────────────
+if ($action_str === 'remove_exclusions') {
+    $paths_arr   = normalize_paths($_POST['paths'] ?? []);
+    ensure_exclusions_file(EXCLUSIONS_FILE);
+    $current_arr = read_lines(EXCLUSIONS_FILE);
 
-    // Normalize any /mnt/diskX/... → /mnt/user0/...
-    $normalized = [];
-    foreach ($paths as $p) {
-        if (preg_match('#^/mnt/disk[0-9]+/#', $p)) {
-            $p = preg_replace('#^/mnt/disk[0-9]+/#', '/mnt/user0/', $p);
-        }
-        $normalized[] = $p;
-    }
-    $paths = $normalized;
+    $remaining_arr = array_values(array_filter($current_arr, fn($l) => !in_array($l, $paths_arr, true)));
+    write_lines(EXCLUSIONS_FILE, $remaining_arr);
 
-    ensure_exclusions_file($EXC_FILE);
-    $current = read_lines($EXC_FILE);
-
-    $remaining = array_values(array_filter($current, fn($l) => !in_array($l, $paths, true)));
-    write_lines($EXC_FILE, $remaining);
-    echo json_encode(['ok'=>true,'count'=>count($remaining)]);
+    echo json_encode([
+        'status'    => 'success',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'data'      => ['ok' => true, 'count' => count($remaining_arr)],
+    ]);
     exit;
 }
 
-// --- GET COUNT ---
-if ($action === 'get_exclusion_count') {
-    ensure_exclusions_file($EXC_FILE);
-    $count = count(read_lines($EXC_FILE));
-    echo json_encode(['ok'=>true,'count'=>$count]);
+// ── Get exclusion count ───────────────────────────────────────────────────────
+if ($action_str === 'get_exclusion_count') {
+    ensure_exclusions_file(EXCLUSIONS_FILE);
+    $count_int = count(read_lines(EXCLUSIONS_FILE));
+
+    echo json_encode([
+        'status'    => 'success',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'data'      => ['ok' => true, 'count' => $count_int],
+    ]);
     exit;
 }
 
-// --- ENSURE FILE EXISTS ---
-if ($action === 'ensure_exclusions') {
-    $ok = ensure_exclusions_file($EXC_FILE);
-    echo json_encode(['ok'=>$ok]);
+// ── Ensure file exists ────────────────────────────────────────────────────────
+if ($action_str === 'ensure_exclusions') {
+    $ok_bool = ensure_exclusions_file(EXCLUSIONS_FILE);
+
+    echo json_encode([
+        'status'    => 'success',
+        'timestamp' => date('Y-m-d H:i:s'),
+        'data'      => ['ok' => $ok_bool],
+    ]);
     exit;
 }
 
-echo json_encode(['ok'=>false,'error'=>'Unknown action']);
+// ── Unknown action ────────────────────────────────────────────────────────────
+echo json_encode(['ok' => false, 'error' => 'Unknown action']);

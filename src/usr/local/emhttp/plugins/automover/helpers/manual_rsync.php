@@ -1,374 +1,318 @@
 <?php
-header("Content-Type: application/json");
+declare(strict_types=1);
 
-$lock   = "/tmp/automover/lock.txt";
-$last   = "/tmp/automover/last_run.log";
-$status = "/tmp/automover/temp_logs/status.txt";
+// ── Constants ─────────────────────────────────────────────────────────────────
+const LOCK_FILE         = '/tmp/automover/lock.txt';
+const LAST_RUN_LOG      = '/tmp/automover/last_run.log';
+const STATUS_FILE       = '/tmp/automover/temp_logs/status.txt';
+const MOVED_LOG         = '/tmp/automover/files_moved.log';
+const MOVED_LOG_PREV    = '/tmp/automover/files_moved_prev.log';
+const INUSE_FILE        = '/tmp/automover/in_use_files.txt';
+const EXCLUDE_FILE      = '/tmp/automover/manual_rsync_in_use_files.txt';
+const CFG_FILE          = '/boot/config/plugins/automover/settings.cfg';
+const NOTIFY_SCRIPT     = '/usr/local/emhttp/webGui/scripts/notify';
+const DYNAMIX_CFG       = '/boot/config/plugins/dynamix/dynamix.cfg';
 
-$automover_log      = "/tmp/automover/files_moved.log";
-$automover_log_prev = "/tmp/automover/files_moved_prev.log";
-
-// ==============================
-// CSRF VALIDATION
-// ==============================
-$cookie = $_COOKIE['csrf_token'] ?? '';
-$posted = $_POST['csrf_token'] ?? '';
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie, $posted)) {
-    echo json_encode(["ok" => false, "error" => "Invalid CSRF token"]);
-    exit;
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function load_settings(string $path_str): array {
+    $settings_arr = [];
+    if (!file_exists($path_str)) return $settings_arr;
+    foreach (file($path_str, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line_str) {
+        if (strpos($line_str, '=') === false) continue;
+        [$key_str, $val_str] = array_map('trim', explode('=', $line_str, 2));
+        $settings_arr[$key_str] = trim($val_str, '"');
+    }
+    return $settings_arr;
 }
 
-// ==========================================================
-// Prevent collision with automover
-// ==========================================================
-$automover_running = false;
-if (file_exists($lock)) {
-    $pid = intval(trim(file_get_contents($lock)));
-    if ($pid > 0 && posix_kill($pid, 0)) {
-        $automover_running = true;
+function set_status(string $status_str): void {
+    @file_put_contents(STATUS_FILE, $status_str);
+}
+
+function log_append(string $message_str): void {
+    file_put_contents(LAST_RUN_LOG, $message_str . "\n", FILE_APPEND);
+}
+
+function format_runtime(int $seconds_int): string {
+    if ($seconds_int < 60)   return $seconds_int . 's';
+    if ($seconds_int < 3600) return floor($seconds_int / 60) . 'm ' . ($seconds_int % 60) . 's';
+    return floor($seconds_int / 3600) . 'h ' . floor(($seconds_int % 3600) / 60) . 'm';
+}
+
+function send_discord(string $webhook_str, string $title_str, string $body_str, int $color_int): void {
+    $json_str = json_encode(['embeds' => [['title' => $title_str, 'description' => $body_str, 'color' => $color_int]]]);
+    exec('curl -s -X POST -H ' . escapeshellarg('Content-Type: application/json') .
+         ' -d ' . escapeshellarg($json_str) . ' ' . escapeshellarg($webhook_str) . ' >/dev/null 2>&1');
+}
+
+function send_unraid_notify(string $subject_str, string $body_str, int $delay_int = 0): void {
+    $cmd_str = NOTIFY_SCRIPT . ' -e automover -s ' . escapeshellarg($subject_str) .
+               ' -d ' . escapeshellarg($body_str) . ' -i normal';
+    if ($delay_int > 0) {
+        exec('echo ' . escapeshellarg($cmd_str) . ' | at now + ' . $delay_int . ' minute');
     } else {
-        @unlink($lock);
+        exec($cmd_str);
     }
 }
-if ($automover_running) {
-    echo json_encode(["ok" => false, "error" => "automover already running"]);
+
+function is_agent_active(): bool {
+    if (!file_exists(DYNAMIX_CFG)) return false;
+    $val_str = trim((string) shell_exec("grep -Po 'normal=\"\\K[0-9]+' " . escapeshellarg(DYNAMIX_CFG) . ' 2>/dev/null'));
+    return (bool) preg_match('/^(4|5|6|7)$/', $val_str);
+}
+
+function ensure_dir(string $path_str): void {
+    if (!is_dir($path_str)) {
+        @mkdir($path_str, 0777, true);
+    }
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+header('Content-Type: application/json');
+
+// ── CSRF validation ───────────────────────────────────────────────────────────
+$cookie_str = $_COOKIE['csrf_token'] ?? '';
+$posted_str = $_POST['csrf_token']   ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie_str, $posted_str)) {
+    echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
     exit;
 }
 
-file_put_contents($lock, getmypid());
-file_put_contents($status, "Manual Rsync Starting");
-usleep(150000);
-file_put_contents($status, "Manual Rsync Running");
-
-// ==========================================================
-// Load settings.cfg
-// ==========================================================
-$cfg_file = "/boot/config/plugins/automover/settings.cfg";
-$settings = [];
-if (file_exists($cfg_file)) {
-    foreach (file($cfg_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        if (strpos($line, "=") !== false) {
-            list($key, $val) = array_map('trim', explode("=", $line, 2));
-            $settings[$key] = trim($val, "\"");
-        }
+// ── Lock check ────────────────────────────────────────────────────────────────
+if (file_exists(LOCK_FILE)) {
+    $pid_int = (int) trim((string) file_get_contents(LOCK_FILE));
+    if ($pid_int > 0 && posix_kill($pid_int, 0)) {
+        echo json_encode(['ok' => false, 'error' => 'automover already running']);
+        exit;
     }
+    @unlink(LOCK_FILE);
 }
 
-// ==========================================================
-// Flags from settings
-// ==========================================================
-$WEBHOOK_URL = "";
-if (!empty($settings["WEBHOOK_URL"]) && strtolower(trim($settings["WEBHOOK_URL"])) !== "null") {
-    $WEBHOOK_URL = trim($settings["WEBHOOK_URL"]);
+file_put_contents(LOCK_FILE, (string) getmypid());
+set_status('Manual Rsync Starting');
+usleep(150000);
+set_status('Manual Rsync Running');
+
+// ── Load settings ─────────────────────────────────────────────────────────────
+$settings_arr        = load_settings(CFG_FILE);
+$webhook_str         = '';
+$raw_webhook_str     = $settings_arr['WEBHOOK_URL'] ?? '';
+if ($raw_webhook_str !== '' && strtolower(trim($raw_webhook_str)) !== 'null') {
+    $webhook_str = trim($raw_webhook_str);
 }
-$ENABLE_NOTIFICATIONS = (
-    isset($settings["ENABLE_NOTIFICATIONS"]) &&
-    strtolower(trim($settings["ENABLE_NOTIFICATIONS"])) === "yes"
-);
-$DRY_RUN = (
-    isset($settings["DRY_RUN"]) &&
-    strtolower(trim($settings["DRY_RUN"])) === "yes"
-);
-$ENABLE_CLEANUP = (
-    isset($settings["ENABLE_CLEANUP"]) &&
-    strtolower(trim($settings["ENABLE_CLEANUP"])) === "yes"
-);
+$notify_bool         = strtolower($settings_arr['ENABLE_NOTIFICATIONS'] ?? 'no') === 'yes';
+$dry_run_bool        = strtolower($settings_arr['DRY_RUN']               ?? 'no') === 'yes';
+$enable_cleanup_bool = strtolower($settings_arr['ENABLE_CLEANUP']        ?? 'no') === 'yes';
 
-$isDry  = $DRY_RUN;
-$notify = $ENABLE_NOTIFICATIONS;
+// ── Input validation ──────────────────────────────────────────────────────────
+$src_raw_str = rtrim($_POST['source'] ?? '', '/');
+$dst_raw_str = rtrim($_POST['dest']   ?? '', '/');
+$copy_str    = $_POST['copy']     ?? '0';
+$del_str     = $_POST['delete']   ?? '0';
+$full_str    = $_POST['fullsync'] ?? '0';
 
-// ==========================================================
-// Inputs
-// ==========================================================
-$src_raw = rtrim($_POST["source"] ?? "", "/");
-$dst_raw = rtrim($_POST["dest"] ?? "", "/");
+if ($src_raw_str === '' || $dst_raw_str === '') {
+    @unlink(LOCK_FILE);
+    set_status('Stopped');
+    echo json_encode(['ok' => false, 'error' => 'Missing source or destination']);
+    exit;
+}
 
-$copy = $_POST["copy"] ?? "0";
-$del  = $_POST["delete"] ?? "0";
-$full = $_POST["fullsync"] ?? "0";
+$src_str = $src_raw_str . '/';
+$dst_str = $dst_raw_str . '/';
 
-$src_clean = $src_raw . "/";
-$dst_clean = $dst_raw . "/";
-
-// ==========================================================
-// Ensure destination exists with correct ownership
-// ==========================================================
-if (!is_dir($dst_clean)) {
-    mkdir($dst_clean, 0777, true);
-    $parent = dirname(rtrim($dst_clean, "/"));
-    $parent_stat = @stat($parent);
+// ── Ensure destination exists with correct ownership ──────────────────────────
+if (!is_dir($dst_str)) {
+    mkdir($dst_str, 0777, true);
+    $parent_str  = dirname(rtrim($dst_str, '/'));
+    $parent_stat = @stat($parent_str);
     if ($parent_stat) {
         if (function_exists('posix_getpwuid')) {
-            $pw = @posix_getpwuid($parent_stat['uid']);
-            if (!empty($pw['name'])) {
-                @chown($dst_clean, $pw['name']);
-            }
+            $pw_arr = @posix_getpwuid($parent_stat['uid']);
+            if (!empty($pw_arr['name'])) @chown($dst_str, $pw_arr['name']);
         }
         if (function_exists('posix_getgrgid')) {
-            $gr = @posix_getgrgid($parent_stat['gid']);
-            if (!empty($gr['name'])) {
-                @chgrp($dst_clean, $gr['name']);
-            }
+            $gr_arr = @posix_getgrgid($parent_stat['gid']);
+            if (!empty($gr_arr['name'])) @chgrp($dst_str, $gr_arr['name']);
         }
     }
 }
 
-// ==========================================================
-// Mode name (for logging)
-// ==========================================================
-if ($full === "1") {
-    $modeName = "full sync";
-} elseif ($del === "1") {
-    $modeName = "delete source after";
-} else {
-    $modeName = "copy";
-}
-if ($isDry) {
-    $modeName .= " (dry run)";
-}
+// ── Mode name ─────────────────────────────────────────────────────────────────
+if ($full_str === '1')     $mode_name_str = 'full sync';
+elseif ($del_str  === '1') $mode_name_str = 'delete source after';
+else                       $mode_name_str = 'copy';
+if ($dry_run_bool)         $mode_name_str .= ' (dry run)';
 
-// ==========================================================
-// Write header to last run log
-// ==========================================================
-file_put_contents(
-    $last,
+// ── Session header ────────────────────────────────────────────────────────────
+file_put_contents(LAST_RUN_LOG,
     "------------------------------------------------\n" .
-    "Session started - " . date("Y-m-d H:i:s") . "\n" .
-    "Manually rsyncing $src_clean -> $dst_clean using mode: $modeName\n",
-    FILE_APPEND
+    'Session started - ' . date('Y-m-d H:i:s') . "\n" .
+    "Manually rsyncing {$src_str} -> {$dst_str} using mode: {$mode_name_str}\n"
 );
-if ($isDry) {
-    file_put_contents($last, "Dry run active - no files will be moved\n", FILE_APPEND);
-}
+if ($dry_run_bool) log_append('Dry run active - no files will be moved');
 
-$start_time = time();
+$start_time_int = time();
 
-// ==========================================================
-// START Notification
-// ==========================================================
-if ($notify) {
-    if (!empty($WEBHOOK_URL)) {
-        $json = json_encode([
-            "embeds" => [[
-                "title" => "Manual rsync started",
-                "description" => "Manual rsync has started.\n$src_clean → $dst_clean",
-                "color" => 16776960
-            ]]
-        ]);
-        exec("curl -s -X POST -H 'Content-Type: application/json' -d '$json' \"$WEBHOOK_URL\" >/dev/null 2>&1");
+// ── Start notification ────────────────────────────────────────────────────────
+if ($notify_bool) {
+    $start_body_str = "Manual rsync has started.\n{$src_str} → {$dst_str}";
+    if ($webhook_str !== '') {
+        send_discord($webhook_str, 'Manual rsync started', $start_body_str, 16776960);
     } else {
-        exec("/usr/local/emhttp/webGui/scripts/notify -e 'automover' -s 'Manual rsync started' -d 'Manual rsync operation has started' -i 'normal'");
+        send_unraid_notify('Manual rsync started', 'Manual rsync operation has started');
     }
 }
 
-// ==========================================================
-// Prepare logs
-// ==========================================================
-if (file_exists($automover_log)) {
-    unlink($automover_log);
-}
+// ── Prepare log files ─────────────────────────────────────────────────────────
+if (file_exists(MOVED_LOG)) unlink(MOVED_LOG);
+file_put_contents(INUSE_FILE,   '');
+file_put_contents(EXCLUDE_FILE, '');
 
-$inuse_file   = "/tmp/automover/in_use_files.txt";
-$exclude_file = "/tmp/automover/manual_rsync_in_use_files.txt";
+$inuse_count_int = 0;
+$output_arr      = [];
+$moved_any_bool  = false;
+$share_counts_arr = [];
 
-// Reset both files each run
-file_put_contents($inuse_file, "");
-file_put_contents($exclude_file, "");
-$inuse_count = 0;
+// ── Run rsync ─────────────────────────────────────────────────────────────────
+if ($full_str === '1') {
+    // Full sync: gather in-use files first, exclude them
+    $all_files_arr   = [];
+    $files_in_use_arr = [];
+    exec('find ' . escapeshellarg($src_str) . ' -type f 2>/dev/null', $all_files_arr);
 
-// ==========================================================
-// RUN RSYNC
-// ==========================================================
-$output = [];
-$moved_any = false;
-$shareCounts = [];
-
-if ($full === "1") {
-    $exclude_file = "/tmp/automover/manual_rsync_in_use_files.txt";
-    $files_in_use = [];
-    $all_files = [];
-
-    exec("find " . escapeshellarg($src_clean) . " -type f 2>/dev/null", $all_files);
-
-    foreach ($all_files as $file) {
-        $fuser_output = shell_exec("fuser -m " . escapeshellarg($file) . " 2>/dev/null");
-        if (!empty($fuser_output)) {
-            $rel = substr($file, strlen($src_clean)); // relative path
-            $files_in_use[] = $rel;
-            file_put_contents($inuse_file, "$file\n", FILE_APPEND);
-            $inuse_count++;
+    foreach ($all_files_arr as $file_str) {
+        $fuser_str = (string) shell_exec('fuser -m ' . escapeshellarg($file_str) . ' 2>/dev/null');
+        if (trim($fuser_str) !== '') {
+            $rel_str = substr($file_str, strlen($src_str));
+            $files_in_use_arr[] = $rel_str;
+            file_put_contents(INUSE_FILE, $file_str . "\n", FILE_APPEND);
+            $inuse_count_int++;
         }
     }
 
-    $exclude_opt = "";
-    if (!empty($files_in_use)) {
-        file_put_contents($exclude_file, implode("\n", $files_in_use) . "\n");
-        $exclude_opt = " --exclude-from=" . escapeshellarg($exclude_file);
+    $exclude_opt_str = '';
+    if (!empty($files_in_use_arr)) {
+        file_put_contents(EXCLUDE_FILE, implode("\n", $files_in_use_arr) . "\n");
+        $exclude_opt_str = ' --exclude-from=' . escapeshellarg(EXCLUDE_FILE);
     }
 
-    // Ensure trailing slashes once, not re-assigned
-    $src_clean = rtrim($src_raw, "/") . "/";
-    $dst_clean = rtrim($dst_raw, "/") . "/";
+    $dry_flag_str = $dry_run_bool ? '--dry-run ' : '';
+    $cmd_str = 'rsync ' . $dry_flag_str . '-aH --delete --out-format=%n' .
+               $exclude_opt_str . ' ' .
+               escapeshellarg($src_str) . ' ' . escapeshellarg($dst_str);
+    exec($cmd_str . ' 2>&1', $output_arr);
 
-    $cmd = $isDry
-        ? "rsync --dry-run -aH --delete --out-format='%n'" . $exclude_opt . " " . escapeshellarg($src_clean) . " " . escapeshellarg($dst_clean)
-        : "rsync -aH --delete --out-format='%n'" . $exclude_opt . " " . escapeshellarg($src_clean) . " " . escapeshellarg($dst_clean);
-
-    exec("$cmd 2>&1", $output);
-
-    if ($inuse_count > 0) {
-        file_put_contents($last, "Skipped $inuse_count in-use file(s)\n", FILE_APPEND);
+    if ($inuse_count_int > 0) {
+        log_append("Skipped {$inuse_count_int} in-use file(s)");
     }
 
 } else {
-    // Copy or delete mode: per-file loop
-    $files = [];
-    exec("find " . escapeshellarg($src_clean) . " -type f 2>/dev/null", $files);
+    // Copy or delete mode: per-file
+    $all_files_arr = [];
+    exec('find ' . escapeshellarg($src_str) . ' -type f 2>/dev/null', $all_files_arr);
 
-    foreach ($files as $file) {
-        if (trim($file) === "") continue;
+    foreach ($all_files_arr as $file_str) {
+        if (trim($file_str) === '') continue;
 
-        $fuser_output = shell_exec("fuser -m " . escapeshellarg($file) . " 2>/dev/null");
-        if (!empty($fuser_output)) {
-            file_put_contents($inuse_file, "$file\n", FILE_APPEND);
-            $inuse_count++;
+        $fuser_str = (string) shell_exec('fuser -m ' . escapeshellarg($file_str) . ' 2>/dev/null');
+        if (trim($fuser_str) !== '') {
+            file_put_contents(INUSE_FILE, $file_str . "\n", FILE_APPEND);
+            $inuse_count_int++;
             continue;
         }
 
-        $deleteFlag = ($del === "1") ? "--remove-source-files" : "";
-        $safe_file = escapeshellarg($file);
-        $single_cmd = $isDry
-            ? "rsync --dry-run -aH $deleteFlag --out-format='%n' $safe_file " . escapeshellarg($dst_clean)
-            : "rsync -aH $deleteFlag --out-format='%n' $safe_file " . escapeshellarg($dst_clean);
-
-        exec("$single_cmd 2>&1", $output);
+        $delete_flag_str = ($del_str === '1') ? '--remove-source-files ' : '';
+        $dry_flag_str    = $dry_run_bool ? '--dry-run ' : '';
+        $cmd_str = 'rsync ' . $dry_flag_str . '-aH ' . $delete_flag_str .
+                   '--out-format=%n ' .
+                   escapeshellarg($file_str) . ' ' . escapeshellarg($dst_str);
+        exec($cmd_str . ' 2>&1', $output_arr);
     }
 
-    if ($inuse_count > 0) {
-        file_put_contents($last, "Skipped $inuse_count in-use file(s)\n", FILE_APPEND);
+    if ($inuse_count_int > 0) {
+        log_append("Skipped {$inuse_count_int} in-use file(s)");
+    }
+}
+
+// ── Parse moved files ─────────────────────────────────────────────────────────
+foreach ($output_arr as $line_str) {
+    $line_str = trim($line_str);
+    if ($line_str === '') continue;
+    if (preg_match('/^(sending incremental|sent|total|bytes|speedup|created|deleting)/i', $line_str)) continue;
+
+    $moved_any_bool = true;
+    $src_file_str   = $src_str . $line_str;
+    $dst_file_str   = $dst_str . $line_str;
+    file_put_contents(MOVED_LOG, "{$src_file_str} -> {$dst_file_str}\n", FILE_APPEND);
+
+    $parts_arr = explode('/', trim($dst_file_str, '/'));
+    if (count($parts_arr) >= 3 && $parts_arr[1] === 'user0') {
+        $share_str = $parts_arr[2];
+        $share_counts_arr[$share_str] = ($share_counts_arr[$share_str] ?? 0) + 1;
     }
 }
 
-// ==========================================================
-// Parse moved files
-// ==========================================================
-foreach ($output as $line) {
-    $line = trim($line);
-    if ($line === "") continue;
-    if (preg_match('/^(sending incremental|sent|total|bytes|speedup|created|deleting)/i', $line)) {
-        continue;
-    }
-    $moved_any = true;
-    $src_file = $src_clean . $line;
-    $dst_file = $dst_clean . $line;
-    file_put_contents($automover_log, "$src_file -> $dst_file\n", FILE_APPEND);
-
-    $parts = explode("/", trim($dst_file, "/"));
-    if (count($parts) >= 3 && $parts[1] === "user0") {
-        $share = $parts[2];
-        $shareCounts[$share] = ($shareCounts[$share] ?? 0) + 1;
-    }
-}
-if (!$moved_any) {
-    file_put_contents($automover_log, "No files moved for this manual move\n", FILE_APPEND);
+if (!$moved_any_bool) {
+    file_put_contents(MOVED_LOG, "No files moved for this manual move\n");
 } else {
-    copy($automover_log, $automover_log_prev);
+    copy(MOVED_LOG, MOVED_LOG_PREV);
 }
 
-// ==========================================================
-// Cleanup empty directories if delete mode AND enabled
-// ==========================================================
-if ($del === "1" && !$isDry && $ENABLE_CLEANUP) {
-    exec("find " . escapeshellarg($src_clean) . " -type d -empty -delete 2>/dev/null");
-    file_put_contents($last, "Cleaned up empty directories from source\n", FILE_APPEND);
+// ── Cleanup empty directories ─────────────────────────────────────────────────
+if ($del_str === '1' && !$dry_run_bool && $enable_cleanup_bool) {
+    exec('find ' . escapeshellarg($src_str) . ' -type d -empty -delete 2>/dev/null');
+    log_append('Cleaned up empty directories from source');
 }
 
-// ==========================================================
-// FINISH Notification
-// ==========================================================
-$end_time = time();
-$duration = $end_time - $start_time;
+// ── Finish notification ───────────────────────────────────────────────────────
+$runtime_str = format_runtime(time() - $start_time_int);
 
-if ($duration < 60) {
-    $runtime = $duration . "s";
-} elseif ($duration < 3600) {
-    $runtime = floor($duration / 60) . "m " . ($duration % 60) . "s";
-} else {
-    $runtime = floor($duration / 3600) . "h " . floor(($duration % 3600) / 60) . "m";
-}
-
-if ($notify) {
-    if (!empty($WEBHOOK_URL)) {
-        $body = "Manual rsync finished.\nMoved: " . ($moved_any ? "Yes" : "No") . "\nRuntime: $runtime";
-        if ($moved_any && !empty($shareCounts)) {
-            $body .= "\n\nPer share summary:";
-            foreach ($shareCounts as $share => $count) {
-                $body .= "\n• $share: $count file(s)";
+if ($notify_bool) {
+    if ($webhook_str !== '') {
+        $body_str = "Manual rsync finished.\nMoved: " . ($moved_any_bool ? 'Yes' : 'No') . "\nRuntime: {$runtime_str}";
+        if ($moved_any_bool && !empty($share_counts_arr)) {
+            $body_str .= "\n\nPer share summary:";
+            foreach ($share_counts_arr as $share_str => $count_int) {
+                $body_str .= "\n• {$share_str}: {$count_int} file(s)";
             }
         }
-
-        $json = json_encode([
-            "embeds" => [[
-                "title" => "Manual rsync finished",
-                "description" => $body,
-                "color" => 65280
-            ]]
-        ]);
-
-        exec("curl -s -X POST -H 'Content-Type: application/json' -d '$json' \"$WEBHOOK_URL\" >/dev/null 2>&1");
+        send_discord($webhook_str, 'Manual rsync finished', $body_str, 65280);
     } else {
-        // Unraid Notification System
-        $notif_cfg = "/boot/config/plugins/dynamix/dynamix.cfg";
-        $agent_active = false;
-
-        if (file_exists($notif_cfg)) {
-            $normal_val = trim(shell_exec("grep -Po 'normal=\"\\K[0-9]+' $notif_cfg 2>/dev/null"));
-            if (preg_match('/^(4|5|6|7)$/', $normal_val)) {
-                $agent_active = true;
-            }
-        }
-
-        $body = "Manual rsync finished. Runtime: $runtime.";
-        if ($moved_any && !empty($shareCounts)) {
-            if ($agent_active) {
-                $body .= " - Per share summary: ";
-                $first = true;
-                foreach ($shareCounts as $share => $count) {
-                    if ($first) {
-                        $body .= "$share: $count file(s)";
-                        $first = false;
-                    } else {
-                        $body .= " - $share: $count file(s)";
-                    }
+        $agent_active_bool = is_agent_active();
+        $body_str = "Manual rsync finished. Runtime: {$runtime_str}.";
+        if ($moved_any_bool && !empty($share_counts_arr)) {
+            if ($agent_active_bool) {
+                $body_str .= ' - Per share summary: ';
+                $first_bool = true;
+                foreach ($share_counts_arr as $share_str => $count_int) {
+                    if ($first_bool) { $body_str .= "{$share_str}: {$count_int} file(s)"; $first_bool = false; }
+                    else             { $body_str .= " - {$share_str}: {$count_int} file(s)"; }
                 }
             } else {
-                $body .= "<br><br>Per share summary:<br>";
-                foreach ($shareCounts as $share => $count) {
-                    $body .= "• $share: $count file(s)<br>";
+                $body_str .= '<br><br>Per share summary:<br>';
+                foreach ($share_counts_arr as $share_str => $count_int) {
+                    $body_str .= "• {$share_str}: {$count_int} file(s)<br>";
                 }
             }
         }
-
-        $body_escaped = escapeshellarg($body);
-        $cmd = "/usr/local/emhttp/webGui/scripts/notify -e 'automover' -s 'Manual rsync finished' -d $body_escaped -i 'normal'";
-        exec("echo " . escapeshellarg($cmd) . " | at now + 1 minute");
+        send_unraid_notify('Manual rsync finished', $body_str, 1);
     }
 }
 
-// ==========================================================
-// Footer log
-// ==========================================================
-file_put_contents($last,
-    "Session finished - " . date("Y-m-d H:i:s") . "\n\n",
-    FILE_APPEND
-);
+// ── Session footer ────────────────────────────────────────────────────────────
+log_append('Session finished - ' . date('Y-m-d H:i:s'));
+log_append('');
 
-// ==========================================================
-// Cleanup
-// ==========================================================
-@unlink($lock);
-file_put_contents($status, "Stopped");
+// ── Cleanup lock ──────────────────────────────────────────────────────────────
+@unlink(LOCK_FILE);
+set_status('Stopped');
 
-echo json_encode(["ok" => true]);
-?>
+echo json_encode([
+    'status'    => 'success',
+    'timestamp' => date('Y-m-d H:i:s'),
+    'data'      => [
+        'ok' => true,
+    ],
+]);
