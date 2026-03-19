@@ -16,20 +16,20 @@
 - Option to run a script pre move and/or post move
 - Option to have notifications sent to unraid or discord
 - Ability to set cpu and i/o priorities
-- Scheduling options available (minutes, hourly, daily, weekly, monthly)
+- Scheduling options available (hourly, daily, weekly, monthly)
 - Option to have start and finish notifications sent to unraid or discord
 - Option to run a seperate script pre move and/or post move
 - Option to run trim after moving is done
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
 - Jdupes option built in to re-hardlink any files after every move
-- Manual rsync options using the manual move checkbox
+- Manual rsync options using manual move from the mode dropdown
 - Option to stop containers before moves and start them back after finish
 - Ability to force turbo write on during move
 - Ability to manually set file/folder excludes
 - Ability to skip hidden folders/files
 - Ability to exclude files from moving unless they are X amount of days or older
 - Ability to exclude files from moving unless they are at least X MB in size or larger
-- Logging available in the webui
+- Logging available in the webui and at /tmp/automover
 - Recommend disabling unraids built in mover schedule at settings > scheduler which requires unraid 7.2.1+
 - Recommend not combining with mover tuning plugin
 
