@@ -16,9 +16,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie_str, $posted_s
     exit;
 }
 
-// ── Input ─────────────────────────────────────────────────────────────────────
-$pool_str = $_POST['pool'] ?? 'cache';
-
 // ── Validation ────────────────────────────────────────────────────────────────
 if (!file_exists(AUTOMOVER_SCRIPT)) {
     echo json_encode(['ok' => false, 'error' => 'automover.sh not found']);
@@ -26,10 +23,12 @@ if (!file_exists(AUTOMOVER_SCRIPT)) {
 }
 
 // ── Core logic ────────────────────────────────────────────────────────────────
+// Run with --force-now only. POOL_NAME is read from settings.cfg which
+// doSaveSettings() already wrote before this request was made.
+// Do NOT pass --pool here — that flag would override the saved config value.
 $cmd_str = sprintf(
-    '/bin/bash %s --force-now --pool %s >/dev/null 2>&1 &',
-    escapeshellarg(AUTOMOVER_SCRIPT),
-    escapeshellarg($pool_str)
+    '/bin/bash %s --force-now >/dev/null 2>&1 &',
+    escapeshellarg(AUTOMOVER_SCRIPT)
 );
 exec($cmd_str);
 

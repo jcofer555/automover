@@ -96,7 +96,7 @@ log_step() {
 # ==========================================================
 #  ERROR TRAP
 # ==========================================================
-trap 'log_error "Unexpected error on line ${LINENO} (exit ${?}). state=${current_state_str}"; cleanup 1' ERR
+trap 'log_error "Unexpected error on line ${LINENO} (exit ${?}). state=${current_state_str}"' ERR
 
 # ==========================================================
 #  SETUP
@@ -138,16 +138,22 @@ log_debug "Previous status: ${prev_status_str}"
 # ==========================================================
 #  LOCK
 # ==========================================================
-if [[ -f "${LOCK_FILE}" ]]; then
-    lock_pid_int="$(cat "${LOCK_FILE}")"
-    if ps -p "${lock_pid_int}" > /dev/null 2>&1; then
-        log_debug "Another instance is running (PID ${lock_pid_int}). Exiting."
-        exit 0
-    else
-        log_warn "Stale lock file found (PID ${lock_pid_int} not running). Removing."
-        rm -f "${LOCK_FILE}"
+if [[ -z "${SCHEDULE_ID:-}" ]]; then
+    # Direct or Move Now invocation — check for a running instance ourselves
+    if [[ -f "${LOCK_FILE}" ]]; then
+        lock_pid_int="$(grep -m1 '^PID=' "${LOCK_FILE}" | cut -d'=' -f2)"
+        [[ -z "${lock_pid_int}" ]] && lock_pid_int="$(head -1 "${LOCK_FILE}" 2>/dev/null)"
+        if [[ -n "${lock_pid_int}" ]] && ps -p "${lock_pid_int}" > /dev/null 2>&1; then
+            log_debug "Another instance is running (PID ${lock_pid_int}). Exiting."
+            exit 0
+        else
+            log_warn "Stale lock file found (PID ${lock_pid_int:-unknown} not running). Removing."
+            rm -f "${LOCK_FILE}"
+        fi
     fi
 fi
+# Write our PID — takes over from PHP's metadata for scheduled runs,
+# or establishes the lock for direct runs.
 echo $$ > "${LOCK_FILE}"
 log_debug "Lock acquired (PID $$)"
 
@@ -162,7 +168,23 @@ cleanup() {
     log_debug "Lock released. Exiting with code ${exit_code_int}."
     exit "${exit_code_int}"
 }
-trap 'cleanup 0' SIGINT SIGTERM SIGHUP SIGQUIT
+
+# Graceful stop — called when stop button sends SIGTERM.
+# Rsync is in a foreground pipeline so it will finish its current file
+# before this handler runs. We log the stop, run session end, then exit.
+_stop_requested_bool=false
+handle_stop() {
+    if [[ "${_stop_requested_bool}" == true ]]; then return; fi
+    _stop_requested_bool=true
+    log_info "Stop requested — finishing current file then stopping"
+    log_debug "SIGTERM received. Finishing current rsync then stopping."
+    # Let the current rsync finish (it runs in the foreground), then the
+    # main loop will hit this flag check after rsync returns and break out.
+    # We raise an exit after a brief wait to unblock any sleep/wait calls.
+    ( sleep 2 && kill -TERM $$ 2>/dev/null ) &
+}
+trap 'handle_stop' SIGTERM
+trap 'cleanup 0' SIGINT SIGHUP SIGQUIT
 
 # ==========================================================
 #  MOVE NOW OVERRIDE
@@ -190,24 +212,54 @@ if [[ ! -f "${CFG_PATH}" ]]; then
     cleanup 0
 fi
 
+# List of all config keys the script uses
+CONFIG_VARS=(
+    AGE_BASED_FILTER AGE_DAYS ALLOW_DURING_PARITY AUTOSTART_ON_BOOT
+    CLEANUP CPU_AND_IO_PRIORITIES DRY_RUN
+    EXCLUSIONS FORCE_TURBO_WRITE
+    HASH_LOCATION HIDDEN_FILTER IO_PRIORITY
+    JDUPES MANUAL_MOVE
+    NOTIFICATION_SERVICE NOTIFICATIONS POOL_NAME POST_SCRIPT PRE_AND_POST_SCRIPTS PRE_SCRIPT
+    CPU_PRIORITY PUSHOVER_USER_KEY
+    QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_HOST
+    QBITTORRENT_MOVE_SCRIPT QBITTORRENT_PASSWORD QBITTORRENT_STATUS QBITTORRENT_USERNAME
+    SIZE SIZE_BASED_FILTER SIZE_UNIT
+    STOP_ALL_CONTAINERS STOP_CONTAINERS STOP_THRESHOLD SSD_TRIM
+    THRESHOLD
+    WEBHOOK_DISCORD WEBHOOK_GOTIFY WEBHOOK_NTFY WEBHOOK_PUSHOVER WEBHOOK_SLACK
+)
+
+# If run_schedule.php injected settings via env vars (SCHEDULE_ID is set),
+# capture them before sourcing settings.cfg so they win after the source.
+declare -A sched_env_arr=()
+if [[ -n "${SCHEDULE_ID:-}" ]]; then
+    log_debug "Scheduled run detected (SCHEDULE_ID=${SCHEDULE_ID}) — capturing env overrides"
+    for var in "${CONFIG_VARS[@]}"; do
+        if [[ -n "${!var+x}" ]]; then
+            sched_env_arr["${var}"]="${!var}"
+        fi
+    done
+fi
+
 # shellcheck source=/dev/null
 source "${CFG_PATH}"
 log_debug "Config loaded from ${CFG_PATH}"
 
-# Apply pool override if set
+# Restore schedule env vars so they override what settings.cfg just set
+if [[ "${#sched_env_arr[@]}" -gt 0 ]]; then
+    for var in "${!sched_env_arr[@]}"; do
+        declare "${var}=${sched_env_arr[${var}]}"
+        log_debug "Schedule override: ${var}=${sched_env_arr[${var}]}"
+    done
+fi
+
+# Apply pool override if set (--pool flag takes highest priority)
 if [[ -n "${POOL_NAME_OVERRIDE:-}" ]]; then
     POOL_NAME="${POOL_NAME_OVERRIDE}"
 fi
 
 # Strip quotes from all config values
-for var in AGE_DAYS THRESHOLD INTERVAL POOL_NAME DRY_RUN ALLOW_DURING_PARITY \
-           AGE_BASED_FILTER SIZE_BASED_FILTER SIZE_MB SIZE_UNIT EXCLUSIONS_ENABLED \
-           QBITTORRENT_SCRIPT QBITTORRENT_HOST QBITTORRENT_USERNAME QBITTORRENT_PASSWORD \
-           QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_STATUS HIDDEN_FILTER \
-           FORCE_RECONSTRUCTIVE_WRITE CONTAINER_NAMES ENABLE_JDUPES HASH_PATH ENABLE_CLEANUP \
-           CRON_EXPRESSION STOP_THRESHOLD ENABLE_NOTIFICATIONS STOP_ALL_CONTAINERS \
-           ENABLE_TRIM ENABLE_SCRIPTS PRE_SCRIPT POST_SCRIPT \
-           PROCESS_PRIORITY IO_PRIORITY PRIORITIES; do
+for var in "${CONFIG_VARS[@]}"; do
     if [[ -n "${!var+x}" ]]; then
         eval "${var}=\"$(echo "${!var}" | tr -d '\"')\""
     fi
@@ -217,20 +269,22 @@ log_debug "Config values stripped of quotes"
 # ==========================================================
 #  SIZE UNIT → BYTES CONVERSION
 # ==========================================================
+# Converts SIZE + SIZE_UNIT into SIZE_BYTES_INT for filter comparisons.
+# SIZE_UNIT defaults to MB for backwards compatibility with existing configs.
 SIZE_BYTES_INT=0
-if [[ "${SIZE_BASED_FILTER:-no}" == "yes" && "${SIZE_MB:-0}" -gt 0 ]]; then
+if [[ "${SIZE_BASED_FILTER:-no}" == "yes" && "${SIZE:-0}" -gt 0 ]]; then
     case "${SIZE_UNIT:-MB}" in
-        TB) SIZE_BYTES_INT=$(( SIZE_MB * 1024 * 1024 * 1024 * 1024 )) ;;
-        GB) SIZE_BYTES_INT=$(( SIZE_MB * 1024 * 1024 * 1024 )) ;;
-        MB) SIZE_BYTES_INT=$(( SIZE_MB * 1024 * 1024 )) ;;
-        *)  SIZE_BYTES_INT=$(( SIZE_MB * 1024 * 1024 )) ;;
+        TB) SIZE_BYTES_INT=$(( SIZE * 1024 * 1024 * 1024 * 1024 )) ;;
+        GB) SIZE_BYTES_INT=$(( SIZE * 1024 * 1024 * 1024 )) ;;
+        MB) SIZE_BYTES_INT=$(( SIZE * 1024 * 1024 )) ;;
+        *)  SIZE_BYTES_INT=$(( SIZE * 1024 * 1024 )) ;;
     esac
-    log_debug "Size filter: ${SIZE_MB} ${SIZE_UNIT:-MB} = ${SIZE_BYTES_INT} bytes"
+    log_debug "Size filter: ${SIZE} ${SIZE_UNIT:-MB} = ${SIZE_BYTES_INT} bytes"
 fi
 
 # Disable notifications during dry run
 if [[ "${DRY_RUN:-no}" == "yes" ]]; then
-    ENABLE_NOTIFICATIONS="no"
+    NOTIFICATIONS="no"
     log_debug "Dry run active — notifications disabled"
 fi
 
@@ -242,16 +296,17 @@ log_step "Normalising priority settings"
 IO_CLASS_STR=""
 IO_LEVEL_STR=""
 
-if [[ "${PRIORITIES:-no}" != "yes" ]]; then
-    PROCESS_PRIORITY=""
+if [[ "${CPU_AND_IO_PRIORITIES:-no}" != "yes" ]]; then
+    CPU_PRIORITY=""
     log_debug "Priorities disabled"
 else
-    if [[ -z "${PROCESS_PRIORITY:-}" || ! "${PROCESS_PRIORITY}" =~ ^-?[0-9]+$ ]]; then
-        PROCESS_PRIORITY=0
-    elif (( PROCESS_PRIORITY < -20 )); then
-        PROCESS_PRIORITY=-20
-    elif (( PROCESS_PRIORITY > 19 )); then
-        PROCESS_PRIORITY=19
+    # CPU nice: clamp to -20..19
+    if [[ -z "${CPU_PRIORITY:-}" || ! "${CPU_PRIORITY}" =~ ^-?[0-9]+$ ]]; then
+        CPU_PRIORITY=0
+    elif (( CPU_PRIORITY < -20 )); then
+        CPU_PRIORITY=-20
+    elif (( CPU_PRIORITY > 19 )); then
+        CPU_PRIORITY=19
     fi
 
     case "${IO_PRIORITY:-normal}" in
@@ -260,12 +315,13 @@ else
         normal|"") IO_CLASS_STR=""; IO_LEVEL_STR="" ;;
         *) IO_CLASS_STR=""; IO_LEVEL_STR="" ;;
     esac
-    log_debug "Priorities: cpu=${PROCESS_PRIORITY} io_class=${IO_CLASS_STR} io_level=${IO_LEVEL_STR}"
+    log_debug "Priorities: cpu=${CPU_PRIORITY} io_class=${IO_CLASS_STR} io_level=${IO_LEVEL_STR}"
 fi
 
+# Build rsync wrapper array
 rsync_wrapper_arr=()
-if [[ "${PRIORITIES:-no}" == "yes" ]]; then
-    [[ -n "${PROCESS_PRIORITY}" ]] && rsync_wrapper_arr+=(nice -n "${PROCESS_PRIORITY}")
+if [[ "${CPU_AND_IO_PRIORITIES:-no}" == "yes" ]]; then
+    [[ -n "${CPU_PRIORITY}" ]] && rsync_wrapper_arr+=(nice -n "${CPU_PRIORITY}")
     if [[ -n "${IO_CLASS_STR}" ]]; then
         if [[ "${IO_CLASS_STR}" == "3" ]]; then
             rsync_wrapper_arr+=(ionice -c3)
@@ -325,7 +381,7 @@ send_discord_message() {
 }
 
 send_summary_notification() {
-    [[ "${ENABLE_NOTIFICATIONS:-no}" != "yes" ]] && return
+    [[ "${NOTIFICATIONS:-no}" != "yes" ]] && return
     if [[ "${prev_status_str}" == "Stopped" && "${move_now_bool}" == false ]]; then
         return
     fi
@@ -451,8 +507,8 @@ manage_containers() {
             fi
         fi
 
-    elif [[ -n "${CONTAINER_NAMES:-}" && "${DRY_RUN:-no}" != "yes" ]]; then
-        IFS=',' read -ra containers_arr <<< "${CONTAINER_NAMES}"
+    elif [[ -n "${STOP_CONTAINERS:-}" && "${DRY_RUN:-no}" != "yes" ]]; then
+        IFS=',' read -ra containers_arr <<< "${STOP_CONTAINERS}"
         if [[ "${action_str}" == "stop" ]]; then
             set_status "Stopping selected containers"
             : > "${STOP_FILE}"
@@ -576,7 +632,7 @@ copy_empty_dirs() {
         local dst_dir_str="${dst_str}/${dir_str#${src_str}/}"
         local skip_dir_bool=false
 
-        if [[ "${EXCLUSIONS_ENABLED:-no}" == "yes" && ${#excluded_paths_arr[@]} -gt 0 ]]; then
+        if [[ "${EXCLUSIONS:-no}" == "yes" && ${#excluded_paths_arr[@]} -gt 0 ]]; then
             local ex_str
             for ex_str in "${excluded_paths_arr[@]}"; do
                 [[ -d "${ex_str}" && "${ex_str}" != */ ]] && ex_str="${ex_str}/"
@@ -677,10 +733,6 @@ fi
     echo "--------------------------------------------"
     echo "Session started - $(date '+%Y-%m-%d %H:%M:%S')"
     echo "Plugin version: ${plugin_version_str}"
-    [[ "${move_now_bool}" == true ]] && echo "Move now triggered — filters disabled"
-    if [[ "${move_now_bool}" == true && "${EXCLUSIONS_ENABLED:-no}" == "yes" ]]; then
-        echo "Exclusions Enabled"
-    fi
 } >> "${LAST_RUN_FILE}"
 log_debug "Session started. version=${plugin_version_str} move_now=${move_now_bool} dry_run=${DRY_RUN:-no}"
 
@@ -690,8 +742,8 @@ log_debug "Session started. version=${plugin_version_str} move_now=${move_now_bo
 log_session_end() {
     log_step "log_session_end"
     if [[ "${moved_anything_bool}" == true ]]; then
-        if [[ "${PRIORITIES:-no}" == "yes" ]]; then
-            log_info "Cpu priority: ${PROCESS_PRIORITY}"
+        if [[ "${CPU_AND_IO_PRIORITIES:-no}" == "yes" ]]; then
+            log_info "Cpu priority: ${CPU_PRIORITY}"
             if [[ "${IO_PRIORITY:-normal}" == "normal" ]]; then
                 log_info "I/O priority: normal"
             elif [[ "${IO_CLASS_STR}" == "3" ]]; then
@@ -757,17 +809,15 @@ fi
 age_filter_bool=false
 size_filter_bool=false
 
-if [[ "${move_now_bool}" == false ]]; then
-    log_step "Applying filters"
-    set_status "Applying Filters"
-    if [[ "${AGE_BASED_FILTER:-no}" == "yes" && "${AGE_DAYS:-0}" -gt 0 ]]; then
-        age_filter_bool=true
-        log_debug "Age filter enabled: ${AGE_DAYS} days"
-    fi
-    if [[ "${SIZE_BASED_FILTER:-no}" == "yes" && "${SIZE_BYTES_INT:-0}" -gt 0 ]]; then
-        size_filter_bool=true
-        log_debug "Size filter enabled: ${SIZE_MB} ${SIZE_UNIT:-MB} (${SIZE_BYTES_INT} bytes)"
-    fi
+log_step "Applying filters"
+set_status "Applying Filters"
+if [[ "${AGE_BASED_FILTER:-no}" == "yes" && "${AGE_DAYS:-0}" -gt 0 ]]; then
+    age_filter_bool=true
+    log_debug "Age filter enabled: ${AGE_DAYS} days"
+fi
+if [[ "${SIZE_BASED_FILTER:-no}" == "yes" && "${SIZE_BYTES_INT:-0}" -gt 0 ]]; then
+    size_filter_bool=true
+    log_debug "Size filter enabled: ${SIZE} ${SIZE_UNIT:-MB} (${SIZE_BYTES_INT} bytes)"
 fi
 
 mount_point_str="/mnt/${POOL_NAME:-cache}"
@@ -793,7 +843,7 @@ log_step "Pool usage check"
 set_status "Checking Usage"
 used_pct_int=0
 
-if [[ "${move_now_bool}" == false && "${DRY_RUN:-no}" != "yes" ]]; then
+if [[ "${DRY_RUN:-no}" != "yes" ]]; then
     local_pool_name_str="$(basename "${mount_point_str}")"
     zfs_cap_str="$(zpool list -H -o name,cap 2>/dev/null \
         | awk -v pool="${local_pool_name_str}" '$1==pool{gsub("%","",$2);print $2}')"
@@ -843,7 +893,7 @@ fi
 # ==========================================================
 #  PRE-MOVE SCRIPT
 # ==========================================================
-if [[ "${ENABLE_SCRIPTS:-no}" == "yes" && -n "${PRE_SCRIPT:-}" ]]; then
+if [[ "${PRE_AND_POST_SCRIPTS:-no}" == "yes" && -n "${PRE_SCRIPT:-}" ]]; then
     log_step "Running pre-move script: ${PRE_SCRIPT}"
     log_info "Running pre-move script: ${PRE_SCRIPT}"
     if run_user_script "${PRE_SCRIPT}" >> "${LAST_RUN_FILE}" 2>&1; then
@@ -857,31 +907,29 @@ fi
 # ==========================================================
 #  LOG ACTIVE FILTERS
 # ==========================================================
-if [[ "${move_now_bool}" == false ]]; then
-    filters_active_bool=false
-    for flag_str in "${HIDDEN_FILTER:-no}" "${SIZE_BASED_FILTER:-no}" \
-                    "${AGE_BASED_FILTER:-no}" "${EXCLUSIONS_ENABLED:-no}"; do
-        [[ "${flag_str}" == "yes" ]] && { filters_active_bool=true; break; }
-    done
+filters_active_bool=false
+for flag_str in "${HIDDEN_FILTER:-no}" "${SIZE_BASED_FILTER:-no}" \
+                "${AGE_BASED_FILTER:-no}" "${EXCLUSIONS:-no}"; do
+    [[ "${flag_str}" == "yes" ]] && { filters_active_bool=true; break; }
+done
 
-    if [[ "${filters_active_bool}" == true ]]; then
-        {
-            echo "***************** Filters Used *****************"
-            [[ "${HIDDEN_FILTER:-no}"      == "yes" ]] && echo "Hidden Filter Enabled"
-            [[ "${SIZE_BASED_FILTER:-no}"  == "yes" ]] && echo "Size Based Filter Enabled (${SIZE_MB:-0} ${SIZE_UNIT:-MB})"
-            [[ "${AGE_BASED_FILTER:-no}"   == "yes" ]] && echo "Age Based Filter Enabled (${AGE_DAYS:-0} days)"
-            [[ "${EXCLUSIONS_ENABLED:-no}" == "yes" ]] && echo "Exclusions Enabled"
-            echo "***************** Filters Used *****************"
-        } >> "${LAST_RUN_FILE}"
-        log_debug "Filters active: hidden=${HIDDEN_FILTER:-no} size=${SIZE_BASED_FILTER:-no} age=${AGE_BASED_FILTER:-no} excl=${EXCLUSIONS_ENABLED:-no}"
-    fi
+if [[ "${filters_active_bool}" == true ]]; then
+    {
+        echo "***************** Filters Used *****************"
+        [[ "${HIDDEN_FILTER:-no}"      == "yes" ]] && echo "Hidden Filter Enabled"
+        [[ "${SIZE_BASED_FILTER:-no}"  == "yes" ]] && echo "Size Based Filter Enabled (${SIZE:-0} ${SIZE_UNIT:-MB})"
+        [[ "${AGE_BASED_FILTER:-no}"   == "yes" ]] && echo "Age Based Filter Enabled (${AGE_DAYS:-0} days)"
+        [[ "${EXCLUSIONS:-no}" == "yes" ]] && echo "Exclusions Enabled"
+        echo "***************** Filters Used *****************"
+    } >> "${LAST_RUN_FILE}"
+    log_debug "Filters active: hidden=${HIDDEN_FILTER:-no} size=${SIZE_BASED_FILTER:-no} age=${AGE_BASED_FILTER:-no} excl=${EXCLUSIONS:-no}"
 fi
 
 # ==========================================================
 #  LOAD EXCLUSIONS
 # ==========================================================
 excluded_paths_arr=()
-if [[ "${EXCLUSIONS_ENABLED:-no}" == "yes" && -f "${EXCLUSIONS_FILE}" ]]; then
+if [[ "${EXCLUSIONS:-no}" == "yes" && -f "${EXCLUSIONS_FILE}" ]]; then
     while IFS= read -r line_str; do
         line_str="$(echo "${line_str}" | sed 's/\r//g' | xargs)"
         [[ -z "${line_str}" || "${line_str}" =~ ^# ]] && continue
@@ -972,7 +1020,7 @@ for cfg_file_str in "${SHARE_CFG_DIR}"/*.cfg; do
 
         # Exclusions
         skip_file_bool=false
-        if [[ "${EXCLUSIONS_ENABLED:-no}" == "yes" && ${#excluded_paths_arr[@]} -gt 0 ]]; then
+        if [[ "${EXCLUSIONS:-no}" == "yes" && ${#excluded_paths_arr[@]} -gt 0 ]]; then
             for ex_str in "${excluded_paths_arr[@]}"; do
                 [[ -d "${ex_str}" ]] && ex_str="${ex_str%/}/"
                 if [[ "${srcfile_str}" == "${ex_str}"* ]]; then
@@ -1005,7 +1053,7 @@ for cfg_file_str in "${SHARE_CFG_DIR}"/*.cfg; do
     if [[ "${pre_move_done_str}" != "yes" ]]; then
 
         # Start notification
-        if [[ "${ENABLE_NOTIFICATIONS:-no}" == "yes" && "${sent_start_notif_str}" != "yes" ]]; then
+        if [[ "${NOTIFICATIONS:-no}" == "yes" && "${sent_start_notif_str}" != "yes" ]]; then
             notif_title_str="Session started"
             notif_msg_str="automover is beginning to move eligible files."
             if [[ -n "${WEBHOOK_URL:-}" ]]; then
@@ -1018,7 +1066,7 @@ for cfg_file_str in "${SHARE_CFG_DIR}"/*.cfg; do
         fi
 
         # Turbo write
-        if [[ "${FORCE_RECONSTRUCTIVE_WRITE:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" ]]; then
+        if [[ "${FORCE_TURBO_WRITE:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" ]]; then
             set_status "Enabling Turbo Write"
             turbo_prev_str="$(grep -Po 'md_write_method="\K[^"]+' "${ARRAY_STATE_FILE}" 2>/dev/null || echo "")"
             echo "${turbo_prev_str}" > /tmp/prev_write_method
@@ -1030,9 +1078,9 @@ for cfg_file_str in "${SHARE_CFG_DIR}"/*.cfg; do
         fi
 
         # qBittorrent pause
-        if [[ "${QBITTORRENT_SCRIPT:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" ]]; then
+        if [[ "${QBITTORRENT_MOVE_SCRIPT:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" ]]; then
             skip_qbit_bool=false
-            IFS=',' read -ra stop_list_arr <<< "${CONTAINER_NAMES:-}"
+            IFS=',' read -ra stop_list_arr <<< "${STOP_CONTAINERS:-}"
             for c_str in "${stop_list_arr[@]}"; do
                 c_str="$(echo "${c_str}" | xargs)"
                 [[ -z "${c_str}" ]] && continue
@@ -1102,7 +1150,7 @@ for cfg_file_str in "${SHARE_CFG_DIR}"/*.cfg; do
 
         # Re-check exclusions
         skip_file_bool=false
-        if [[ "${EXCLUSIONS_ENABLED:-no}" == "yes" && ${#excluded_paths_arr[@]} -gt 0 ]]; then
+        if [[ "${EXCLUSIONS:-no}" == "yes" && ${#excluded_paths_arr[@]} -gt 0 ]]; then
             for ex_str in "${excluded_paths_arr[@]}"; do
                 [[ -d "${ex_str}" ]] && ex_str="${ex_str%/}/"
                 if [[ "${srcfile_str}" == "${ex_str}"* ]]; then
@@ -1172,6 +1220,14 @@ for cfg_file_str in "${SHARE_CFG_DIR}"/*.cfg; do
                 log_warn "File not found at destination after rsync: ${dstfile_str}"
             fi
         fi
+
+        # Check for stop request after each file — rsync already finished so
+        # the current file is safe. Break out to let cleanup run normally.
+        if [[ "${_stop_requested_bool}" == true ]]; then
+            log_debug "Stop flag detected after file move — breaking move loop"
+            stop_triggered_bool=true
+            break
+        fi
     done < "${ELIGIBLE_TMP_FILE}"
     rm -f "${ELIGIBLE_TMP_FILE}"
 
@@ -1194,7 +1250,7 @@ done
     [[ "${HIDDEN_FILTER:-no}"      == "yes" ]] && echo "Skipped due to hidden filter: ${skipped_hidden_int} file(s)"
     [[ "${SIZE_BASED_FILTER:-no}"  == "yes" ]] && echo "Skipped due to size filter: ${skipped_size_int} file(s)"
     [[ "${AGE_BASED_FILTER:-no}"   == "yes" ]] && echo "Skipped due to age filter: ${skipped_age_int} file(s)"
-    [[ "${EXCLUSIONS_ENABLED:-no}" == "yes" ]] && echo "Skipped due to exclusions: ${skipped_excl_int} file(s)"
+    [[ "${EXCLUSIONS:-no}" == "yes" ]] && echo "Skipped due to exclusions: ${skipped_excl_int} file(s)"
 } >> "${LAST_RUN_FILE}"
 log_debug "Skip totals: hidden=${skipped_hidden_int} size=${skipped_size_int} age=${skipped_age_int} excl=${skipped_excl_int}"
 
@@ -1204,9 +1260,9 @@ log_debug "Skip totals: hidden=${skipped_hidden_int} size=${skipped_size_int} ag
 if [[ "${pre_move_done_str}" != "yes" && "${moved_anything_bool}" == false ]]; then
     log_info "No shares had files to move"
     log_debug "No eligible files found across all shares"
-    [[ "${FORCE_RECONSTRUCTIVE_WRITE:-no}" == "yes" ]] && log_info "No files moved — skipping enabling reconstructive write (turbo write)"
-    [[ -n "${CONTAINER_NAMES:-}" ]]                    && log_info "No files moved — skipping stopping of containers"
-    [[ "${QBITTORRENT_SCRIPT:-no}" == "yes" ]]         && log_info "No files moved — skipping pausing of qbittorrent torrents"
+    [[ "${FORCE_TURBO_WRITE:-no}" == "yes" ]] && log_info "No files moved — skipping enabling reconstructive write (turbo write)"
+    [[ -n "${STOP_CONTAINERS:-}" ]]                    && log_info "No files moved — skipping stopping of containers"
+    [[ "${QBITTORRENT_MOVE_SCRIPT:-no}" == "yes" ]]         && log_info "No files moved — skipping pausing of qbittorrent torrents"
 fi
 
 # ==========================================================
@@ -1226,7 +1282,7 @@ fi
 # ==========================================================
 #  RESUME QBITTORRENT
 # ==========================================================
-if [[ "${qbit_paused_bool}" == true && "${QBITTORRENT_SCRIPT:-no}" == "yes" && "${skip_qbit_bool}" == false ]]; then
+if [[ "${qbit_paused_bool}" == true && "${QBITTORRENT_MOVE_SCRIPT:-no}" == "yes" && "${skip_qbit_bool}" == false ]]; then
     set_status "Resuming Torrents"
     log_debug "Waiting 10s before resuming qBittorrent"
     sleep 10
@@ -1289,10 +1345,10 @@ else
 fi
 
 # ==========================================================
-#  POOL-WIDE CLEANUP (ENABLE_CLEANUP=yes)
+#  POOL-WIDE CLEANUP (CLEANUP=yes)
 # ==========================================================
-if [[ "${ENABLE_CLEANUP:-no}" == "yes" ]]; then
-    log_step "Pool-wide cleanup (ENABLE_CLEANUP=yes)"
+if [[ "${CLEANUP:-no}" == "yes" ]]; then
+    log_step "Pool-wide cleanup (CLEANUP=yes)"
     set_status "Cleaning Up"
     pool_path_str="/mnt/${POOL_NAME:-cache}"
 
@@ -1352,12 +1408,12 @@ fi
 # ==========================================================
 #  JDUPES
 # ==========================================================
-if [[ "${ENABLE_JDUPES:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" && "${moved_anything_bool}" == true ]]; then
+if [[ "${JDUPES:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" && "${moved_anything_bool}" == true ]]; then
     log_step "Running jdupes"
     set_status "Running Jdupes"
     if command -v jdupes > /dev/null 2>&1; then
         temp_list_str="${TMP_LOGS_DIR}/jdupes_list.txt"
-        hash_dir_str="${HASH_PATH:-/mnt/user/appdata}"
+        hash_dir_str="${HASH_LOCATION:-/mnt/user/appdata}"
         hash_db_str="${hash_dir_str}/jdupes_hash_database.db"
 
         mkdir -p "${hash_dir_str}"
@@ -1419,7 +1475,7 @@ if [[ "${ENABLE_JDUPES:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" && "${moved_a
         log_info "jdupes not installed — skipping jdupes step"
         log_debug "jdupes binary not found"
     fi
-elif [[ "${ENABLE_JDUPES:-no}" == "yes" ]]; then
+elif [[ "${JDUPES:-no}" == "yes" ]]; then
     if [[ "${DRY_RUN:-no}" == "yes" ]]; then
         log_info "Dry run active — skipping jdupes step"
     elif [[ "${moved_anything_bool}" == false ]]; then
@@ -1432,7 +1488,7 @@ fi
 # ==========================================================
 #  RESTORE TURBO WRITE
 # ==========================================================
-if [[ "${FORCE_RECONSTRUCTIVE_WRITE:-no}" == "yes" && "${moved_anything_bool}" == true ]]; then
+if [[ "${FORCE_TURBO_WRITE:-no}" == "yes" && "${moved_anything_bool}" == true ]]; then
     set_status "Restoring Turbo Write Setting"
     log_step "Restoring turbo write setting"
     if [[ "${DRY_RUN:-no}" == "yes" ]]; then
@@ -1474,7 +1530,7 @@ fi
 # ==========================================================
 #  POST-MOVE SHARE CONFIG CLEANUP
 # ==========================================================
-if [[ "${moved_anything_bool}" == true && "${ENABLE_CLEANUP:-no}" == "yes" ]]; then
+if [[ "${moved_anything_bool}" == true && "${CLEANUP:-no}" == "yes" ]]; then
     set_status "Checking Share Existence"
     log_debug "Checking share config existence post-move"
     while IFS= read -r cleanup_share_str; do
@@ -1495,7 +1551,7 @@ fi
 # ==========================================================
 #  SSD TRIM
 # ==========================================================
-if [[ "${ENABLE_TRIM:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" && "${moved_anything_bool}" == true ]]; then
+if [[ "${SSD_TRIM:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" && "${moved_anything_bool}" == true ]]; then
     log_step "Running SSD trim"
     set_status "Running ssd trim"
     if /usr/local/emhttp/plugins/dynamix/scripts/ssd_trim cron > /dev/null 2>&1; then
@@ -1504,7 +1560,7 @@ if [[ "${ENABLE_TRIM:-no}" == "yes" && "${DRY_RUN:-no}" != "yes" && "${moved_any
     else
         log_error "Ssd trim failed"
     fi
-elif [[ "${ENABLE_TRIM:-no}" == "yes" && "${DRY_RUN:-no}" == "yes" ]]; then
+elif [[ "${SSD_TRIM:-no}" == "yes" && "${DRY_RUN:-no}" == "yes" ]]; then
     log_info "Dry run active — skipping ssd trim"
     log_debug "DRY-RUN: skip SSD trim"
 fi
@@ -1512,16 +1568,21 @@ fi
 # ==========================================================
 #  SUMMARY NOTIFICATION + POST SCRIPT + DONE SIGNAL
 # ==========================================================
-send_summary_notification
+if [[ "${_stop_requested_bool}" == true ]]; then
+    log_info "Move stopped by user request"
+    log_debug "Stop requested — skipping notifications and post-script"
+else
+    send_summary_notification
 
-if [[ "${ENABLE_SCRIPTS:-no}" == "yes" && -n "${POST_SCRIPT:-}" ]]; then
-    log_step "Running post-move script: ${POST_SCRIPT}"
-    log_info "Running post-move script: ${POST_SCRIPT}"
-    if run_user_script "${POST_SCRIPT}" >> "${LAST_RUN_FILE}" 2>&1; then
-        log_info "Post-move script completed successfully"
-        log_debug "Post-move script OK: ${POST_SCRIPT}"
-    else
-        log_error "Post-move script failed: ${POST_SCRIPT}"
+    if [[ "${PRE_AND_POST_SCRIPTS:-no}" == "yes" && -n "${POST_SCRIPT:-}" ]]; then
+        log_step "Running post-move script: ${POST_SCRIPT}"
+        log_info "Running post-move script: ${POST_SCRIPT}"
+        if run_user_script "${POST_SCRIPT}" >> "${LAST_RUN_FILE}" 2>&1; then
+            log_info "Post-move script completed successfully"
+            log_debug "Post-move script OK: ${POST_SCRIPT}"
+        else
+            log_error "Post-move script failed: ${POST_SCRIPT}"
+        fi
     fi
 fi
 

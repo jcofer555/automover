@@ -8,32 +8,71 @@ Markdown="false"
 <?php
 const CFG_PATH = '/boot/config/plugins/automover/settings.cfg';
 if (session_status() === PHP_SESSION_NONE) session_start();
+
+// Keys that are no longer stored in settings.cfg (moved to schedules.cfg)
+const STALE_KEYS = ['CRON_EXPRESSION','CRON_MODE','DAILY_TIME','DAILY_MINUTE',
+    'HOURLY_FREQUENCY','MONTHLY_DAY','MONTHLY_MINUTE','MONTHLY_TIME','PROCESS_PRIORITY',
+    'WEEKLY_DAY','WEEKLY_MINUTE','WEEKLY_TIME','ENABLE_CLEANUP','ENABLE_JDUPES','ENABLE_NOTIFICATIONS','ENABLE_SCRIPTS',
+    'ENABLE_TRIM','EXCLUSIONS_ENABLED','AUTOSTART','CONTAINER_NAMES','FORCE_RECONSTRUCTIVE_WRITE','HASH_PATH','SIZE_MB','PRIORITIES','QBITTORRENT_SCRIPT'];
+
 $defaults = [
-    'AGE_BASED_FILTER'=>'no','AGE_DAYS'=>1,'ALLOW_DURING_PARITY'=>'no',
-    'AUTOSTART'=>'no','CONTAINER_NAMES'=>'','CRON_EXPRESSION'=>'','CRON_MODE'=>'daily',
-    'DAILY_TIME'=>'00:00','DRY_RUN'=>'no','ENABLE_CLEANUP'=>'no','ENABLE_JDUPES'=>'no',
-    'ENABLE_NOTIFICATIONS'=>'no','ENABLE_SCRIPTS'=>'no','ENABLE_TRIM'=>'no',
-    'EXCLUSIONS_ENABLED'=>'no','FORCE_RECONSTRUCTIVE_WRITE'=>'no',
-    'HASH_PATH'=>'/mnt/user/appdata','HIDDEN_FILTER'=>'no','HOURLY_FREQUENCY'=>'4',
-    'IO_PRIORITY'=>'normal','MANUAL_MOVE'=>'no','MONTHLY_DAY'=>'','MONTHLY_TIME'=>'',
-    'NOTIFICATION_SERVICE'=>'','POOL_NAME'=>'cache','POST_SCRIPT'=>'','PRE_SCRIPT'=>'',
-    'PRIORITIES'=>'no','PROCESS_PRIORITY'=>'0','PUSHOVER_USER_KEY'=>'',
-    'QBITTORRENT_DAYS_FROM'=>'0','QBITTORRENT_DAYS_TO'=>'2','QBITTORRENT_HOST'=>'',
-    'QBITTORRENT_PASSWORD'=>'','QBITTORRENT_SCRIPT'=>'no','QBITTORRENT_STATUS'=>'completed',
-    'QBITTORRENT_USERNAME'=>'','SIZE_BASED_FILTER'=>'no','SIZE_MB'=>1,'SIZE_UNIT'=>'MB',
-    'STOP_ALL_CONTAINERS'=>'no','STOP_THRESHOLD'=>0,'THRESHOLD'=>0,
-    'WEBHOOK_DISCORD'=>'','WEBHOOK_GOTIFY'=>'','WEBHOOK_NTFY'=>'',
-    'WEBHOOK_PUSHOVER'=>'','WEBHOOK_SLACK'=>'','WEEKLY_DAY'=>'','WEEKLY_TIME'=>'',
+    'AGE_BASED_FILTER'       => 'no',
+    'AGE_DAYS'               => 1,
+    'ALLOW_DURING_PARITY'    => 'no',
+    'AUTOSTART_ON_BOOT'      => 'no',
+    'CLEANUP'                => 'no',
+    'CPU_AND_IO_PRIORITIES'  => 'no',
+    'CPU_PRIORITY'           => '0',
+    'DRY_RUN'                => 'no',
+    'EXCLUSIONS'             => 'no',
+    'FORCE_TURBO_WRITE'      => 'no',
+    'HASH_LOCATION'          => '/mnt/user/appdata',
+    'HIDDEN_FILTER'          => 'no',
+    'IO_PRIORITY'            => 'normal',
+    'JDUPES'                 => 'no',
+    'MANUAL_MOVE'            => 'no',
+    'NOTIFICATION_SERVICE'   => '',
+    'NOTIFICATIONS'          => 'no',
+    'POOL_NAME'              => 'cache',
+    'POST_SCRIPT'            => '',
+    'PRE_AND_POST_SCRIPTS'   => 'no',
+    'PRE_SCRIPT'             => '',
+    'PUSHOVER_USER_KEY'      => '',
+    'QBITTORRENT_DAYS_FROM'  => '0',
+    'QBITTORRENT_DAYS_TO'    => '2',
+    'QBITTORRENT_HOST'       => '',
+    'QBITTORRENT_MOVE_SCRIPT'=> 'no',
+    'QBITTORRENT_PASSWORD'   => '',
+    'QBITTORRENT_STATUS'     => 'completed',
+    'QBITTORRENT_USERNAME'   => '',
+    'SIZE'                   => 1,
+    'SIZE_BASED_FILTER'      => 'no',
+    'SIZE_UNIT'              => 'MB',
+    'STOP_ALL_CONTAINERS'    => 'no',
+    'STOP_CONTAINERS'        => '',
+    'STOP_THRESHOLD'         => 0,
+    'SSD_TRIM'               => 'no',
+    'THRESHOLD'              => 0,
+    'WEBHOOK_DISCORD'        => '',
+    'WEBHOOK_GOTIFY'         => '',
+    'WEBHOOK_NTFY'           => '',
+    'WEBHOOK_PUSHOVER'       => '',
+    'WEBHOOK_SLACK'          => '',
 ];
 $existing = file_exists(CFG_PATH) ? (parse_ini_file(CFG_PATH) ?: []) : [];
+// Remove stale cron keys if present
+foreach (STALE_KEYS as $sk) { unset($existing[$sk]); }
 foreach ($defaults as $k=>$v) { if (!array_key_exists($k,$existing)) $existing[$k]=$v; }
-$cfg=''; foreach ($defaults as $k=>$dv) { $cfg.="$k=\"{$existing[$k]}\"\n"; }
+// Write alphabetically so key order never shifts
+$write = []; foreach ($defaults as $k=>$dv) { $write[$k] = $existing[$k]; }
+ksort($write);
+$cfg=''; foreach ($write as $k=>$v) { $cfg.="$k=\"{$v}\"\n"; }
 @file_put_contents(CFG_PATH,$cfg);
 $settings=$existing;
 $unraid_version='7.1';
 if (file_exists('/etc/unraid-version')) { $d=parse_ini_file('/etc/unraid-version'); if (!empty($d['version'])) $unraid_version=$d['version']; }
 $sib_checks=[
-    'automover_beta'             =>['plg'=>'/boot/config/plugins/automover_beta.plg','page'=>'/usr/local/emhttp/plugins/automover_beta/automover_beta.page','label'=>'Automover (Beta)','url'=>'/Settings/automover-beta'],
+    'automover_beta'             =>['plg'=>'/boot/config/plugins/automover_beta.plg','page'=>'/usr/local/emhttp/plugins/automover_beta/automover_beta.page','label'=>'Automover (Beta)','url'=>'/Settings/automover_beta'],
     'flash-backup'          =>['plg'=>'/boot/config/plugins/flash-backup.plg','page'=>'/usr/local/emhttp/plugins/flash-backup/flash-backup.page','label'=>'Flash Backup','url'=>'/Settings/flash-backup'],
     'flash-backup_beta'     =>['plg'=>'/boot/config/plugins/flash-backup_beta.plg','page'=>'/usr/local/emhttp/plugins/flash-backup_beta/flash-backup_beta.page','label'=>'Flash Backup (Beta)','url'=>'/Settings/flash-backup_beta'],
     'vm-backup-and-restore' =>['plg'=>'/boot/config/plugins/vm-backup-and-restore.plg','page'=>'/usr/local/emhttp/plugins/vm-backup-and-restore/vm-backup-and-restore.page','label'=>'VM Backup & Restore','url'=>'/Settings/vm-backup-and-restore'],
@@ -44,9 +83,7 @@ foreach ($sib_checks as $k=>$c) { if ($k===$cur) continue; if (file_exists($c['p
 $has_sibs=!empty($sibs); $sib_opts=$sibs; uasort($sib_opts,fn($a,$b)=>strcmp($a['label'],$b['label']));
 $notif_svcs=['Discord','Gotify','Ntfy','Pushover','Slack','Unraid'];
 $sel_svcs=array_filter(array_map('trim',explode(',',$settings['NOTIFICATION_SERVICE']??'')));
-$cron_mode=$settings['CRON_MODE']??'daily';
-if (!in_array($cron_mode,['hourly','daily','weekly','monthly'])) $cron_mode='hourly';
-$sharesFile='/var/local/emhttp/shares.ini'; $curHash=$settings['HASH_PATH']??'/mnt/user/appdata'; $sharesList=[];
+$sharesFile='/var/local/emhttp/shares.ini'; $curHash=$settings['HASH_LOCATION']??'/mnt/user/appdata'; $sharesList=[];
 if (file_exists($sharesFile)){$sh=parse_ini_file($sharesFile,true);if($sh)$sharesList=array_keys($sh);}
 if (empty($sharesList)) $sharesList=['appdata','system','domains','isos'];
 ?>
@@ -64,117 +101,11 @@ if (!csrf || csrf === 'undefined' || csrf === '') {
 const WH_SAVED={DISCORD:"<?=htmlspecialchars($settings['WEBHOOK_DISCORD']??'')?>",GOTIFY:"<?=htmlspecialchars($settings['WEBHOOK_GOTIFY']??'')?>",NTFY:"<?=htmlspecialchars($settings['WEBHOOK_NTFY']??'')?>",PUSHOVER:"<?=htmlspecialchars($settings['WEBHOOK_PUSHOVER']??'')?>",SLACK:"<?=htmlspecialchars($settings['WEBHOOK_SLACK']??'')?>"};
 const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
 </script>
-<style>
-:root{--a:#0891b2;--al:#22d3ee;--adim:rgba(8,145,178,.18);--aglow:rgba(8,145,178,.35);--bg:#0a0f11;--sf:#0f1a1d;--sf2:#152024;--br:rgba(8,145,178,.3);--br2:rgba(8,145,178,.6);--tx:#d0eaf0;--mt:#5f9baa;--lb:#22d3ee;--er:#ef4444;--wn:#f59e0b;--ok:#22c55e;--r:10px;--r2:6px;--sh:0 4px 24px rgba(0,0,0,.5);--iw:210px;--lw:158px;--ih:29px;}
-#amb{position:relative;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:var(--tx);margin-top:-31px;width:100%;}
-#amb *{box-sizing:border-box;}
-#amb-g{display:grid;grid-template-columns:minmax(290px,.85fr) minmax(0,1.6fr) minmax(0,1fr);gap:14px;width:100%;margin-bottom:14px;align-items:start;}
-.ac{background:var(--sf);border:1px solid var(--br);border-radius:var(--r);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;margin-top:-27px;height:732px;min-width:0;}
-.ac-head{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--sf2);border-bottom:1px solid var(--br);flex-shrink:0;}
-.ac-title{font-size:13px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--al);flex:1;}
-.ac-body{padding:14px 16px 16px;overflow-y:auto;flex:1;min-height:0;}
-.ac-body::-webkit-scrollbar{width:5px;}.ac-body::-webkit-scrollbar-thumb{background:var(--a);border-radius:3px;}.ac-body::-webkit-scrollbar-track{background:var(--bg);}
-.ac-body{scrollbar-width:thin;scrollbar-color:var(--a) var(--bg);}
-.adot{width:7px;height:7px;border-radius:50%;background:var(--mt);flex-shrink:0;transition:background .4s;}
-.adot.on{background:var(--ok);box-shadow:0 0 6px var(--ok);animation:apulse 1.4s infinite;}
-@keyframes apulse{0%,100%{opacity:1}50%{opacity:.4}}
-#amb-tb{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--sf2);border-bottom:1px solid var(--br);border-radius:var(--r) var(--r) 0 0;flex-shrink:0;flex-wrap:nowrap;}
-.atbl{font-size:12px;font-weight:600;color:var(--lb);white-space:nowrap;flex-shrink:0;cursor:help;}
-#amb-tb select{height:26px;font-size:12px;background:var(--bg);color:var(--tx);border:1px solid var(--br2);border-radius:var(--r2);padding:0 20px 0 6px;cursor:pointer;width:auto;max-width:130px;outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2322d3ee'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;flex-shrink:1;}
-.asec{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mt);padding:5px 0 3px;margin:4px 0 2px;border-bottom:1px solid var(--br);}
-.af{display:flex;flex-direction:row;align-items:center;gap:10px;margin-bottom:10px;margin-top:4px;width:100%;}
-.afl{width:var(--lw);min-width:var(--lw);flex-shrink:0;font-size:12px;font-weight:600;color:var(--lb);cursor:help;}
-.afi{display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
-#amb input[type="text"],#amb input[type="password"],#amb input[type="number"],#amb select{height:var(--ih);width:var(--iw);background:var(--bg);border:1px solid var(--br2);border-radius:var(--r2);color:var(--tx);padding:0 8px;font-size:12px;outline:none;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s;}
-#amb select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2322d3ee'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;}
-#amb input:focus,#amb select:focus{border-color:var(--al);box-shadow:0 0 0 3px var(--aglow);}
-#amb input:hover,#amb select:hover{border-color:var(--al);}
-#amb select:disabled,#amb input:disabled{opacity:.45;cursor:not-allowed;}
-#amb select option{background:var(--sf);color:var(--tx);}
-#amb input[type="checkbox"]{width:15px;height:15px;-webkit-appearance:auto;appearance:auto;accent-color:var(--a);cursor:pointer;flex-shrink:0;background:none;border:none;padding:0;}
-#amb input[type="number"]{-webkit-appearance:textfield;appearance:textfield;}
-.ainv{border-color:var(--er)!important;color:var(--er)!important;}
-#amb button{background:var(--a);border:none;border-radius:var(--r2);color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:7px 14px;letter-spacing:.3px;transition:filter .15s;white-space:nowrap;flex-shrink:0;}
-#amb button:hover{filter:brightness(1.15);}
-#amb button:disabled{opacity:.45;cursor:not-allowed;}
-.amd button,.amb-box button,#amb-mw button{background:var(--a);border:none;border-radius:var(--r2);color:#fff;cursor:pointer;font-size:12px;font-weight:600;padding:7px 14px;letter-spacing:.3px;transition:filter .15s;white-space:nowrap;}
-.amd button:hover,.amb-box button:hover,#amb-mw button:hover{filter:brightness(1.15);}
-.amd button:disabled,.amb-box button:disabled{opacity:.45;cursor:not-allowed;}
-.amd .ab-sec,.amb-box .ab-sec{background:#444!important;}
-.amd .ab-dng,.amb-box .ab-dng{background:#b54708!important;}
-.ab-sec{background:#444!important;}
-.ab-dng{background:#b54708!important;}
-.aw{color:var(--wn);font-size:11px;display:none;margin-top:2px;}
-.aw.on{display:block;}
-.apw{color:var(--wn);font-size:11px;display:none;margin:0 0 6px;}
-.apw.on{display:block;}
-.apop{display:none;background:rgba(34,197,94,.15);color:var(--ok);border:1px solid rgba(34,197,94,.35);padding:5px 10px;border-radius:var(--r2);margin-top:6px;font-size:12px;font-weight:600;}
-.atst{font-size:11px;color:var(--al);white-space:nowrap;visibility:hidden;flex-shrink:0;}
-.atst.on{visibility:visible;}
-.aact{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
-.atog{position:relative;display:inline-block;width:38px;height:20px;flex-shrink:0;cursor:pointer;}
-.atog input{opacity:0;width:0;height:0;position:absolute;}
-.aslide{position:absolute;cursor:pointer;inset:0;background:var(--bg);border:1px solid var(--br2);border-radius:20px;transition:background .2s,border-color .2s;}
-.aslide:before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--mt);border-radius:50%;transition:transform .2s,background .2s;}
-.atog input:checked+.aslide{background:var(--adim);border-color:var(--al);}
-.atog input:checked+.aslide:before{transform:translateX(18px);background:var(--al);}
-.aog{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:6px;}
-.aor{display:flex;align-items:center;justify-content:space-between;gap:6px;}
-.aol{font-size:12px;font-weight:600;color:var(--lb);cursor:help;flex:1;min-width:0;}
-.aht{display:none;background:var(--sf2);border-left:3px solid var(--a);border-radius:4px;color:var(--mt);font-size:11px;line-height:1.5;margin:0 0 8px;padding:5px 8px;}
-.ams{position:relative;width:var(--iw);height:var(--ih);background:var(--bg);border:1px solid var(--br2);border-radius:var(--r2);cursor:pointer;display:flex;align-items:center;padding:0 24px 0 8px;font-size:12px;color:var(--tx);flex-shrink:0;user-select:none;overflow:visible;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27%3E%3Cpath d=%27M0 0l5 6 5-6z%27 fill=%27%2322d3ee%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 8px center;}
-.ams:hover{border-color:var(--al);}
-.amsl{display:none;position:absolute;top:100%;left:0;z-index:200;width:var(--iw);background:var(--sf);border:1px solid var(--br2);border-radius:0 0 var(--r2) var(--r2);box-shadow:0 8px 24px rgba(0,0,0,.6);padding:4px 0;}
-.amsl label{display:flex;align-items:center;gap:6px;padding:4px 10px;color:var(--tx);font-weight:400;cursor:pointer;font-size:12px;}
-.amsl label:hover{background:rgba(8,145,178,.18);}
-.amsl input[type="checkbox"]{width:14px!important;height:14px!important;accent-color:var(--a)!important;}
-#amb-mp,#amb-lp{background:var(--sf);border:1px solid var(--br);border-radius:var(--r);box-shadow:var(--sh);display:flex;flex-direction:column;overflow:hidden;height:732px;margin-top:-27px;min-width:0;}
-.altb{display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--sf2);border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap;}
-.alr{margin-left:auto;display:flex;align-items:center;gap:6px;}
-.alp{background:var(--bg);border:none;color:#b0b8d0;font-family:'Consolas','JetBrains Mono',monospace;font-size:12px;line-height:1.65;overflow-y:auto;padding:10px 14px;white-space:pre-wrap;word-break:break-word;flex:1;margin:0;min-height:0;}
-.alp::-webkit-scrollbar{width:5px;}.alp::-webkit-scrollbar-thumb{background:var(--a);border-radius:3px;}.alp::-webkit-scrollbar-track{background:var(--bg);}
-.alp{scrollbar-width:thin;scrollbar-color:var(--a) var(--bg);}
-.skipped-line{color:var(--wn);}
-.alh{background:rgba(8,145,178,.22);border-radius:2px;color:var(--ok);}
-
-.adbl{font-size:12px;font-weight:600;color:var(--lb);white-space:nowrap;cursor:help;flex-shrink:0;}
-.asw{position:relative;display:flex;align-items:center;flex-shrink:0;}
-.asi{height:26px;background:var(--bg);border:1px solid var(--br2);border-radius:var(--r2);color:var(--tx);font-size:12px;padding:0 22px 0 8px;outline:none;width:160px;-webkit-appearance:none;appearance:none;background-image:none!important;}
-.asi:focus{box-shadow:0 0 0 2px var(--aglow);border-color:var(--al);}
-.asi::placeholder{color:rgba(255,255,255,.25);}
-#amb .asx{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none!important;border:none!important;box-shadow:none!important;padding:0!important;margin:0;cursor:pointer;color:var(--mt);line-height:0;width:12px;height:12px;display:none;align-items:center;justify-content:center;outline:none!important;flex-shrink:0;-webkit-appearance:none;appearance:none;filter:none!important;min-width:0;}
-#amb .asx:hover{color:var(--tx);}
-#amb .asx svg{display:block;pointer-events:none;}
-.asc{font-size:11px;color:var(--tx);white-space:nowrap;visibility:hidden;flex-shrink:0;}
-.asc.on{visibility:visible;}
-.amd{display:none;position:fixed;z-index:9999;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(3px);align-items:center;justify-content:center;}
-.amd.open{display:flex;}
-.amb-box{background:var(--sf);border:1px solid var(--br2);border-radius:var(--r);box-shadow:0 24px 60px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;width:90%;max-width:820px;max-height:90vh;}
-.amh{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--sf2);border-bottom:1px solid var(--br2);font-weight:700;font-size:13px;color:var(--al);flex-shrink:0;}
-.ambo{padding:12px 16px;overflow-y:auto;flex:1;}
-.amf{padding:10px 16px;border-top:1px solid var(--br);background:var(--sf2);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
-.apc{font-size:13px;color:var(--al);margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;}
-.acr{cursor:pointer;color:var(--al);font-weight:500;}.acr:hover{color:var(--er);text-decoration:underline;}.acs{color:var(--mt);}
-.apg{border:1px solid var(--br);overflow-y:auto;max-height:340px;padding:4px;}
-.apr{display:flex;align-items:center;gap:6px;padding:3px 4px;}
-.apn{flex:1;cursor:pointer;color:var(--al);font-size:12px;}.apr.file .apn{color:var(--tx);cursor:default;}
-#amb-et{width:100%;height:380px;background:var(--bg);color:var(--tx);font-family:monospace;font-size:12px;border:1px solid var(--br2);border-radius:var(--r2);padding:8px;resize:none;outline:none;}
-#amb-et:focus{box-shadow:0 0 0 2px var(--aglow);}
-.appr{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid var(--br);}
-.appn{flex:1;cursor:pointer;color:var(--al);font-size:12px;}.appr.file .appn{color:var(--tx);cursor:default;}.appr.dim{opacity:.35;}.appr.dim .appn{cursor:not-allowed;}
-#amb-ppg{max-height:320px;overflow-y:auto;}
-.ame{color:var(--er);font-size:11px;display:none;margin-top:2px;}.ame.on{display:block;}
-#amb-mw{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--sf);color:var(--wn);border:1px solid var(--br2);border-radius:var(--r);padding:14px 36px 14px 20px;width:auto;max-width:480px;box-shadow:var(--sh);z-index:8000;font-size:13px;line-height:1.5;text-align:center;}
-#amb-mwx{position:absolute!important;top:-4px!important;right:-4px!important;background:transparent!important;border:none!important;box-shadow:none!important;color:var(--wn)!important;font-size:18px!important;font-weight:bold!important;cursor:pointer!important;padding:0!important;line-height:1!important;width:auto!important;height:auto!important;filter:none!important;}
-@media(max-width:1200px){#amb-g{grid-template-columns:1fr 1fr;}#amb-sc{grid-column:1/-1;}.ac,#amb-mp,#amb-lp{height:auto;min-height:400px;}}
-@media(max-width:768px){#amb-g{grid-template-columns:1fr;}#amb-mp,#amb-lp{height:360px;min-height:360px;}}
-@keyframes ashk{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-5px)}}
-</style>
+<link rel="stylesheet" href="/plugins/automover/automover.css">
 
 <div id="amb">
 <div id="amb-g">
 
-<!-- SETTINGS COLUMN -->
 <div id="amb-sc">
 <div class="ac">
 
@@ -197,20 +128,26 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   <span class="ac-title" id="act" style="margin-left:-4px;">Automover</span>
   <div class="adot" id="adot" style="margin-left:2px;"></div>
   <span id="astxt" style="font-size:11px;color:var(--mt);margin-left:0;">Idle</span>
-
 </div>
 
-<!-- AUTOMOVER PANEL -->
 <div id="aap" class="ac-body">
 
 <div class="asec">Controls</div>
 <div class="aact">
-  <button type="button" id="asaveb">Save &amp; Start</button>
-  <button type="button" id="astopb">Stop</button>
-  <button type="button" id="amnb">Move Now</button>
+  <button type="button" id="amnb" data-tipster="Run the mover now">Move</button>
+  <button type="button" id="amb-schedule-btn" data-tipster="Create or update a scheduled job">Schedule It</button>
+  <button type="button" id="amb-cancel-edit-btn" data-tipster="Cancel editing this schedule" style="display:none;">Cancel</button>
 </div>
+
+<div id="amb-banner">
+  <div class="amb-banner-inner">
+    <span id="amb-banner-text" class="amb-banner-text"></span>
+    <button type="button" id="astopb" data-tipster="Stop the current move after it finishes the current file">Stop</button>
+    <span id="amb-stop-toast">Stop requested</span>
+  </div>
+</div>
+
 <div id="asp" class="apop"></div>
-<div id="astp" class="apop"></div>
 <div id="amnp" class="apop"></div>
 
 <div class="asec" style="margin-top:8px;">Core</div>
@@ -222,7 +159,7 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
 <div id="apw" class="apw">&#9888; This pool has no share with mover direction pool &rarr; array or pool &rarr; pool assigned</div>
 
 <div class="af">
-  <span class="afl" data-tip="Disk usage % that triggers the mover">Threshold (%):</span>
+  <span class="afl" data-tip="Disk usage % that the pool has to be at in order for the move to proceed">Threshold (%):</span>
   <div class="afi">
     <select id="athr"><?php $tv=(int)($settings['THRESHOLD']??0); for($i=0;$i<=100;$i++) echo'<option value="'.htmlspecialchars($i).'"'.($tv===$i?' selected':'').'>'.htmlspecialchars($i).'</option>'; ?></select>
   </div>
@@ -241,71 +178,83 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   <span class="afl" data-tip="Select scheduling frequency">Scheduling:</span>
   <div class="afi">
     <select id="acm">
-      <?php foreach(['hourly'=>'Hourly','daily'=>'Daily','weekly'=>'Weekly','monthly'=>'Monthly'] as $v=>$l): ?>
-      <option value="<?=$v?>" <?=$cron_mode===$v?'selected':''?>><?=$l?></option>
-      <?php endforeach; ?>
+      <option value="hourly">Hourly</option>
+      <option value="daily" selected>Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
     </select>
   </div>
 </div>
 
 <div id="aho" style="display:none;">
   <div class="af"><span class="afl" data-tip="How often to run">Frequency:</span>
-    <div class="afi"><select id="ahf"><?php $hf=$settings['HOURLY_FREQUENCY']??'4'; foreach([4,6,8] as $i) echo"<option value=\"$i\"".($hf==$i?' selected':'').">Every $i Hours</option>"; ?></select></div>
+    <div class="afi"><select id="ahf">
+      <option value="4">Every 4 Hours</option>
+      <option value="6">Every 6 Hours</option>
+      <option value="8">Every 8 Hours</option>
+    </select></div>
   </div>
 </div>
 <div id="ado" style="display:none;">
-  <div class="af"><span class="afl" data-tip="Time of day to run">Time Of Day:</span>
-    <div class="afi"><select id="adt"><?php for($h=0;$h<24;$h++){$t=str_pad($h,2,'0',STR_PAD_LEFT).':00';echo"<option value=\"$t\"".((($settings['DAILY_TIME']??'')===$t)?' selected':'').">$t</option>";}?></select></div>
+  <div class="af"><span class="afl" data-tip="Hour of day to run">Hour:</span>
+    <div class="afi"><select id="adt"><?php for($h=0;$h<24;$h++){$hv=str_pad($h,2,'0',STR_PAD_LEFT);echo"<option value=\"$hv\">$hv</option>";}?></select></div>
+  </div>
+  <div class="af"><span class="afl" data-tip="Minute to run">Minute:</span>
+    <div class="afi"><select id="adm"><?php for($m=0;$m<60;$m++){$mv=str_pad($m,2,'0',STR_PAD_LEFT);echo"<option value=\"$mv\">$mv</option>";}?></select></div>
   </div>
 </div>
 <div id="awo" style="display:none;">
   <div class="af"><span class="afl" data-tip="Day of the week to run">Day Of Week:</span>
-    <div class="afi"><select id="awd"><?php foreach(['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as $d) echo"<option value=\"$d\"".((($settings['WEEKLY_DAY']??'')===$d)?' selected':'').">$d</option>";?></select></div>
+    <div class="afi"><select id="awd">
+      <?php foreach(['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as $d) echo"<option value=\"$d\">$d</option>";?>
+    </select></div>
   </div>
-  <div class="af"><span class="afl" data-tip="Time of day">Time Of Day:</span>
-    <div class="afi"><select id="awt"><?php for($h=0;$h<24;$h++){$t=str_pad($h,2,'0',STR_PAD_LEFT).':00';echo"<option value=\"$t\"".((($settings['WEEKLY_TIME']??'')===$t)?' selected':'').">$t</option>";}?></select></div>
+  <div class="af"><span class="afl" data-tip="Hour of day">Hour:</span>
+    <div class="afi"><select id="awt"><?php for($h=0;$h<24;$h++){$hv=str_pad($h,2,'0',STR_PAD_LEFT);echo"<option value=\"$hv\">$hv</option>";}?></select></div>
+  </div>
+  <div class="af"><span class="afl" data-tip="Minute">Minute:</span>
+    <div class="afi"><select id="awm"><?php for($m=0;$m<60;$m++){$mv=str_pad($m,2,'0',STR_PAD_LEFT);echo"<option value=\"$mv\">$mv</option>";}?></select></div>
   </div>
 </div>
 <div id="amo" style="display:none;">
   <div class="af"><span class="afl" data-tip="Day of the month to run">Day Of Month:</span>
-    <div class="afi"><select id="amdy"><?php for($d=1;$d<=31;$d++){$dy=str_pad($d,2,'0',STR_PAD_LEFT);echo"<option value=\"$dy\"".((($settings['MONTHLY_DAY']??'')===$dy)?' selected':'').">$dy</option>";}?></select></div>
+    <div class="afi"><select id="amdy"><?php for($d=1;$d<=31;$d++){$dy=str_pad($d,2,'0',STR_PAD_LEFT);echo"<option value=\"$dy\">$dy</option>";}?></select></div>
   </div>
-  <div class="af"><span class="afl" data-tip="Time of day">Time Of Day:</span>
-    <div class="afi"><select id="amt"><?php for($h=0;$h<24;$h++){$t=str_pad($h,2,'0',STR_PAD_LEFT).':00';echo"<option value=\"$t\"".((($settings['MONTHLY_TIME']??'')===$t)?' selected':'').">$t</option>";}?></select></div>
+  <div class="af"><span class="afl" data-tip="Hour of day">Hour:</span>
+    <div class="afi"><select id="amt"><?php for($h=0;$h<24;$h++){$hv=str_pad($h,2,'0',STR_PAD_LEFT);echo"<option value=\"$hv\">$hv</option>";}?></select></div>
+  </div>
+  <div class="af"><span class="afl" data-tip="Minute">Minute:</span>
+    <div class="afi"><select id="amm"><?php for($m=0;$m<60;$m++){$mv=str_pad($m,2,'0',STR_PAD_LEFT);echo"<option value=\"$mv\">$mv</option>";}?></select></div>
   </div>
 </div>
 
 <div class="asec" style="margin-top:8px;">Containers</div>
 <div class="af">
   <span class="afl" data-tip="Comma-separated list of containers to stop during moves">Stop Containers:</span>
-  <div class="afi"><input type="text" id="acont" placeholder="e.g. qbit-manage,cross-seed" value="<?=htmlspecialchars($settings['CONTAINER_NAMES']??'')?>"></div>
+  <div class="afi"><div class="amb-clr-wrap"><input type="text" id="acont" placeholder="e.g. qbit-manage,cross-seed" value="<?=htmlspecialchars($settings['STOP_CONTAINERS']??'')?>"><button type="button" class="amb-clr" data-target="acont"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div></div>
 </div>
 
-<!-- Conditional sections - ordered to match the Options grid above -->
 
-<!-- 2. Exclusions (aext) -->
 <div id="aex-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">Exclusions</div>
   <div class="af"><span class="afl" data-tip="Click to open the file picker and manage exclusions">Exclusions:</span>
     <div class="afi">
       <input type="text" id="aexf" readonly value="Click to open file picker" style="cursor:pointer;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27%3E%3Cpath d=%27M0 0l5 6 5-6z%27 fill=%27%2322d3ee%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;">
-      <button type="button" id="aexlb" style="margin-top:4px;">Exclusions List</button>
+      <button type="button" id="aexlb" data-tipster="View and manually edit the exclusions list" style="margin-top:4px;">Exclusions List</button>
     </div>
   </div>
 </div>
 
-<!-- 4. Size Based Filter (aszf) -->
 <div id="asz-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">Size Filter</div>
   <div class="af"><span class="afl" data-tip="Only move files larger than this size">Min Size:</span>
     <div class="afi"><div style="display:flex;gap:4px;width:var(--iw);">
-      <select id="aszm" style="width:140px;flex-shrink:0;"><?php $sv=(int)($settings['SIZE_MB']??1); for($i=1;$i<=999;$i++) echo'<option value="'.$i.'"'.($sv===$i?' selected':'').'>'.$i.'</option>'; ?></select>
+      <select id="aszm" style="width:140px;flex-shrink:0;"><?php $sv=(int)($settings['SIZE']??1); for($i=1;$i<=999;$i++) echo'<option value="'.$i.'"'.($sv===$i?' selected':'').'>'.$i.'</option>'; ?></select>
       <select id="aszu" style="flex:1;"><?php $su=$settings['SIZE_UNIT']??'MB'; foreach(['MB','GB','TB'] as $u) echo'<option value="'.$u.'"'.($su===$u?' selected':'').'>'.$u.'</option>'; ?></select>
     </div></div>
   </div>
 </div>
 
-<!-- 5. Notifications (antf) -->
 <div id="an-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">Notification Service</div>
   <div class="af">
@@ -322,7 +271,6 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   <div id="awh-box"></div>
 </div>
 
-<!-- 6. Age Based Filter (aagf) -->
 <div id="aag-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">Age Filter</div>
   <div class="af"><span class="afl" data-tip="Only move files older than this many days">Age (days):</span>
@@ -330,11 +278,10 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   </div>
 </div>
 
-<!-- 11. CPU & I/O Priorities (apri) -->
 <div id="apr-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">CPU &amp; I/O Priorities</div>
   <div class="af"><span class="afl" data-tip="CPU scheduling priority (-20=highest, 19=lowest)">CPU Priority:</span>
-    <div class="afi"><select id="acpu"><?php $cp=$settings['PROCESS_PRIORITY']??'0'; for($i=-20;$i<=19;$i++) echo"<option value=\"$i\"".($cp==$i?' selected':'').">$i</option>"; ?></select></div>
+    <div class="afi"><select id="acpu"><?php $cp=$settings['CPU_PRIORITY']??'0'; for($i=-20;$i<=19;$i++) echo"<option value=\"$i\"".($cp==$i?' selected':'').">$i</option>"; ?></select></div>
   </div>
   <div class="af"><span class="afl" data-tip="I/O scheduling priority">I/O Priority:</span>
     <div class="afi"><select id="aiop">
@@ -345,18 +292,16 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   </div>
 </div>
 
-<!-- 12. Pre/Post Scripts (ascp) -->
 <div id="asc-sec" style="display:none;">
-  <div class="asec" style="margin-top:8px;">Pre / Post Scripts</div>
+  <div class="asec" style="margin-top:8px;">Pre &amp; Post Scripts</div>
   <div class="af"><span class="afl" data-tip="Script to run at the start of every session">Pre-Move Script:</span>
-    <div class="afi"><input type="text" id="apres" placeholder="/mnt/user/scripts/pre_move.sh" value="<?=htmlspecialchars($settings['PRE_SCRIPT']??'')?>"></div>
+    <div class="afi"><div class="amb-clr-wrap"><input type="text" id="apres" placeholder="/mnt/user/scripts/pre_move.sh" value="<?=htmlspecialchars($settings['PRE_SCRIPT']??'')?>"><button type="button" class="amb-clr" data-target="apres"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div></div>
   </div>
   <div class="af"><span class="afl" data-tip="Script to run at the end of every session">Post-Move Script:</span>
-    <div class="afi"><input type="text" id="aposts" placeholder="/mnt/user/scripts/post_move.sh" value="<?=htmlspecialchars($settings['POST_SCRIPT']??'')?>"></div>
+    <div class="afi"><div class="amb-clr-wrap"><input type="text" id="aposts" placeholder="/mnt/user/scripts/post_move.sh" value="<?=htmlspecialchars($settings['POST_SCRIPT']??'')?>"><button type="button" class="amb-clr" data-target="aposts"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div></div>
   </div>
 </div>
 
-<!-- 13. Jdupes (ajdp) -->
 <div id="ahsh-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">Jdupes Hash Location</div>
   <div class="af"><span class="afl" data-tip="Share to save the jdupes hash database">Hash Location:</span>
@@ -364,17 +309,16 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   </div>
 </div>
 
-<!-- 14. Qbittorrent (aqbt) -->
 <div id="aqb-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">qBittorrent</div>
   <div class="af"><span class="afl" data-tip="host:port only, no http://">Host:</span>
-    <div class="afi"><input type="text" id="aqbh" placeholder="10.0.0.1:8080" value="<?=htmlspecialchars($settings['QBITTORRENT_HOST']??'')?>"><span class="aw" id="aqbhw">&#9888; Required (no http://)</span></div>
+    <div class="afi"><div class="amb-clr-wrap"><input type="text" id="aqbh" placeholder="10.0.0.1:8080" value="<?=htmlspecialchars($settings['QBITTORRENT_HOST']??'')?>"><button type="button" class="amb-clr" data-target="aqbh"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div><span class="aw" id="aqbhw">&#9888; Required (no http://)</span></div>
   </div>
   <div class="af"><span class="afl" data-tip="WebUI username">Username:</span>
-    <div class="afi"><input type="text" id="aqbu" autocomplete="off" value="<?=htmlspecialchars($settings['QBITTORRENT_USERNAME']??'')?>"><span class="aw" id="aqbuw">&#9888; Required</span></div>
+    <div class="afi"><div class="amb-clr-wrap"><input type="text" id="aqbu" autocomplete="off" value="<?=htmlspecialchars($settings['QBITTORRENT_USERNAME']??'')?>"><button type="button" class="amb-clr" data-target="aqbu"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div><span class="aw" id="aqbuw">&#9888; Required</span></div>
   </div>
   <div class="af"><span class="afl" data-tip="WebUI password">Password:</span>
-    <div class="afi"><input type="text" id="aqbp" autocomplete="off" style="-webkit-text-security:disc;" value="<?=htmlspecialchars($settings['QBITTORRENT_PASSWORD']??'')?>"><span class="aw" id="aqbpw">&#9888; Required</span></div>
+    <div class="afi"><div class="amb-clr-wrap"><input type="text" id="aqbp" autocomplete="off" style="-webkit-text-security:disc;" value="<?=htmlspecialchars($settings['QBITTORRENT_PASSWORD']??'')?>"><button type="button" class="amb-clr" data-target="aqbp"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div><span class="aw" id="aqbpw">&#9888; Required</span></div>
   </div>
   <div class="af"><span class="afl" data-tip="Torrents newer than this (days) are ignored">Days From:</span>
     <div class="afi"><select id="aqbdf"><?php $dfv=(int)($settings['QBITTORRENT_DAYS_FROM']??0); for($i=0;$i<=99;$i++) echo'<option value="'.htmlspecialchars($i).'"'.($dfv===$i?' selected':'').'>'.htmlspecialchars($i).'</option>'; ?></select></div>
@@ -388,26 +332,25 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   <div id="apyw" data-py="<?=file_exists('/usr/bin/python3')?'1':'0'?>" style="display:none;color:var(--er);font-size:11px;margin-bottom:6px;">&#9888; Python3 not installed &mdash; required for Qbit Script</div>
 </div>
 
-<!-- Options slider grid -->
 <div class="asec" style="margin-top:8px;">Options</div>
 <div class="aog">
 <?php
 $opts=[
-  'aaut'=>['AUTOSTART',               'Autostart on Boot',           'Start automatically when Unraid boots'],
-  'aext'=>['EXCLUSIONS_ENABLED',      'Exclusions',                  'Exclude specific files and folders from moving'],
+  'aaut'=>['AUTOSTART_ON_BOOT',               'Autostart on Boot',           'Start automatically when Unraid boots'],
+  'aext'=>['EXCLUSIONS',      'Exclusions',                  'Exclude specific files and folders from moving'],
   'adr' =>['DRY_RUN',                 'Dry Run',                     'Simulate moves without transferring files'],
   'aszf'=>['SIZE_BASED_FILTER',       'Size Based Filter',           'Only move files larger than the specified MB'],
-  'antf'=>['ENABLE_NOTIFICATIONS',    'Notifications',               'Send notifications when automover starts/finishes'],
+  'antf'=>['NOTIFICATIONS',    'Notifications',               'Send notifications when automover starts/finishes'],
   'aagf'=>['AGE_BASED_FILTER',        'Age Based Filter',            'Only move files older than the specified days'],
-  'atw' =>['FORCE_RECONSTRUCTIVE_WRITE','Force Turbo Write',         'Force Unraid reconstructive write during moves'],
+  'atw' =>['FORCE_TURBO_WRITE','Force Turbo Write',         'Force Unraid reconstructive write during moves'],
   'ahid'=>['HIDDEN_FILTER',           'Hidden Filter',               'Skip files and folders starting with a dot'],
-  'atrm'=>['ENABLE_TRIM',             'SSD Trim',                    'Run SSD trim after the move completes'],
+  'atrm'=>['SSD_TRIM',             'SSD Trim',                    'Run SSD trim after the move completes'],
   'aap2'=>['ALLOW_DURING_PARITY',     'Allow During Parity',         'Allow running during a parity check'],
-  'apri'=>['PRIORITIES',              'CPU &amp; I/O Priorities',    'Enable CPU and I/O scheduling priority controls'],
-  'ascp'=>['ENABLE_SCRIPTS',          'Pre/Post Scripts',            'Run a script at session start and end'],
-  'ajdp'=>['ENABLE_JDUPES',           'Jdupes',                      'Run jdupes fix-hardlinks on shares after moving'],
-  'aqbt'=>['QBITTORRENT_SCRIPT',      'Qbittorrent Move Script',     'Pause qBittorrent torrents before moving'],
-  'acln'=>['ENABLE_CLEANUP',          'Cleanup',                     'Remove empty folders from the selected pool'],
+  'apri'=>['CPU_AND_IO_PRIORITIES',              'CPU &amp; I/O Priorities',    'Enable CPU and I/O scheduling priority controls'],
+  'ascp'=>['PRE_AND_POST_SCRIPTS',          'Pre &amp; Post Scripts',            'Run a script at session start and end'],
+  'ajdp'=>['JDUPES',           'Jdupes',                      'Run jdupes fix-hardlinks on shares after moving'],
+  'aqbt'=>['QBITTORRENT_MOVE_SCRIPT',      'Qbittorrent Move Script',     'Pause qBittorrent torrents before moving'],
+  'acln'=>['CLEANUP',          'Cleanup',                     'Remove empty folders from the selected pool'],
   'asac'=>['STOP_ALL_CONTAINERS',     'Stop All Containers',         'Stop all running containers during moves'],
 ];
 foreach($opts as $id=>$info): ?>
@@ -418,9 +361,8 @@ foreach($opts as $id=>$info): ?>
 <?php endforeach; ?>
 </div>
 
-</div><!-- #aap -->
+</div>
 
-<!-- MANUAL MOVE PANEL -->
 <div id="ammp" class="ac-body" style="display:none;">
 <p style="font-size:11px;color:var(--mt);margin:0 0 10px;">* Only Dry Run, Cleanup, and Notifications from saved settings apply.</p>
 <div class="af"><span class="afl" data-tip="Source folder to move from">Source:</span>
@@ -436,16 +378,15 @@ foreach($opts as $id=>$info): ?>
   <div class="aor"><span class="aol" data-tip="Keep destination fully in sync with source">Full Sync</span><label class="atog"><input type="checkbox" id="ammsy"><span class="aslide"></span></label></div>
 </div>
 <span class="ame" id="ammoe" style="max-width:320px;">&#9888; Select one mode</span>
-<div class="aact" style="margin-top:12px;"><button type="button" id="ammst">Start</button></div>
+<div class="aact" style="margin-top:12px;"><button type="button" id="ammst" data-tipster="Start the manual rsync operation">Start</button></div>
 <div id="ammp2" class="apop"></div>
-</div><!-- #ammp -->
+</div>
 
-</div><!-- .ac -->
-</div><!-- #amb-sc -->
+</div>
+</div>
 
-<!-- FILES MOVED LOG -->
 <div id="amb-mp">
-  <div class="ac-head" style="border-radius:var(--r) var(--r) 0 0;"><span class="ac-title" style="margin-left:-4px;">Files Moved</span><span id="amb-lc" style="font-size:11px;color:var(--al);margin-left:auto;padding:0;"></span></div>
+  <div class="ac-head" style="border-radius:var(--r) var(--r) 0 0;"><span class="ac-title" style="margin-left:-4px;">Files Moved</span><span id="amb-lc" style="font-size:11px;color:var(--mt);margin-left:auto;padding:0;"></span></div>
   <div class="altb">
     <div class="asw" style="margin-left:-4px;">
       <input type="text" class="asi" id="amvs" placeholder="Search&hellip;" autocomplete="off">
@@ -454,16 +395,15 @@ foreach($opts as $id=>$info): ?>
     <span class="asc" id="amvc"></span>
     <div class="alr" style="margin-right:-10px;">
       <span class="atst" id="amvt"></span>
-      <button type="button" id="amvcl">Clear</button>
-      <button type="button" id="amvcp">Copy</button>
-      <button type="button" id="amvtp">&#8679;</button>
-      <button type="button" id="amvbt">&#8681;</button>
+      <button type="button" id="amvcl" data-tipster="Clear files moved log">Clear</button>
+      <button type="button" id="amvcp" data-tipster="Copy log to clipboard">Copy</button>
+      <button type="button" id="amvtp" data-tipster="Scroll to top">&#8679;</button>
+      <button type="button" id="amvbt" data-tipster="Auto-scroll to bottom (toggles)">&#8681;</button>
     </div>
   </div>
   <pre class="alp" id="amvl">Loading&hellip;</pre>
 </div>
 
-<!-- ACTIVITY LOG -->
 <div id="amb-lp">
   <div class="ac-head" style="border-radius:var(--r) var(--r) 0 0;">
     <span class="ac-title" style="margin-left:-10px;">Activity Log</span>
@@ -481,58 +421,92 @@ foreach($opts as $id=>$info): ?>
     </div>
     <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-top:1px solid var(--br);margin-left:-12px;">
       <span class="atst" id="algt"></span>
-      <button type="button" id="algcl">Clear</button>
-      <button type="button" id="algcp">Copy</button>
-      <button type="button" id="algtp">&#8679;</button>
-      <button type="button" id="algbt" style="margin-right:-10px;">&#8681;</button>
+      <button type="button" id="algcl" data-tipster="Clear activity log">Clear</button>
+      <button type="button" id="algcp" data-tipster="Copy log to clipboard">Copy</button>
+      <button type="button" id="algtp" data-tipster="Scroll to top">&#8679;</button>
+      <button type="button" id="algbt" data-tipster="Auto-scroll to bottom (toggles)" style="margin-right:-10px;">&#8681;</button>
     </div>
   </div>
   <pre class="alp" id="algl">Automover log not found</pre>
 </div>
 
-</div><!-- #amb-g -->
-</div><!-- #amb -->
+</div>
 
-<!-- MODALS -->
+<div id="amb-sched-section" style="width:100%;box-sizing:border-box;padding-bottom:16px;margin-top:4px;">
+  <div id="amb-sched-title" class="asec" style="display:none;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mt);padding:6px 0 4px;margin-bottom:6px;">Scheduled Jobs</div>
+  <div id="amb-schedule-list"></div>
+</div>
+
+</div>
+
+<!-- ── Exclusion file picker modal ──────────────────────────────────────────── -->
 <div class="amd" id="apm">
   <div class="amb-box">
-    <div class="amh"><button type="button" id="apup" style="padding:4px 10px;font-size:12px;">&uarr; Up</button><span>Select Exclusion Paths</span><button type="button" id="apcl" style="margin-left:auto;">Close</button></div>
+    <div class="amh">
+      <button type="button" id="apup" data-tipster="Go up one directory" style="padding:4px 10px;font-size:12px;">&uarr; Up</button>
+      <span>Select Exclusion Paths</span>
+      <button type="button" id="apcl" data-tipster="Close this dialog" style="margin-left:auto;">Close</button>
+    </div>
     <div class="ambo"><div class="apc" id="apcrm"></div><div class="apg" id="apgr"></div></div>
     <div class="amf">
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <div style="display:flex;gap:6px;"><button type="button" id="apad">Add Selected</button><button type="button" id="aprem">Remove Selected</button></div>
-        <div style="display:flex;gap:6px;"><button type="button" id="apadx" style="display:none;">Add as wildcards</button><button type="button" id="apremx" style="display:none;">Remove as wildcards</button></div>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="apad" data-tipster="Add selected paths to exclusions">Add Selected</button>
+          <button type="button" id="aprem" data-tipster="Remove selected paths from exclusions">Remove Selected</button>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="apadx" data-tipster="Add selected file extensions as wildcards (e.g. *.mkv)" style="display:none;">Add as wildcards</button>
+          <button type="button" id="apremx" data-tipster="Remove selected file extensions as wildcards" style="display:none;">Remove as wildcards</button>
+        </div>
         <div id="aptst"></div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- ── Exclusions list (text editor) modal ──────────────────────────────────── -->
 <div class="amd" id="aem">
   <div class="amb-box" style="max-width:640px;">
     <div class="amh"><span>View / Edit Exclusions</span></div>
-    <div class="ambo"><p style="font-size:11px;color:var(--mt);margin:0 0 8px;">Only pool paths work (e.g. /mnt/cache/folder). Do not use /mnt/disk1, /mnt/user, or /mnt/user0.</p><textarea id="amb-et"></textarea></div>
-    <div class="amf"><div style="display:flex;gap:6px;"><button type="button" id="aecp">Copy</button><button type="button" id="aesv">Save</button></div><button type="button" id="aecl2">Close</button></div>
+    <div class="ambo">
+      <p style="font-size:11px;color:var(--mt);margin:0 0 8px;">Only pool paths work (e.g. /mnt/cache/folder). Do not use /mnt/disk1, /mnt/user, or /mnt/user0.</p>
+      <textarea id="amb-et"></textarea>
+    </div>
+    <div class="amf">
+      <div style="display:flex;gap:6px;">
+        <button type="button" id="aecp" data-tipster="Copy exclusions to clipboard">Copy</button>
+        <button type="button" id="aesv" data-tipster="Save changes to exclusions list">Save</button>
+      </div>
+      <button type="button" id="aecl2" data-tipster="Close this dialog">Close</button>
+    </div>
   </div>
 </div>
 
+<!-- ── Path picker modal (manual move) ─────────────────────────────────────── -->
 <div class="amd" id="appm">
   <div class="amb-box" style="max-width:700px;height:520px;">
-    <div class="amh"><button type="button" id="appup" style="padding:4px 10px;font-size:12px;">&uarr; Up</button><span>Select Path</span><button type="button" id="appcl" style="margin-left:auto;">Close</button></div>
+    <div class="amh">
+      <button type="button" id="appup" data-tipster="Go up one directory" style="padding:4px 10px;font-size:12px;">&uarr; Up</button>
+      <span>Select Path</span>
+      <button type="button" id="appcl" data-tipster="Close this dialog" style="margin-left:auto;">Close</button>
+    </div>
     <div class="ambo" style="display:flex;flex-direction:column;padding-bottom:0;overflow:hidden;">
       <div class="apc" id="appcrm" style="flex-shrink:0;"></div>
       <div id="amb-ppg" style="flex:1;overflow-y:auto;"></div>
     </div>
     <div class="amf">
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <button type="button" id="appcr">Create Folder</button>
+        <button type="button" id="appcr" data-tipster="Create a new folder at the current location">Create Folder</button>
         <div id="appnr" style="display:none;gap:6px;align-items:center;">
           <input type="text" id="appnn" placeholder="Folder name" style="width:160px;height:26px;background:var(--bg);border:1px solid var(--br2);border-radius:var(--r2);color:var(--tx);padding:0 8px;font-size:12px;outline:none;-webkit-appearance:none;appearance:none;">
-          <button type="button" id="appnok">Create</button>
-          <button type="button" id="appnnc" class="ab-sec">Cancel</button>
+          <button type="button" id="appnok" data-tipster="Create this folder">Create</button>
+          <button type="button" id="appnnc" data-tipster="Cancel folder creation" class="ab-sec">Cancel</button>
         </div>
       </div>
-      <div style="display:flex;gap:6px;"><button type="button" id="appclr">Clear</button><button type="button" id="appcnf">Select</button></div>
+      <div style="display:flex;gap:6px;">
+        <button type="button" id="appclr" data-tipster="Clear the current selection">Clear</button>
+        <button type="button" id="appcnf" data-tipster="Use selected path">Select</button>
+      </div>
     </div>
   </div>
 </div>
@@ -542,423 +516,34 @@ foreach($opts as $id=>$info): ?>
   <button id="amb-mwx" type="button" style="position:absolute;top:8px;right:10px;background:transparent;border:none;box-shadow:none;padding:0;color:#f59e0b;font-size:18px;font-weight:bold;cursor:pointer;line-height:1;width:auto;height:auto;min-width:0;min-height:0;filter:none;border-radius:0;">&times;</button>
   &#9888; Mover Tuning plugin appears to be installed. Having both can cause conflicts.
   <div style="margin-top:8px;">
-    <button type="button" id="amb-mwd">Dismiss Permanently</button>
+    <button type="button" id="amb-mwd" data-tipster="Permanently dismiss this warning — deletes mover_warning_dismissed.txt to re-enable">Dismiss Permanently</button>
     <div id="amb-mwdn" style="display:none;color:var(--ok);font-size:12px;margin-top:4px;">&#10003; Dismissed permanently</div>
     <div style="color:var(--mt);font-size:11px;margin-top:4px;">Delete <b>mover_warning_dismissed.txt</b> from <i>/boot/config/plugins/automover</i> to re-enable.</div>
   </div>
 </div>
 <?php endif; ?>
-<script>
-'use strict';
-function ah(p){return A_H+'/'+p;}
-function showPop(id,msg){const e=document.getElementById(id);if(!e)return;e.textContent=msg;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>{e.style.display='none';},3000);}
-function showToast(id,msg){const e=document.getElementById(id);if(!e)return;e.textContent=msg;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2200);}
-function timeAgo(d){const s=Math.floor((Date.now()-d)/1000);if(s<60)return'<1 min ago';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';}
-function fallbackCopy(t){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);}
-let snStatus=null,snLock=null,snLog=null,snMoved=null;
-let logDebug=false,logAuto=false,movedAuto=false,lastRunTs=null;
 
-function ambSL(on){logDebug=on;logAuto=false;snLog=null;const el=document.getElementById('algl');if(el){el.scrollTop=0;el.dataset.raw='';el.textContent='';}}
+<!-- ── Confirm dialog ───────────────────────────────────────────────────────── -->
+<div class="amd" id="amb-confirm">
+  <div class="amb-box" style="max-width:360px;">
+    <div class="amh"><span id="amb-confirm-title">Confirm</span></div>
+    <div class="ambo" style="padding:16px;"><p id="amb-confirm-msg" style="margin:0;font-size:13px;color:var(--tx);"></p></div>
+    <div class="amf" style="justify-content:flex-end;gap:8px;">
+      <button type="button" id="amb-confirm-cancel" data-tipster="Cancel this action" class="ab-sec">Cancel</button>
+      <button type="button" id="amb-confirm-ok" data-tipster="Confirm and proceed">OK</button>
+    </div>
+  </div>
+</div>
 
-function applyLogSearch(logId,searchId,countId,clearId){
-  const logEl=document.getElementById(logId);if(!logEl)return;
-  const searchEl=document.getElementById(searchId);if(!searchEl)return;
-  const countEl=document.getElementById(countId);
-  const clearEl=document.getElementById(clearId);
-  const term=searchEl.value.trim();
-  const raw=logEl.dataset.raw||'';
-  if(clearEl)clearEl.style.display=term?'flex':'none';
-  if(!term){logEl.textContent=raw||'';if(countEl)countEl.classList.remove('on');return;}
-  const esc=term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const re=new RegExp('('+esc+')','gi');
-  const parts=raw.split(re);let hits=0;
-  logEl.innerHTML='';
-  parts.forEach(p=>{if(re.test(p)){hits++;const m=document.createElement('mark');m.className='alh';m.textContent=p;logEl.appendChild(m);re.lastIndex=0;}else logEl.appendChild(document.createTextNode(p));});
-  if(countEl){countEl.textContent=hits+' match'+(hits!==1?'es':'');countEl.classList.toggle('on',hits>0);}
-}
+<!-- ── Alert dialog ─────────────────────────────────────────────────────────── -->
+<div class="amd" id="amb-alert">
+  <div class="amb-box" style="max-width:360px;">
+    <div class="amh"><span id="amb-alert-title">Error</span></div>
+    <div class="ambo" style="padding:16px;"><p id="amb-alert-msg" style="margin:0;font-size:13px;color:var(--tx);"></p></div>
+    <div class="amf" style="justify-content:flex-end;">
+      <button type="button" id="amb-alert-ok" data-tipster="Dismiss this message">OK</button>
+    </div>
+  </div>
+</div>
 
-// Pollers
-(function pollStatus(){
-  fetch(ah('status_check.php'),{credentials:'same-origin'}).then(r=>r.json()).then(d=>{
-    snStatus=JSON.stringify(d);
-    const dot=document.getElementById('adot');const st=document.getElementById('astxt');
-    const ds=d.data||d;
-    if(st){const s=(ds.status||'').trim();st.textContent=(s&&s!=='None'&&s!=='null'&&s!=='undefined')?s:'Idle';}
-    if(dot)dot.classList.toggle('on',ds.status&&ds.status!=='Stopped'&&ds.status!=='Idle');
-    const lrt=document.getElementById('alrtxt');if(lrt)lrt.textContent=ds.last_run||'No last run';
-  }).catch(()=>{}).finally(()=>setTimeout(pollStatus,A_F));
-})();
-
-(function pollLock(){
-  fetch(ah('check_lock.php')).then(r=>r.json()).then(d=>{
-    const sn=JSON.stringify(d);if(sn===snLock)return;snLock=sn;
-    const locked=!!((d.data||d).locked);
-    ['asaveb','amnb'].forEach(id=>{const b=document.getElementById(id);if(!b)return;b.disabled=locked;b.style.opacity=locked?'.45':'1';b.style.cursor=locked?'not-allowed':'pointer';});
-  }).catch(()=>{}).finally(()=>setTimeout(pollLock,A_F));
-})();
-
-(function pollLog(){
-  fetch(ah('fetch_last_run_log.php')+'?debug='+(logDebug?'1':'0')).then(r=>r.text()).then(raw=>{
-    const empty=logDebug?'Automover debug log not found':'Automover log not found';
-    const rev=raw?raw.split('\n').filter(l=>l.trim()).reverse().join('\n'):'';
-    const display=rev||empty;
-    if(display===snLog)return;snLog=display;
-    const el=document.getElementById('algl');if(!el)return;
-    el.dataset.raw=display;
-    applyLogSearch('algl','algs','algc','algx');
-    if(logAuto)el.scrollTop=el.scrollHeight;
-    if(raw){for(const ln of raw.split('\n')){if(/session finished/i.test(ln)){const m=ln.match(/\[?(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})/);if(m){lastRunTs=new Date(m[1].replace(' ','T'));break;}}}}
-  }).catch(()=>{}).finally(()=>setTimeout(pollLog,A_F));
-})();
-
-setInterval(()=>{const el=document.getElementById('alrtxt2');if(el)el.textContent=lastRunTs&&!isNaN(lastRunTs)?'Last Run: '+timeAgo(lastRunTs):'No last run';},1000);
-
-(function pollMoved(){
-  const kw=(document.getElementById('amvs')||{}).value||'';
-  const url=ah('fetch_files_moved_log.php')+(kw?'?filter='+encodeURIComponent(kw):'');
-  fetch(url).then(r=>r.json()).then(d=>{
-    const sn=JSON.stringify(d);if(sn===snMoved)return;snMoved=sn;
-    const el=document.getElementById('amvl');if(!el)return;
-    const dm=d.data||d;
-    el.innerHTML='';el.dataset.raw=dm.log||'';
-    (dm.log||'').split('\n').forEach(line=>{const div=document.createElement('div');div.textContent=line;if(line.toLowerCase().includes('skipped'))div.classList.add('skipped-line');el.appendChild(div);});
-    const lc=document.getElementById('amb-lc');if(lc)lc.textContent='Total Files Moved: '+(dm.moved??0);
-    if(movedAuto)el.scrollTop=el.scrollHeight;
-  }).catch(()=>{}).finally(()=>setTimeout(pollMoved,A_F));
-})();
-
-(function pollPool(){
-  const sel=document.getElementById('apool');if(!sel)return setTimeout(pollPool,A_S);
-  const cur=sel.value||sel.dataset.sel||'';
-  fetch(ah('pool_usage.php')).then(r=>r.json()).then(d=>{
-    const pd=d.data||d;
-    const pools=Object.keys(pd).filter(n=>pd[n]!=='N/A');
-    if(!pools.length){sel.innerHTML='<option disabled>No pools — is array started?</option>';return;}
-    const prev=sel.value;sel.innerHTML='';
-    pools.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p+' ('+pd[p]+'%)';if(p===(prev||cur))o.selected=true;sel.appendChild(o);});
-    checkPoolWarn(sel.value);
-  }).catch(()=>{}).finally(()=>setTimeout(pollPool,A_S));
-})();
-
-function checkPoolWarn(pool){
-  if(!pool)return;
-  fetch(ah('check_pool_usage.php')+'?pool='+encodeURIComponent(pool)).then(r=>r.json()).then(d=>{const w=document.getElementById('apw');if(w)w.classList.toggle('on',!(d.data||d).in_use);}).catch(()=>{});
-}
-
-document.addEventListener('DOMContentLoaded',function(){
-
-  // Search X buttons
-  function initSearch(si,xi,onInput){
-    const s=document.getElementById(si);const x=document.getElementById(xi);if(!s||!x)return;
-    s.addEventListener('input',function(){x.style.display=this.value?'flex':'none';if(onInput)onInput();});
-    x.addEventListener('mousedown',function(e){e.preventDefault();s.value='';x.style.display='none';if(onInput)onInput();s.focus();});
-    x.style.display=s.value?'flex':'none';
-  }
-  initSearch('algs','algx',()=>applyLogSearch('algl','algs','algc','algx'));
-  initSearch('amvs','amvx',()=>{snMoved=null;});
-
-  // Scroll buttons
-  (function(){const el=document.getElementById('algl');document.getElementById('algtp')?.addEventListener('click',()=>{logAuto=false;if(el)el.scrollTop=0;});document.getElementById('algbt')?.addEventListener('click',()=>{logAuto=!logAuto;if(logAuto&&el)el.scrollTop=el.scrollHeight;});el?.addEventListener('scroll',()=>{if(el.scrollHeight-el.scrollTop-el.clientHeight>8)logAuto=false;});})();
-  (function(){const el=document.getElementById('amvl');document.getElementById('amvtp')?.addEventListener('click',()=>{movedAuto=false;if(el)el.scrollTop=0;});document.getElementById('amvbt')?.addEventListener('click',()=>{movedAuto=!movedAuto;if(movedAuto&&el)el.scrollTop=el.scrollHeight;});el?.addEventListener('scroll',()=>{if(el.scrollHeight-el.scrollTop-el.clientHeight>8)movedAuto=false;});})();
-
-  // Clear/copy buttons
-  document.getElementById('algcl')?.addEventListener('click',function(){
-    const lbl=logDebug?'debug log':'automover log';if(!confirm('Clear the '+lbl+'?'))return;
-    fetch(ah('clear_log.php'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf},body:'log=last&debug='+(logDebug?'1':'0')+'&csrf_token='+encodeURIComponent(csrf)}).then(r=>r.json()).then(d=>{if((d.data||d).ok){const el=document.getElementById('algl');if(el){el.dataset.raw='';el.textContent='';}snLog=null;showToast('algt',logDebug?'Debug log cleared':'Log cleared');}}).catch(()=>alert('Failed'));
-  });
-  document.getElementById('amvcl')?.addEventListener('click',function(){
-    if(!confirm('Clear the files moved log?'))return;
-    fetch(ah('clear_log.php'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf},body:'log=mover&csrf_token='+encodeURIComponent(csrf)}).then(r=>r.json()).then(d=>{if((d.data||d).ok){const el=document.getElementById('amvl');if(el){el.innerHTML='';el.dataset.raw='';}snMoved=null;const lc=document.getElementById('amb-lc');if(lc)lc.textContent='';showToast('amvt','Log cleared');}}).catch(()=>alert('Failed'));
-  });
-  document.getElementById('algcp')?.addEventListener('click',function(){const t=(document.getElementById('algl')?.dataset.raw)||'';if(!t.trim())return;navigator.clipboard?.writeText(t).then(()=>showToast('algt',logDebug?'Debug log copied':'Log copied')).catch(()=>fallbackCopy(t))||fallbackCopy(t);});
-  document.getElementById('amvcp')?.addEventListener('click',function(){const t=(document.getElementById('amvl')?.dataset.raw)||'';if(!t.trim())return;navigator.clipboard?.writeText(t).then(()=>showToast('amvt','Copied')).catch(()=>fallbackCopy(t))||fallbackCopy(t);});
-
-  // Pool change
-  document.getElementById('apool')?.addEventListener('change',function(){checkPoolWarn(this.value);});
-
-  // Mode switcher
-  const msSel=document.getElementById('amb-ms');
-  function applyMode(){
-    const m=msSel?.value;
-    document.getElementById('aap').style.display=m==='manual'?'none':'';
-    document.getElementById('ammp').style.display=m==='manual'?'':'none';
-    const t=document.getElementById('act');if(t)t.textContent=m==='manual'?'Manual Move':'Automover';
-  }
-  msSel?.addEventListener('change',applyMode);applyMode();
-
-  // Cron mode
-  const cronSel=document.getElementById('acm');
-  function applyCron(){
-    const v=cronSel?.value;
-    const map={hourly:'aho',daily:'ado',weekly:'awo',monthly:'amo'};
-    Object.values(map).forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
-    const show=map[v];if(show){const el=document.getElementById(show);if(el)el.style.display='';}
-  }
-  cronSel?.addEventListener('change',applyCron);applyCron();
-
-  // Option slider → show/hide conditional sections
-  const OPTS_MAP=[
-    ['antf',['an-sec']],['apri',['apr-sec']],['aagf',['aag-sec']],['aszf',['asz-sec']],
-    ['aqbt',['aqb-sec']],['ajdp',['ahsh-sec']],['aext',['aex-sec']],['ascp',['asc-sec']],
-  ];
-  OPTS_MAP.forEach(([cbId,secIds])=>{
-    const cb=document.getElementById(cbId);if(!cb)return;
-    function apply(){secIds.forEach(sid=>{const el=document.getElementById(sid);if(el)el.style.display=cb.checked?'':'none';});}
-    cb.addEventListener('change',apply);apply();
-  });
-
-  // Python warning
-  (function(){const w=document.getElementById('apyw');if(!w)return;const cb=document.getElementById('aqbt');const hasPy=w.dataset.py==='1';function upd(){if(w)w.style.display=(cb?.checked&&!hasPy)?'block':'none';}cb?.addEventListener('change',upd);upd();})();
-
-  // Notification multiselect
-  const ams=document.getElementById('anms');const amsl=document.getElementById('anml-list');const anml=document.getElementById('anml');
-  function updateNotifLabel(){const svcs=Array.from(document.querySelectorAll('#anml-list input:checked')).map(c=>c.value);if(anml)anml.textContent=svcs.length?svcs.join(', '):'Select service(s)';rebuildWebhooks();}
-  ams?.addEventListener('click',e=>{e.stopPropagation();if(amsl)amsl.style.display=amsl.style.display==='none'||amsl.style.display===''?'block':'none';});
-  amsl?.addEventListener('click',e=>e.stopPropagation());
-  amsl?.querySelectorAll('input').forEach(cb=>cb.addEventListener('change',updateNotifLabel));
-  document.addEventListener('click',()=>{if(amsl)amsl.style.display='none';});
-  updateNotifLabel();
-
-  // Webhook fields
-  const WH_CFG={Discord:{label:'Discord Webhook URL',prefix:'https://discord.com/api/webhooks/'},Gotify:{label:'Gotify URL',prefix:'https://'},Ntfy:{label:'Ntfy URL',prefix:'https://'},Pushover:{label:'Pushover App Token URL',prefix:'https://api.pushover.net/',needsKey:true},Slack:{label:'Slack Webhook URL',prefix:'https://hooks.slack.com/'},Unraid:{label:null}};
-  function rebuildWebhooks(){
-    const box=document.getElementById('awh-box');if(!box)return;
-    const svcs=Array.from(document.querySelectorAll('#anml-list input:checked')).map(c=>c.value);
-    box.innerHTML='';
-    svcs.forEach(svc=>{
-      const cfg=WH_CFG[svc];if(!cfg||!cfg.label)return;
-      const row=document.createElement('div');row.className='af';row.id='wh-row-'+svc.toLowerCase();
-      const saved=WH_SAVED[svc.toUpperCase()]||'';
-      row.innerHTML='<span class="afl" data-tip="'+cfg.label+'">'+cfg.label+':</span><div class="afi"><input type="text" id="wh-'+svc.toLowerCase()+'" data-svc="'+svc+'" class="whi" placeholder="'+(cfg.prefix||'')+'" value="'+saved+'"><span class="aw" id="whe-'+svc.toLowerCase()+'">Invalid URL</span></div>';
-      box.appendChild(row);
-      if(cfg.needsKey){const pkRow=document.createElement('div');pkRow.className='af';pkRow.id='wh-row-pushover-key';pkRow.innerHTML='<span class="afl" data-tip="Your Pushover user key">Pushover User Key:</span><div class="afi"><input type="text" id="wh-pushover-key" placeholder="user key" value="'+PO_SAVED+'"><span class="aw" id="whe-pushover-key">Required</span></div>';box.appendChild(pkRow);}
-    });
-    box.querySelectorAll('.whi').forEach(inp=>{inp.addEventListener('blur',function(){const svc=this.dataset.svc;const cfg=WH_CFG[svc];if(!cfg||!cfg.prefix)return;const v=this.value.trim();if(v&&!v.startsWith('https://')&&!v.startsWith('http://'))this.value=cfg.prefix+v;validateWh(this);});inp.addEventListener('input',function(){validateWh(this);});});
-    // Attach help to new webhook labels
-    box.querySelectorAll('.afl[data-tip]').forEach(span=>{const tip=span.dataset.tip;if(!tip||span._helpAttached)return;span._helpAttached=true;const row=span.closest('.af');if(row)attachHelp(span,tip,row);});
-  }
-  function validateWh(inp){const svc=inp.dataset.svc;const cfg=WH_CFG[svc];const w=document.getElementById('whe-'+svc.toLowerCase());if(!w)return;const v=inp.value.trim();const ok=!v||!cfg.prefix||v.startsWith(cfg.prefix)||v.startsWith('http://');inp.classList.toggle('ainv',!ok);w.classList.toggle('on',!ok);}
-
-  // qBit days order validation (selects)
-  ['aqbdf','aqbdt'].forEach(id=>{document.getElementById(id)?.addEventListener('change',()=>{const f=parseInt(document.getElementById('aqbdf')?.value,10);const t=parseInt(document.getElementById('aqbdt')?.value,10);document.getElementById('aqbow')?.classList.toggle('on',!isNaN(f)&&!isNaN(t)&&f>=t);});});
-
-  // ── Save & Start (FIXED) ──────────────────────────────────────────────────
-  document.getElementById('asaveb')?.addEventListener('click', function () {
-    function vf(id, min, max, wid) {
-      const el = document.getElementById(id); if (!el) return true;
-      const v = parseFloat(el.value);
-      const bad = isNaN(v) || (min != null && v < min) || (max != null && v > max);
-      el.classList.toggle('ainv', bad);
-      document.getElementById(wid)?.classList.toggle('on', bad);
-      return !bad;
-    }
-    const ageOk = true;
-    const szOk  = true;
-    let qbOk = true;
-    if (document.getElementById('aqbt')?.checked) {
-      const hv = (document.getElementById('aqbh')?.value || '').trim();
-      const hasProto = /^https?:\/\//i.test(hv);
-      document.getElementById('aqbh')?.classList.toggle('ainv', !hv || hasProto);
-      document.getElementById('aqbhw')?.classList.toggle('on',  !hv || hasProto);
-      const uOk = !!(document.getElementById('aqbu')?.value.trim());
-      document.getElementById('aqbu')?.classList.toggle('ainv', !uOk);
-      document.getElementById('aqbuw')?.classList.toggle('on',  !uOk);
-      const pOk = !!(document.getElementById('aqbp')?.value.trim());
-      document.getElementById('aqbp')?.classList.toggle('ainv', !pOk);
-      document.getElementById('aqbpw')?.classList.toggle('on',  !pOk);
-      const fv = parseInt(document.getElementById('aqbdf')?.value, 10);
-      const tv = parseInt(document.getElementById('aqbdt')?.value, 10);
-      const ordOk = !isNaN(fv) && !isNaN(tv) && fv < tv;
-      document.getElementById('aqbow')?.classList.toggle('on', !ordOk);
-      if (!hv || hasProto || !uOk || !pOk || !ordOk) qbOk = false;
-    }
-    if (!(ageOk && szOk && qbOk)) {
-      document.getElementById('aap')?.classList.add('ashk');
-      setTimeout(() => document.getElementById('aap')?.classList.remove('ashk'), 400);
-      return;
-    }
-
-    const mode = document.getElementById('acm')?.value;
-    let cron = '';
-    if (mode === 'hourly') {
-      cron = '0 */' + parseInt(document.getElementById('ahf')?.value, 10) + ' * * *';
-    } else if (mode === 'daily') {
-      const [h, m] = (document.getElementById('adt')?.value || '00:00').split(':');
-      cron = parseInt(m, 10) + ' ' + parseInt(h, 10) + ' * * *';
-    } else if (mode === 'weekly') {
-      const DAY = {Sunday:0,Monday:1,Tuesday:2,Wednesday:3,Thursday:4,Friday:5,Saturday:6};
-      const [h, m] = (document.getElementById('awt')?.value || '00:00').split(':');
-      cron = parseInt(m, 10) + ' ' + parseInt(h, 10) + ' * * ' + DAY[document.getElementById('awd')?.value];
-    } else if (mode === 'monthly') {
-      const [h, m] = (document.getElementById('amt')?.value || '00:00').split(':');
-      cron = parseInt(m, 10) + ' ' + parseInt(h, 10) + ' ' + parseInt(document.getElementById('amdy')?.value, 10) + ' * *';
-    }
-
-    const svcs = Array.from(document.querySelectorAll('#anml-list input:checked')).map(c => c.value).join(',');
-    const wh = {};
-    document.querySelectorAll('#awh-box .whi').forEach(inp => { wh['WEBHOOK_' + inp.dataset.svc.toUpperCase()] = inp.value.trim(); });
-    ['DISCORD','GOTIFY','NTFY','PUSHOVER','SLACK'].forEach(s => { if (!wh['WEBHOOK_' + s]) wh['WEBHOOK_' + s] = ''; });
-
-    function g(id) { return (document.getElementById(id)?.value || '').trim(); }
-    function cb(id) { return document.getElementById(id)?.checked ? 'yes' : 'no'; }
-
-    const p = new URLSearchParams({
-      csrf_token: csrf,
-      AGE_BASED_FILTER: cb('aagf'), AGE_DAYS: g('aaged'),
-      ALLOW_DURING_PARITY: cb('aap2'), AUTOSTART: cb('aaut'),
-      CONTAINER_NAMES: g('acont'), CRON_EXPRESSION: cron, CRON_MODE: mode,
-      DAILY_TIME: g('adt'), DRY_RUN: cb('adr'),
-      ENABLE_CLEANUP: cb('acln'), ENABLE_JDUPES: cb('ajdp'),
-      ENABLE_NOTIFICATIONS: cb('antf'), ENABLE_SCRIPTS: cb('ascp'),
-      ENABLE_TRIM: cb('atrm'), EXCLUSIONS_ENABLED: cb('aext'),
-      FORCE_RECONSTRUCTIVE_WRITE: cb('atw'), HASH_PATH: g('ahp'),
-      HIDDEN_FILTER: cb('ahid'), HOURLY_FREQUENCY: g('ahf'),
-      IO_PRIORITY: g('aiop'),
-      MANUAL_MOVE: document.getElementById('amb-ms')?.value === 'manual' ? 'yes' : 'no',
-      MONTHLY_DAY: g('amdy'), MONTHLY_TIME: g('amt'),
-      NOTIFICATION_SERVICE: svcs, POOL_NAME: g('apool'),
-      POST_SCRIPT: g('aposts'), PRE_SCRIPT: g('apres'),
-      PRIORITIES: cb('apri'), PROCESS_PRIORITY: g('acpu'),
-      PUSHOVER_USER_KEY: g('wh-pushover-key'),
-      QBITTORRENT_DAYS_FROM: g('aqbdf'), QBITTORRENT_DAYS_TO: g('aqbdt'),
-      QBITTORRENT_HOST: g('aqbh'), QBITTORRENT_PASSWORD: g('aqbp'),
-      QBITTORRENT_SCRIPT: cb('aqbt'), QBITTORRENT_STATUS: g('aqbs'),
-      QBITTORRENT_USERNAME: g('aqbu'),
-      SIZE_BASED_FILTER: cb('aszf'), SIZE_MB: g('aszm'), SIZE_UNIT: g('aszu'),
-      STOP_ALL_CONTAINERS: cb('asac'), STOP_THRESHOLD: g('asthr'),
-      THRESHOLD: g('athr'), WEEKLY_DAY: g('awd'), WEEKLY_TIME: g('awt'),
-      ...wh
-    });
-
-    function safeJson(r, label) {
-      if (!r.ok) throw new Error(label + ' returned HTTP ' + r.status);
-      return r.text().then(txt => {
-        const t = txt.trim();
-        if (!t) throw new Error(label + ' returned an empty response — check the PHP file for errors');
-        try { return JSON.parse(t); }
-        catch (e) { throw new Error(label + ' returned non-JSON: ' + t.slice(0, 120)); }
-      });
-    }
-
-    // Step 1: save settings
-    fetch(ah('save_settings.php') + '?csrf_token=' + encodeURIComponent(csrf), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
-      body: p.toString()
-    })
-    .then(r => safeJson(r, 'save_settings.php'))
-    .then(sd => {
-      if (sd.status === 'error') throw new Error('Save failed: ' + (sd.message || 'Unknown error'));
-
-      // Step 2: start cron
-      const sp = new URLSearchParams({
-        csrf_token: csrf,
-        CRON_MODE: mode,
-        CRON_EXPRESSION: cron,
-        PRIORITIES: cb('apri'),
-        PROCESS_PRIORITY: g('acpu'),
-        IO_PRIORITY: g('aiop')
-      });
-      return fetch(ah('start_cron.php') + '?csrf_token=' + encodeURIComponent(csrf), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
-        body: sp.toString()
-      });
-    })
-    .then(r => safeJson(r, 'start_cron.php'))
-    .then(cd => {
-      if (!cd || cd.status !== 'success') {
-        throw new Error('Schedule failed: ' + (cd?.message || 'Unexpected response'));
-      }
-      showPop('asp', '✅ Saved & Started');
-    })
-    .catch(e => {
-      console.error('Save & Start error:', e);
-      alert(e.message || 'Save or Start failed');
-    });
-  });
-  // ── End Save & Start ──────────────────────────────────────────────────────
-
-  // Stop
-  document.getElementById('astopb')?.addEventListener('click',function(){fetch(ah('stop_automover.php'),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'csrf_token='+encodeURIComponent(csrf)}).then(()=>fetch(ah('stop_cron.php'),{credentials:'same-origin'})).then(()=>showPop('astp','✅ Stopping')).catch(()=>{});});
-
-  // Move Now
-  document.getElementById('amnb')?.addEventListener('click',function(){fetch(ah('run_manual_move.php'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf},body:'csrf_token='+encodeURIComponent(csrf)}).then(r=>r.json()).then(d=>{const dd=d.data||d;if(dd.ok)showPop('amnp','✅ Moving Now');else alert('Move Now failed: '+(dd.error||'?'));}).catch(()=>alert('Move Now failed'));});
-
-  // Exclusion picker
-  let pickerPath='/mnt',pickerExts=new Set();
-  function buildCrumbs(path,crmId){const c=document.getElementById(crmId);if(!c)return;c.innerHTML='';if(!path.startsWith('/mnt'))path='/mnt';const parts=path.split('/').filter(Boolean);let acc='';parts.forEach((p,i)=>{if(i>0){const sep=document.createElement('span');sep.className='acs';sep.textContent=' / ';c.appendChild(sep);}acc+='/'+p;const sp=document.createElement('span');sp.className='acr';sp.textContent=i===0?'/mnt':p;sp.dataset.path=acc;sp.addEventListener('click',()=>loadPicker(sp.dataset.path));c.appendChild(sp);});}
-  function loadPicker(path){pickerPath=path;fetch(ah('update_exclusions.php')+'?action=list_dir&path='+encodeURIComponent(path)+'&csrf_token='+encodeURIComponent(csrf)).then(r=>r.json()).then(d=>{const dd=d.data||d;if(!dd.ok)return;pickerPath=dd.path||path;buildCrumbs(pickerPath,'apcrm');const grid=document.getElementById('apgr');if(!grid)return;grid.innerHTML='';pickerExts.clear();dd.items.forEach(item=>{const row=document.createElement('div');row.className='apr '+(item.isDir?'':'file');const cb=document.createElement('input');cb.type='checkbox';cb.dataset.path=item.path;const isRoot=/^\/mnt\/[^/]+$/.test(item.path);if(isRoot){cb.disabled=true;}const name=document.createElement('div');name.className='apn';name.textContent=(item.isDir?'📁 ':'📄 ')+item.name;if(item.isDir)name.addEventListener('click',()=>{if(!isRoot)loadPicker(item.path);});row.appendChild(cb);row.appendChild(name);grid.appendChild(row);});updateExtBtns();}).catch(()=>pickerToast('Error loading directory','err'));}
-  function updateExtBtns(){pickerExts.clear();document.querySelectorAll('#apgr input:checked:not(:disabled)').forEach(cb=>{if(cb.closest('.file')){const n=cb.dataset.path.split('/').pop();const pts=n.split('.');if(pts.length>1)pickerExts.add(pts.pop());}});const show=pickerExts.size>0;document.getElementById('apadx').style.display=show?'inline-block':'none';document.getElementById('apremx').style.display=show?'inline-block':'none';}
-  document.getElementById('apgr')?.addEventListener('change',updateExtBtns);
-  let ptDelay=0;
-  function pickerToast(msg,type){const c=document.getElementById('aptst');if(!c)return;const t=document.createElement('div');t.textContent=msg;t.style.cssText='color:'+(type==='err'?'var(--er)':'var(--ok)')+';font-size:12px;font-weight:600;opacity:0;transition:opacity .3s;';c.appendChild(t);const d=ptDelay;ptDelay+=800;setTimeout(()=>{t.style.opacity='1';},d+50);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},d+2200);setTimeout(()=>{ptDelay=0;},d+3000);}
-  function pickerAction(action,paths){const body=new URLSearchParams({csrf_token:csrf});paths.forEach(p=>body.append('paths[]',p));return fetch(ah('update_exclusions.php')+'?action='+action,{method:'POST',body}).then(r=>r.json());}
-  document.getElementById('apad')?.addEventListener('click',()=>{const p=Array.from(document.querySelectorAll('#apgr input:checked')).map(c=>c.dataset.path);if(!p.length){pickerToast('No selection','err');return;}pickerAction('add_exclusions',p).then(d=>(d.data||d).ok?pickerToast('✅ Added'):pickerToast('Failed','err'));});
-  document.getElementById('aprem')?.addEventListener('click',()=>{const p=Array.from(document.querySelectorAll('#apgr input:checked')).map(c=>c.dataset.path);if(!p.length){pickerToast('No selection','err');return;}pickerAction('remove_exclusions',p).then(d=>(d.data||d).ok?pickerToast('✅ Removed'):pickerToast('Failed','err'));});
-  document.getElementById('apadx')?.addEventListener('click',()=>{const paths=Array.from(pickerExts).map(e=>'*.'+e);pickerAction('add_exclusions',paths).then(d=>{if((d.data||d).ok)paths.forEach(p=>pickerToast('✅ Added '+p));else pickerToast('Failed','err');});});
-  document.getElementById('apremx')?.addEventListener('click',()=>{const paths=Array.from(pickerExts).map(e=>'*.'+e);pickerAction('remove_exclusions',paths).then(d=>{if((d.data||d).ok)paths.forEach(p=>pickerToast('✅ Removed '+p));else pickerToast('Failed','err');});});
-  document.getElementById('apup')?.addEventListener('click',()=>{if(pickerPath&&pickerPath!=='/mnt'){const up=pickerPath.replace(/\/+$/,'').split('/').slice(0,-1).join('/')||'/mnt';loadPicker(up.startsWith('/mnt')?up:'/mnt');}});
-  document.getElementById('apcl')?.addEventListener('click',()=>document.getElementById('apm')?.classList.remove('open'));
-  document.getElementById('aexf')?.addEventListener('click',()=>{document.getElementById('apm')?.classList.add('open');loadPicker('/mnt');});
-  document.getElementById('aexlb')?.addEventListener('click',()=>{document.getElementById('aem')?.classList.add('open');fetch(ah('manage_exclusions.php')+'?action=get&csrf_token='+encodeURIComponent(csrf),{cache:'no-store'}).then(r=>r.json()).then(d=>{const dd=d.data||d;const et=document.getElementById('amb-et');if(et)et.value=dd.ok?(dd.content||'').trim():(dd.error||'');}).catch(()=>{});});
-  document.getElementById('aecl')?.addEventListener('click',()=>document.getElementById('aem')?.classList.remove('open'));
-  document.getElementById('aecl2')?.addEventListener('click',()=>document.getElementById('aem')?.classList.remove('open'));
-  document.getElementById('aecp')?.addEventListener('click',()=>{const t=document.getElementById('amb-et')?.value||'';navigator.clipboard?.writeText(t).catch(()=>fallbackCopy(t))||fallbackCopy(t);});
-  document.getElementById('aesv')?.addEventListener('click',()=>{const content=document.getElementById('amb-et')?.value||'';fetch(ah('manage_exclusions.php')+'?action=save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf},body:'csrf_token='+encodeURIComponent(csrf)+'&content='+encodeURIComponent(content)}).then(r=>r.json()).then(d=>{const dd=d.data||d;showToast('algt',dd.ok?'✅ Saved':(dd.error||'Save failed'));}).catch(()=>showToast('algt','Save failed'));});
-
-  // Path picker (manual move)
-  let ppMode='',ppPath='/mnt',ppSel='';
-  function ppBuildCrumbs(path){buildCrumbs(path,'appcrm');}
-  function ppLoad(path){ppPath=path;ppBuildCrumbs(path);fetch(ah('list_dir.php')+'?path='+encodeURIComponent(path)).then(r=>r.json()).then(d=>{const grid=document.getElementById('amb-ppg');if(!grid)return;grid.innerHTML='';const dd=d.data||d;const srcV=(document.getElementById('amms')?.value||'').trim().replace(/\/$/,'');const dstV=(document.getElementById('ammd')?.value||'').trim().replace(/\/$/,'');const other=ppMode==='src'?dstV:srcV;const oIsU=/^\/mnt\/user(\/|$)/.test(other)&&!/^\/mnt\/user0/.test(other);const oIsU0=/^\/mnt\/user0(\/|$)/.test(other);const oIsD=/^\/mnt\/disk[0-9]+(\/|$)/.test(other);(dd.entries||[]).forEach(e=>{const full=path.replace(/\/$/,'')+'/'+e.name;const isU=/^\/mnt\/user(\/|$)/.test(full)&&!/^\/mnt\/user0/.test(full);const isU0=/^\/mnt\/user0(\/|$)/.test(full);const isD=/^\/mnt\/disk[0-9]+(\/|$)/.test(full);let dis=false;if(oIsU&&(isU0||isD))dis=true;if(oIsU0&&(isU||isD))dis=true;if(oIsD&&(isU||isU0))dis=true;if(full.replace(/\/$/,'')===(other))dis=true;const row=document.createElement('div');row.className='appr '+(e.type!=='dir'?'file':'')+(dis?' dim':'');if(e.type==='dir'){const cb=document.createElement('input');cb.type='checkbox';cb.disabled=dis;cb.addEventListener('click',ev=>{ev.stopPropagation();grid.querySelectorAll('input[type=checkbox]').forEach(c=>{if(c!==cb)c.checked=false;});ppSel=cb.checked?full:'';});row.appendChild(cb);}else{const sp=document.createElement('span');sp.style.width='22px';row.appendChild(sp);}const nm=document.createElement('span');nm.className='appn';nm.textContent=(e.type==='dir'?'📁 ':'📄 ')+e.name;nm.addEventListener('click',()=>{if(!dis&&e.type==='dir')ppLoad(full);});row.appendChild(nm);grid.appendChild(row);});}).catch(()=>{});}
-  ['amms','ammd'].forEach((id,i)=>{document.getElementById(id)?.addEventListener('click',()=>{ppMode=i===0?'src':'dst';ppSel='';ppPath='/mnt';document.getElementById('appm')?.classList.add('open');ppLoad('/mnt');});});
-  document.getElementById('appup')?.addEventListener('click',()=>{if(ppPath&&ppPath!=='/mnt'){const up=ppPath.replace(/\/+$/,'').split('/').slice(0,-1).join('/')||'/mnt';ppLoad(up.startsWith('/mnt')?up:'/mnt');}});
-  document.getElementById('appcl')?.addEventListener('click',()=>{document.getElementById('appm')?.classList.remove('open');document.getElementById('appnr').style.display='none';});
-  document.getElementById('appcnf')?.addEventListener('click',()=>{if(!ppSel)return;document.getElementById(ppMode==='src'?'amms':'ammd').value=ppSel+'/';document.getElementById('appm')?.classList.remove('open');});
-  document.getElementById('appclr')?.addEventListener('click',()=>{document.getElementById('amb-ppg')?.querySelectorAll('input').forEach(c=>c.checked=false);ppSel='';document.getElementById(ppMode==='src'?'amms':'ammd').value='';});
-  document.getElementById('appcr')?.addEventListener('click',()=>{const r=document.getElementById('appnr');if(r){r.style.display=r.style.display==='none'||!r.style.display?'flex':'none';document.getElementById('appnn')?.focus();}});
-  document.getElementById('appnnc')?.addEventListener('click',()=>{const r=document.getElementById('appnr');if(r)r.style.display='none';});
-  document.getElementById('appnok')?.addEventListener('click',()=>{const name=document.getElementById('appnn')?.value.trim();if(!name)return;fetch(ah('create_folder.php'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'parent='+encodeURIComponent(ppPath)+'&name='+encodeURIComponent(name)+'&csrf_token='+encodeURIComponent(csrf)}).then(r=>r.json()).then(d=>{if((d.data||d).ok){const r=document.getElementById('appnr');if(r)r.style.display='none';document.getElementById('appnn').value='';ppLoad(ppPath);}}).catch(()=>{});});
-  document.getElementById('appnn')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('appnok')?.click();if(e.key==='Escape')document.getElementById('appnnc')?.click();});
-
-  // Manual move
-  ['ammc','ammd2','ammsy'].forEach(id=>{document.getElementById(id)?.addEventListener('change',function(){if(this.checked)['ammc','ammd2','ammsy'].forEach(oid=>{if(oid!==id)document.getElementById(oid).checked=false;});});});
-  document.getElementById('ammst')?.addEventListener('click',function(){
-    const src=(document.getElementById('amms')?.value||'').trim();const dst=(document.getElementById('ammd')?.value||'').trim();const copy=document.getElementById('ammc')?.checked;const del=document.getElementById('ammd2')?.checked;const sync=document.getElementById('ammsy')?.checked;
-    let ok=true;document.getElementById('amse')?.classList.toggle('on',!src);if(!src)ok=false;document.getElementById('amde')?.classList.toggle('on',!dst);if(!dst)ok=false;document.getElementById('ammoe')?.classList.toggle('on',!copy&&!del&&!sync);if(!copy&&!del&&!sync)ok=false;
-    if(!ok){document.getElementById('ammp')?.classList.add('ashk');setTimeout(()=>document.getElementById('ammp')?.classList.remove('ashk'),400);return;}
-    const p=new URLSearchParams({csrf_token:csrf,source:src,dest:dst,copy:copy?'1':'0',delete:del?'1':'0',fullsync:sync?'1':'0'});
-    fetch(ah('manual_rsync.php'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf},body:p.toString()}).then(r=>r.json()).then(d=>{const dd=d.data||d;if(dd.ok)showPop('ammp2','✅ Manual Move Started');else showPop('ammp2','❌ '+(dd.error||'Failed'));}).catch(()=>showPop('ammp2','❌ Request error'));
-  });
-
-  // Mover tuning warning
-  const mwBox=document.getElementById('amb-mw');
-  if(mwBox){fetch(ah('mover_warning_state.php')).then(r=>r.json()).then(d=>{if(!(d.data||d).dismissed)mwBox.style.display='block';}).catch(()=>{mwBox.style.display='block';});document.getElementById('amb-mwx')?.addEventListener('click',()=>{mwBox.style.transition='opacity .3s';mwBox.style.opacity='0';setTimeout(()=>mwBox.remove(),300);});document.getElementById('amb-mwd')?.addEventListener('click',function(){fetch(ah('mover_warning_state.php'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf},body:'csrf_token='+encodeURIComponent(csrf)}).then(r=>r.json()).then(d=>{if((d.data||d).ok){document.getElementById('amb-mwdn').style.display='block';this.style.display='none';setTimeout(()=>mwBox.style.display='none',1500);}});});}
-
-  // Inline help (click label to show tooltip below row; F1 toggles all)
-  let hlastClick=0;
-  function attachHelp(trigger,text,insertAfter){
-    if(trigger._helpAttached)return;trigger._helpAttached=true;
-    const id='aht-'+Math.random().toString(36).substr(2,8);
-    const div=document.createElement('div');div.className='aht';div.id=id;div.textContent=text;
-    if(insertAfter.insertAdjacentElement)insertAfter.insertAdjacentElement('afterend',div);
-    else if(insertAfter.parentNode)insertAfter.parentNode.insertBefore(div,insertAfter.nextSibling);
-    trigger.addEventListener('click',e=>{e.stopPropagation();hlastClick=Date.now();const el=document.getElementById(id);if(el)el.style.display=el.style.display==='block'?'none':'block';});
-  }
-  // Slider option labels
-  document.querySelectorAll('.aol[data-tip]').forEach(span=>{const tip=span.dataset.tip;if(!tip)return;const row=span.closest('.aor');if(!row)return;attachHelp(span,tip,row);});
-  // Field labels
-  document.querySelectorAll('.afl[data-tip]').forEach(span=>{const tip=span.dataset.tip;if(!tip)return;const row=span.closest('.af');if(!row)return;attachHelp(span,tip,row);});
-  // Special labels in topbar
-  const tips={apl:'Switch between your installed jcofer555 plugins',aml:'Switch between Automover scheduling mode and Manual Move mode'};
-  document.querySelectorAll('#amb-tb .atbl[id]').forEach(span=>{const tip=tips[span.id];if(!tip)return;const tb=document.getElementById('amb-tb');if(tb)attachHelp(span,tip,tb);});
-  // Debug log label
-  const dbLabel=document.getElementById('adbl');if(dbLabel){const tb=dbLabel.closest('.altb');if(tb)attachHelp(dbLabel,'Toggle between standard log and full debug log',tb);}
-  // F1
-  document.addEventListener('keydown',e=>{if(e.key!=='F1')return;e.preventDefault();const all=document.querySelectorAll('.aht');const anyOpen=Array.from(all).some(el=>el.style.display==='block');all.forEach(el=>el.style.display=anyOpen?'none':'block');});
-  document.addEventListener('click',()=>{if(Date.now()-hlastClick<150)return;document.querySelectorAll('.aht').forEach(el=>el.style.display='none');});
-
-  if(typeof caPluginUpdateCheck==='function')caPluginUpdateCheck('automover.plg',{name:'automover'});
-
-});// end DOMContentLoaded
-</script>
+<script src="/plugins/automover/automover.js?v=<?=filemtime('/usr/local/emhttp/plugins/automover/automover.js')?>"></script>
