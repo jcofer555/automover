@@ -1,13 +1,24 @@
 <?php
 ob_start();
 
+// ── Shutdown handler — catches fatal errors that would otherwise cause an ──────
+// empty response (ob_start() holds everything and nothing is flushed).
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        // Discard whatever partial output is buffered
+        if (ob_get_level() > 0) ob_end_clean();
+        header('Content-Type: application/json');
+        http_response_code(500);
+        echo json_encode([
+            'status'  => 'error',
+            'message' => 'PHP fatal: ' . $err['message'] . ' in ' . $err['file'] . ':' . $err['line'],
+        ]);
+    }
+});
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 define('CFG_PATH', '/boot/config/plugins/automover/settings.cfg');
-
-// ── Suppress any session warnings — Unraid may already have one running ───────
-if (session_status() === PHP_SESSION_NONE) {
-    @session_start();
-}
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
@@ -36,7 +47,7 @@ if (!empty($csrf_cookie) && $csrf_header !== $csrf_cookie && $csrf_post !== $csr
 }
 
 // ── Catch stray warnings ──────────────────────────────────────────────────────
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
+set_error_handler(function ($errno, $errstr, $errfile, $errline) {
     global $_amb_err;
     $_amb_err = "PHP error [$errno]: $errstr in $errfile:$errline";
     return true;
@@ -46,7 +57,7 @@ $_amb_err = null;
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function get_str($key, $default = '') {
-    return isset($_POST[$key]) ? trim((string)$_POST[$key]) : $default;
+    return isset($_POST[$key]) ? trim((string) $_POST[$key]) : $default;
 }
 
 function normalize_container_names($raw) {
@@ -56,48 +67,48 @@ function normalize_container_names($raw) {
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 $settings = [
-    'AGE_BASED_FILTER'           => get_str('AGE_BASED_FILTER',           'no'),
-    'AGE_DAYS'                   => get_str('AGE_DAYS',                   '1'),
-    'ALLOW_DURING_PARITY'        => get_str('ALLOW_DURING_PARITY',        'no'),
-    'AUTOSTART_ON_BOOT'                  => get_str('AUTOSTART_ON_BOOT',                  'no'),
-    'STOP_CONTAINERS'            => normalize_container_names(get_str('STOP_CONTAINERS')),
-    'DRY_RUN'                    => get_str('DRY_RUN',                    'no'),
-    'CLEANUP'             => get_str('CLEANUP',             'no'),
-    'JDUPES'              => get_str('JDUPES',              'no'),
-    'NOTIFICATIONS'       => get_str('NOTIFICATIONS',       'no'),
-    'PRE_AND_POST_SCRIPTS'             => get_str('PRE_AND_POST_SCRIPTS',             'no'),
-    'SSD_TRIM'                => get_str('SSD_TRIM',                'no'),
-    'EXCLUSIONS'         => get_str('EXCLUSIONS',         'no'),
-    'FORCE_TURBO_WRITE' => get_str('FORCE_TURBO_WRITE', 'no'),
-    'HASH_LOCATION'                  => get_str('HASH_LOCATION',                  '/mnt/user/appdata'),
-    'HIDDEN_FILTER'              => get_str('HIDDEN_FILTER',              'no'),
-    'IO_PRIORITY'                => get_str('IO_PRIORITY',                'normal'),
-    'MANUAL_MOVE'                => get_str('MANUAL_MOVE',                'no'),
-    'NOTIFICATION_SERVICE'       => get_str('NOTIFICATION_SERVICE',       ''),
-    'POOL_NAME'                  => get_str('POOL_NAME',                  'cache'),
-    'POST_SCRIPT'                => get_str('POST_SCRIPT',                ''),
-    'PRE_SCRIPT'                 => get_str('PRE_SCRIPT',                 ''),
-    'CPU_AND_IO_PRIORITIES'                 => get_str('CPU_AND_IO_PRIORITIES',                 'no'),
-    'CPU_PRIORITY'           => get_str('CPU_PRIORITY',           '0'),
-    'PUSHOVER_USER_KEY'          => get_str('PUSHOVER_USER_KEY',          ''),
-    'QBITTORRENT_DAYS_FROM'      => get_str('QBITTORRENT_DAYS_FROM',      '0'),
-    'QBITTORRENT_DAYS_TO'        => get_str('QBITTORRENT_DAYS_TO',        '2'),
-    'QBITTORRENT_HOST'           => get_str('QBITTORRENT_HOST',           ''),
-    'QBITTORRENT_PASSWORD'       => get_str('QBITTORRENT_PASSWORD',       ''),
-    'QBITTORRENT_MOVE_SCRIPT'         => get_str('QBITTORRENT_MOVE_SCRIPT',         'no'),
-    'QBITTORRENT_STATUS'         => get_str('QBITTORRENT_STATUS',         'completed'),
-    'QBITTORRENT_USERNAME'       => get_str('QBITTORRENT_USERNAME',       ''),
-    'SIZE_BASED_FILTER'          => get_str('SIZE_BASED_FILTER',          'no'),
-    'SIZE'                    => get_str('SIZE',                    '1'),
-    'SIZE_UNIT'                  => get_str('SIZE_UNIT',                  'MB'),
-    'STOP_ALL_CONTAINERS'        => get_str('STOP_ALL_CONTAINERS',        'no'),
-    'STOP_THRESHOLD'             => get_str('STOP_THRESHOLD',             '0'),
-    'THRESHOLD'                  => get_str('THRESHOLD',                  '0'),
-    'WEBHOOK_DISCORD'            => get_str('WEBHOOK_DISCORD',            ''),
-    'WEBHOOK_GOTIFY'             => get_str('WEBHOOK_GOTIFY',             ''),
-    'WEBHOOK_NTFY'               => get_str('WEBHOOK_NTFY',               ''),
-    'WEBHOOK_PUSHOVER'           => get_str('WEBHOOK_PUSHOVER',           ''),
-    'WEBHOOK_SLACK'              => get_str('WEBHOOK_SLACK',              ''),
+    'AGE_BASED_FILTER'            => get_str('AGE_BASED_FILTER',            'no'),
+    'AGE_DAYS'                    => get_str('AGE_DAYS',                    '1'),
+    'ALLOW_DURING_PARITY'         => get_str('ALLOW_DURING_PARITY',         'no'),
+    'AUTOSTART_ON_BOOT'           => get_str('AUTOSTART_ON_BOOT',           'no'),
+    'CLEANUP'                     => get_str('CLEANUP',                     'no'),
+    'CPU_AND_IO_PRIORITIES'       => get_str('CPU_AND_IO_PRIORITIES',       'no'),
+    'CPU_PRIORITY'                => get_str('CPU_PRIORITY',                '0'),
+    'DRY_RUN'                     => get_str('DRY_RUN',                     'no'),
+    'EXCLUSIONS'                  => get_str('EXCLUSIONS',                  'no'),
+    'FORCE_TURBO_WRITE'           => get_str('FORCE_TURBO_WRITE',           'no'),
+    'HASH_LOCATION'               => get_str('HASH_LOCATION',               '/mnt/user/appdata'),
+    'HIDDEN_FILTER'               => get_str('HIDDEN_FILTER',               'no'),
+    'IO_PRIORITY'                 => get_str('IO_PRIORITY',                 'normal'),
+    'JDUPES'                      => get_str('JDUPES',                      'no'),
+    'MANUAL_MOVE'                 => get_str('MANUAL_MOVE',                 'no'),
+    'NOTIFICATION_SERVICE'        => get_str('NOTIFICATION_SERVICE',        ''),
+    'NOTIFICATIONS'               => get_str('NOTIFICATIONS',               'no'),
+    'POOL_NAME'                   => get_str('POOL_NAME',                   'cache'),
+    'POST_SCRIPT'                 => get_str('POST_SCRIPT',                 ''),
+    'PRE_AND_POST_SCRIPTS'        => get_str('PRE_AND_POST_SCRIPTS',        'no'),
+    'PRE_SCRIPT'                  => get_str('PRE_SCRIPT',                  ''),
+    'PUSHOVER_USER_KEY'           => get_str('PUSHOVER_USER_KEY',           ''),
+    'QBITTORRENT_DAYS_FROM'       => get_str('QBITTORRENT_DAYS_FROM',       '0'),
+    'QBITTORRENT_DAYS_TO'         => get_str('QBITTORRENT_DAYS_TO',         '2'),
+    'QBITTORRENT_HOST'            => get_str('QBITTORRENT_HOST',            ''),
+    'QBITTORRENT_MOVE_SCRIPT'     => get_str('QBITTORRENT_MOVE_SCRIPT',     'no'),
+    'QBITTORRENT_PASSWORD'        => get_str('QBITTORRENT_PASSWORD',        ''),
+    'QBITTORRENT_STATUS'          => get_str('QBITTORRENT_STATUS',          'completed'),
+    'QBITTORRENT_USERNAME'        => get_str('QBITTORRENT_USERNAME',        ''),
+    'SIZE'                        => get_str('SIZE',                        '1'),
+    'SIZE_BASED_FILTER'           => get_str('SIZE_BASED_FILTER',           'no'),
+    'SIZE_UNIT'                   => get_str('SIZE_UNIT',                   'MB'),
+    'STOP_ALL_CONTAINERS'         => get_str('STOP_ALL_CONTAINERS',         'no'),
+    'STOP_CONTAINERS'             => normalize_container_names(get_str('STOP_CONTAINERS')),
+    'STOP_THRESHOLD'              => get_str('STOP_THRESHOLD',              '0'),
+    'SSD_TRIM'                    => get_str('SSD_TRIM',                    'no'),
+    'THRESHOLD'                   => get_str('THRESHOLD',                   '0'),
+    'WEBHOOK_DISCORD'             => get_str('WEBHOOK_DISCORD',             ''),
+    'WEBHOOK_GOTIFY'              => get_str('WEBHOOK_GOTIFY',              ''),
+    'WEBHOOK_NTFY'                => get_str('WEBHOOK_NTFY',                ''),
+    'WEBHOOK_PUSHOVER'            => get_str('WEBHOOK_PUSHOVER',            ''),
+    'WEBHOOK_SLACK'               => get_str('WEBHOOK_SLACK',               ''),
 ];
 ksort($settings);
 

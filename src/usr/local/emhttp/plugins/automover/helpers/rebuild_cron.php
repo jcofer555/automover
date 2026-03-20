@@ -2,9 +2,11 @@
 declare(strict_types=1);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define('SCHEDULES_CFG',    '/boot/config/plugins/automover/schedules.cfg');
-define('CRON_FILE',        '/boot/config/plugins/automover/automover.cron');
-define('RUN_SCHEDULE_PHP', '/usr/local/emhttp/plugins/automover/helpers/run_schedule.php');
+// Use defined() guards so this file is safe to require_once from files that
+// also define these constants (schedule_create.php, schedule_update.php).
+if (!defined('SCHEDULES_CFG'))    define('SCHEDULES_CFG',    '/boot/config/plugins/automover/schedules.cfg');
+if (!defined('CRON_FILE'))        define('CRON_FILE',        '/boot/config/plugins/automover/automover.cron');
+if (!defined('RUN_SCHEDULE_PHP')) define('RUN_SCHEDULE_PHP', '/usr/local/emhttp/plugins/automover/helpers/run_schedule.php');
 
 // ── rebuild_cron() ────────────────────────────────────────────────────────────
 // Reads schedules.cfg and writes a fresh .cron file, then calls update_cron.
