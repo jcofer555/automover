@@ -90,13 +90,32 @@ if (empty($sharesList)) $sharesList=['appdata','system','domains','isos'];
 <script>
 'use strict';
 const A_H='/plugins/automover/helpers',A_F=1000,A_S=1000;
-let csrf = "<?= $_SESSION['csrf_token'] ?? $_GET['csrf_token'] ?? $_COOKIE['csrf_token'] ?? '' ?>";
-if (!csrf || csrf === 'undefined' || csrf === '') {
-  try {
-    if (typeof parent !== 'undefined' && parent.csrf_token) csrf = parent.csrf_token;
-    else if (typeof csrf_token !== 'undefined' && csrf_token) csrf = csrf_token;
-    else { const m = document.cookie.match(/csrf_token=([^;]+)/); if (m) csrf = decodeURIComponent(m[1]); }
-  } catch(e) {}
+let csrf = '';
+
+try {
+  // 1. window.parent.csrf_token — most reliable in Unraid's iframe layout
+  if (typeof parent !== 'undefined' && parent.csrf_token) {
+    csrf = parent.csrf_token;
+  }
+  // 2. window.csrf_token — covers non-iframe context
+  if (!csrf && typeof csrf_token !== 'undefined' && csrf_token) {
+    csrf = csrf_token;
+  }
+  // 3. Cookie — Unraid's csrf_token cookie is not HttpOnly so JS can read it
+  if (!csrf && document.cookie) {
+    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    if (m && m[1]) csrf = decodeURIComponent(m[1]);
+  }
+  // 4. Meta tag fallback
+  if (!csrf) {
+    const meta = document.querySelector("meta[name='csrf_token']");
+    if (meta) csrf = meta.getAttribute('content') || '';
+  }
+} catch(e) {}
+
+// 5. PHP inline value — last resort
+if (!csrf) {
+  csrf = "<?= htmlspecialchars($_SESSION['csrf_token'] ?? $_GET['csrf_token'] ?? $_COOKIE['csrf_token'] ?? '', ENT_QUOTES) ?>";
 }
 const WH_SAVED={DISCORD:"<?=htmlspecialchars($settings['WEBHOOK_DISCORD']??'')?>",GOTIFY:"<?=htmlspecialchars($settings['WEBHOOK_GOTIFY']??'')?>",NTFY:"<?=htmlspecialchars($settings['WEBHOOK_NTFY']??'')?>",PUSHOVER:"<?=htmlspecialchars($settings['WEBHOOK_PUSHOVER']??'')?>",SLACK:"<?=htmlspecialchars($settings['WEBHOOK_SLACK']??'')?>"};
 const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
