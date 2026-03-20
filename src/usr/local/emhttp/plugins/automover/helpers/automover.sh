@@ -1311,6 +1311,7 @@ if [[ "${moved_anything_bool}" == true && -s "${CLEANUP_SOURCES_FILE}" ]]; then
         [[ -z "${src_path_str}" ]] && continue
         [[ -d "${src_path_str}" ]] || continue
         cleanup_share_str="$(basename "${src_path_str}")"
+
         case "${cleanup_share_str}" in
             appdata|system|domains|isos)
                 log_info "Skipping cleanup for excluded share: ${cleanup_share_str}"
@@ -1318,6 +1319,16 @@ if [[ "${moved_anything_bool}" == true && -s "${CLEANUP_SOURCES_FILE}" ]]; then
                 continue
                 ;;
         esac
+
+        # Skip cleanup if share has no secondary pool configured
+        share_cfg_check_str="${SHARE_CFG_DIR}/${cleanup_share_str}.cfg"
+        if [[ -f "${share_cfg_check_str}" ]]; then
+            pool2_check_str="$(grep -E '^shareCachePool2=' "${share_cfg_check_str}" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs || true)"
+            if [[ -z "${pool2_check_str}" ]]; then
+                log_debug "Cleanup skipped for ${cleanup_share_str}: no secondary pool configured"
+                continue
+            fi
+        fi
 
         if [[ "${DRY_RUN:-no}" == "yes" ]]; then
             find "${src_path_str}" -mindepth 1 -depth -type d -empty | while IFS= read -r dir_str; do
@@ -1347,7 +1358,7 @@ fi
 # ==========================================================
 #  POOL-WIDE CLEANUP (CLEANUP=yes)
 # ==========================================================
-if [[ "${CLEANUP:-no}" == "yes" ]]; then
+if [[ "${CLEANUP:-no}" == "yes" && "${moved_anything_bool}" == true ]]; then
     log_step "Pool-wide cleanup (CLEANUP=yes)"
     set_status "Cleaning Up"
     pool_path_str="/mnt/${POOL_NAME:-cache}"
@@ -1377,6 +1388,18 @@ if [[ "${CLEANUP:-no}" == "yes" ]]; then
             [[ -d "${share_dir_str}" ]] || continue
             share_dir_str="${share_dir_str%/}"
             is_excluded "${share_dir_str}" && continue
+
+            # Skip cleanup if share has no secondary pool configured
+            share_name_check_str="$(basename "${share_dir_str}")"
+            share_cfg_check_str="${SHARE_CFG_DIR}/${share_name_check_str}.cfg"
+            if [[ -f "${share_cfg_check_str}" ]]; then
+                pool2_check_str="$(grep -E '^shareCachePool2=' "${share_cfg_check_str}" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs || true)"
+                if [[ -z "${pool2_check_str}" ]]; then
+                    log_debug "Pool-wide cleanup skipped for ${share_name_check_str}: no secondary pool configured"
+                    continue
+                fi
+            fi
+
             log_debug "Pool-wide cleanup scanning: ${share_dir_str}"
             if [[ "${DRY_RUN:-no}" == "yes" ]]; then
                 find "${share_dir_str}" -mindepth 1 -depth -type d -empty | while IFS= read -r dir_str; do
