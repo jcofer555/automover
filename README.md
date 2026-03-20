@@ -4,24 +4,19 @@
 
 ## Features ##
 - Monitor selected pool disks only (cache, other pools — excludes array)
-- Enable dry-run mode to simulate triggers
-- Selected pool's usage % is displayed
+- Able to schedule different settings for different pools
+- Dry-run mode to simulate a run
 - Only moves from pool -> array or pool -> pool and skips any shares set to array -> pool
 - Threshold setting to prevent moving unless pool is at least that % full
 - Stop threshold setting to stop moving once pool reaches that %
 - Autostart at boot option
-- Move now button to bypass filters
 - Allow or deny moving when parity is checking
 - Option to trim ssd disks after files are moved
 - Option to run a script pre move and/or post move
-- Option to have notifications sent to unraid or discord
+- Notification support for discord, gotify, ntfy, pushover, slack, and unraids built in
 - Ability to set cpu and i/o priorities
-- Scheduling options available (hourly, daily, weekly, monthly)
-- Option to have start and finish notifications sent to unraid or discord
-- Option to run a seperate script pre move and/or post move
-- Option to run trim after moving is done
 - Built in trash guides mover script to pause and resume active torrents so the files can be moved
-- Jdupes option built in to re-hardlink any files after every move
+- Jdupes option to re-hardlink any files after every move
 - Manual rsync options using manual move from the mode dropdown
 - Option to stop containers before moves and start them back after finish
 - Ability to force turbo write on during move
