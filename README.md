@@ -28,4 +28,4 @@
 - Recommend disabling unraids built in mover schedule at settings > scheduler which requires unraid 7.2.1+
 - Recommend not combining with mover tuning plugin
 
-<img width="1000" height="414" alt="image" src="https://github.com/user-attachments/assets/89fc5123-219f-424e-82d1-9a24089afa72" />
+<img width="1000" height="476" alt="image" src="https://github.com/user-attachments/assets/69440baf-fa56-48b8-a5d5-682b1383a0e9" />
