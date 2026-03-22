@@ -44,7 +44,7 @@ function fallbackCopy(t) {
 let snStatus = null, snLock = null, snLog = null, snMoved = null;
 let logDebug  = false, logAuto = false, movedAuto = false, lastRunTs = null;
 
-// ── Custom dialogs at module scope so onclick handlers in injected HTML can reach them ──
+// ── Custom dialogs ────────────────────────────────────────────────────────────
 function ambConfirm(msg, onOk) {
   const modal  = document.getElementById('amb-confirm');
   const msgEl  = document.getElementById('amb-confirm-msg');
@@ -80,9 +80,9 @@ function ambAlert(msg, title) {
   okBtn.addEventListener('click', handleOk);
 }
 
-// ── Banner state — must be at module scope so pollLock can access ─────────────
+// ── Banner state ──────────────────────────────────────────────────────────────
 let ambMoveRunning = false;
-let ambStopPending = false; // true during the 2.5s "stop requested" window
+let ambStopPending = false;
 
 function ambShowBanner(msg) {
   ambMoveRunning = true;
@@ -151,8 +151,6 @@ function applyLogSearch(logId, searchId, countId, clearId) {
 }
 
 // ── Tooltipster helper ────────────────────────────────────────────────────────
-// Initialises tooltipster on elements that have a data-tipster attribute.
-// Safe to call multiple times — skips already-initialised elements.
 function ambInitTooltips(root) {
   const ctx = root || document;
   if (typeof $ === 'undefined' || !$.fn || !$.fn.tooltipster) return;
@@ -165,7 +163,6 @@ function ambInitTooltips(root) {
       delay:    120,
       content:  $el.data('tipster'),
     });
-    // Remove native title so browser doesn't double-tip
     $el.removeAttr('title');
   });
 }
@@ -199,7 +196,7 @@ function ambInitTooltips(root) {
       if (sn === snLock) return;
       snLock = sn;
       const locked = !!((d.data || d).locked);
-      if (ambStopPending) return; // don't interfere during stop countdown
+      if (ambStopPending) return;
       if (locked  && !ambMoveRunning) ambShowBanner('⚠ Move in progress');
       if (!locked &&  ambMoveRunning) ambHideBanner();
     })
@@ -311,10 +308,8 @@ function checkPoolWarn(pool) {
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
 
-  // ── Initialise tooltipster on all static buttons ──────────────────────────
   ambInitTooltips(document);
 
-  // ── Custom confirm dialog (replaces native confirm() which browsers suppress) ─
   function initSearch(si, xi, onInput) {
     const s = document.getElementById(si);
     const x = document.getElementById(xi);
@@ -335,7 +330,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initSearch('algs', 'algx', () => applyLogSearch('algl', 'algs', 'algc', 'algx'));
   initSearch('amvs', 'amvx', () => { snMoved = null; });
 
-  // ── Scroll buttons ───────────────────────────────────────────────────────────
+  // ── Scroll buttons ────────────────────────────────────────────────────────────
   (function () {
     const el = document.getElementById('algl');
     document.getElementById('algtp')?.addEventListener('click', () => { logAuto = false; if (el) el.scrollTop = 0; });
@@ -359,7 +354,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   })();
 
-  // ── Clear / copy buttons ─────────────────────────────────────────────────────
+  // ── Clear / copy ──────────────────────────────────────────────────────────────
   document.getElementById('algcl')?.addEventListener('click', function () {
     const lbl = logDebug ? 'debug log' : 'automover log';
     if (!confirm('Clear the ' + lbl + '?')) return;
@@ -407,10 +402,10 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(() => fallbackCopy(t)) || fallbackCopy(t);
   });
 
-  // ── Pool change ──────────────────────────────────────────────────────────────
+  // ── Pool change ───────────────────────────────────────────────────────────────
   document.getElementById('apool')?.addEventListener('change', function () { checkPoolWarn(this.value); });
 
-  // ── Mode switcher ────────────────────────────────────────────────────────────
+  // ── Mode switcher ─────────────────────────────────────────────────────────────
   const msSel = document.getElementById('amb-ms');
   function applyMode() {
     const m = msSel?.value;
@@ -422,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function () {
   msSel?.addEventListener('change', applyMode);
   applyMode();
 
-  // ── Cron mode ────────────────────────────────────────────────────────────────
+  // ── Cron mode ─────────────────────────────────────────────────────────────────
   const cronSel = document.getElementById('acm');
   function applyCron() {
     const v   = cronSel?.value;
@@ -437,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function () {
   cronSel?.addEventListener('change', applyCron);
   applyCron();
 
-  // ── Option sliders → show/hide conditional sections ──────────────────────────
+  // ── Option sliders ────────────────────────────────────────────────────────────
   const OPTS_MAP = [
     ['antf', ['an-sec']],
     ['apri', ['apr-sec']],
@@ -461,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function () {
     apply();
   });
 
-  // ── Python warning ───────────────────────────────────────────────────────────
+  // ── Python warning ────────────────────────────────────────────────────────────
   (function () {
     const w     = document.getElementById('apyw'); if (!w) return;
     const cb    = document.getElementById('aqbt');
@@ -471,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
     upd();
   })();
 
-  // ── Webhook fields ───────────────────────────────────────────────────────────
+  // ── Webhook fields ────────────────────────────────────────────────────────────
   const WH_CFG = {
     Discord:  { label: 'Discord Webhook URL',    prefix: 'https://discord.com/api/webhooks/' },
     Gotify:   { label: 'Gotify URL',             prefix: 'https://' },
@@ -481,7 +476,6 @@ document.addEventListener('DOMContentLoaded', function () {
     Unraid:   { label: null },
   };
 
-  // ── Notification multiselect ─────────────────────────────────────────────────
   const ams  = document.getElementById('anms');
   const amsl = document.getElementById('anml-list');
   const anml = document.getElementById('anml');
@@ -562,7 +556,7 @@ document.addEventListener('DOMContentLoaded', function () {
     w.classList.toggle('on', !ok);
   }
 
-  // ── qBit days order validation ───────────────────────────────────────────────
+  // ── qBit days order validation ────────────────────────────────────────────────
   ['aqbdf', 'aqbdt'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', () => {
       const f    = parseInt(document.getElementById('aqbdf')?.value, 10);
@@ -571,7 +565,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // ── Shared helpers ───────────────────────────────────────────────────────────
+  // ── Shared helpers ────────────────────────────────────────────────────────────
   function safeJson(r, label) {
     if (!r.ok) throw new Error(label + ' returned HTTP ' + r.status);
     return r.text().then(txt => {
@@ -699,7 +693,7 @@ document.addEventListener('DOMContentLoaded', function () {
     .then(sd => { if (sd.status === 'error') throw new Error('Save failed: ' + (sd.message || 'Unknown')); });
   }
 
-  // ── Schedule CRUD ────────────────────────────────────────────────────────────
+  // ── Schedule CRUD ─────────────────────────────────────────────────────────────
   let ambEditingId = null;
 
   function ambLoadSchedules() {
@@ -711,7 +705,6 @@ document.addEventListener('DOMContentLoaded', function () {
           document.querySelector('#amb-schedule-list .TableContainer') ? 'block' : 'none';
         setTimeout(() => {
           ambInitTableTips();
-          // Re-init tooltipster on any newly injected buttons inside the schedule list
           ambInitTooltips(document.getElementById('amb-schedule-list'));
         }, 50);
       })
@@ -756,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const newMins = toMins(newCron);
     if (!newMins.length) return null;
     for (const e of existing) {
-      if (e.id === excludeId) continue;
+      if (excludeId && e.id.trim() === String(excludeId).trim()) continue;
       const em = toMins(e.cron);
       for (const nt of newMins) {
         for (const et of em) {
@@ -805,23 +798,76 @@ document.addEventListener('DOMContentLoaded', function () {
     .catch(e => { ambAlert(e.message || 'Failed to save schedule'); });
   }
 
-  function ambResetScheduleUI() {
-    ambEditingId = null;
-    const btn = document.getElementById('amb-schedule-btn');
-    if (btn) btn.textContent = 'Schedule It';
-    document.getElementById('amb-cancel-edit-btn').style.display = 'none';
-    // Restore the edit button in the table row if it was changed
-    const editingBtn = document.querySelector('#amb-schedule-list button[data-action="edit"][data-editing="true"]');
-    if (editingBtn) {
-      editingBtn.textContent = 'Edit';
-      editingBtn.removeAttribute('data-editing');
+  // ── Schedule edit mode helpers ────────────────────────────────────────────────
+  function ambEnterEditMode(id) {
+    // Hide Move Now, show Update
+    const moveNow = document.getElementById('amnb');
+    const update  = document.getElementById('amnb-update');
+    if (moveNow) moveNow.style.display = 'none';
+    if (update)  update.style.display  = '';
+    // Hide Schedule It, show Cancel
+    const schedBtn  = document.getElementById('amb-schedule-btn');
+    const cancelBtn = document.getElementById('amb-cancel-edit-btn');
+    if (schedBtn)  schedBtn.style.display  = 'none';
+    if (cancelBtn) cancelBtn.style.display = '';
+    // Grey out Save button
+    const saveBtn = document.getElementById('amb-save-btn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = '0.45'; saveBtn.style.cursor = 'not-allowed'; }
+    // Mark the table Edit button as Update for this row
+    ambMarkTableEditBtn(id, true);
+  }
+
+  function ambMarkTableEditBtn(id, isEditing) {
+    // Reset all Edit buttons to their original onclick
+    document.querySelectorAll('#amb-schedule-list button[data-action="edit"]').forEach(btn => {
+      const btnId = btn.dataset.id;
+      btn.textContent = 'Edit';
+      delete btn.dataset.updating;
+      btn.onclick = function() { window.ambEditSchedule(btnId, btn); };
+      if (typeof $ !== 'undefined' && $(btn).hasClass('tooltipstered')) {
+        $(btn).tooltipster('content', 'Edit this schedule');
+      } else {
+        btn.setAttribute('data-tipster', 'Edit this schedule');
+      }
+    });
+    if (isEditing && id) {
+      const target = document.querySelector(
+        '#amb-schedule-list button[data-action="edit"][data-id="' + id + '"]'
+      );
+      if (target) {
+        target.textContent = 'Update';
+        target.dataset.updating = 'true';
+        target.onclick = function() { ambScheduleJob(); };
+        if (typeof $ !== 'undefined' && $(target).hasClass('tooltipstered')) {
+          $(target).tooltipster('content', 'Save changes to this schedule');
+        } else {
+          target.setAttribute('data-tipster', 'Save changes to this schedule');
+        }
+      }
     }
   }
 
+  function ambResetScheduleUI() {
+    ambEditingId = null;
+    // Restore Move Now, hide Update
+    const moveNow = document.getElementById('amnb');
+    const update  = document.getElementById('amnb-update');
+    if (moveNow) moveNow.style.display = '';
+    if (update)  update.style.display  = 'none';
+    // Restore Schedule It, hide Cancel
+    const schedBtn  = document.getElementById('amb-schedule-btn');
+    const cancelBtn = document.getElementById('amb-cancel-edit-btn');
+    if (schedBtn)  schedBtn.style.display  = '';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    // Re-enable Save
+    const saveBtn = document.getElementById('amb-save-btn');
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ''; saveBtn.style.cursor = ''; }
+    // Reset table edit buttons
+    ambMarkTableEditBtn(null, false);
+  }
+
   window.ambEditSchedule = function (id, editBtn) {
-    // If already editing this row, treat as cancel
     if (ambEditingId === id) { ambResetScheduleUI(); return; }
-    // Reset any previously editing row first
     if (ambEditingId) ambResetScheduleUI();
     fetch(ah('schedule_load.php') + '?id=' + encodeURIComponent(id))
       .then(r => safeJson(r, 'schedule_load.php'))
@@ -854,6 +900,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (c) c.checked = (v === 'yes');
           }
         });
+        // Populate cron fields from stored expression
         if (s.CRON) populateCronUI(s.CRON);
         if (settings.NOTIFICATION_SERVICE) {
           const svcs = settings.NOTIFICATION_SERVICE.split(',').map(s => s.trim());
@@ -873,11 +920,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         checkPoolWarn(g('apool'));
         ambEditingId = id;
-        // Change the row's Edit button to Cancel
-        if (editBtn) { editBtn.textContent = 'Cancel'; editBtn.dataset.editing = 'true'; }
-        const btn = document.getElementById('amb-schedule-btn');
-        if (btn) btn.textContent = 'Update Schedule';
-        document.getElementById('amb-cancel-edit-btn').style.display = '';
+        ambEnterEditMode(id);
         document.getElementById('aap')?.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(e => { ambAlert('Failed to load schedule: ' + e.message); });
@@ -925,32 +968,39 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   };
 
-  // Delegated listener on document — most reliable cross-browser approach
+  // Delegated listener on document
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('#amb-schedule-list button[data-action]');
     if (!btn) return;
-    console.log('[amb] schedule btn clicked', btn.dataset.action, btn.dataset.id);
     const action  = btn.dataset.action;
     const id      = btn.dataset.id;
     const enabled = btn.dataset.enabled === 'true';
-    if (action === 'edit')   window.ambEditSchedule(id, btn);
+    if (action === 'edit' && !btn.dataset.updating) window.ambEditSchedule(id, btn);
     if (action === 'toggle') window.ambToggleSchedule(id, enabled);
     if (action === 'delete') window.ambDeleteSchedule(id);
     if (action === 'run')    window.ambRunSchedule(id, btn);
   });
 
   document.getElementById('amb-schedule-btn')?.addEventListener('click', ambScheduleJob);
+  document.getElementById('amnb-update')?.addEventListener('click', ambScheduleJob);
   document.getElementById('amb-cancel-edit-btn')?.addEventListener('click', () => { ambResetScheduleUI(); });
+
+  // ── Save button — saves settings without running ───────────────────────────
+  document.getElementById('amb-save-btn')?.addEventListener('click', function() {
+    doSaveSettings()
+      .then(() => showPop('asp', '✅ Settings Saved'))
+      .catch(e => { ambAlert(e.message || 'Failed to save settings'); });
+  });
 
   ambLoadSchedules();
 
-  // ── Restore banner if move is already running on page load ───────────────────
+  // Restore banner if move already running on page load
   fetch(ah('check_lock.php'))
     .then(r => r.json())
     .then(d => { if ((d.data || d).locked) ambShowBanner('⚠ Move in progress'); })
     .catch(() => {});
 
-  // ── Clearable input X buttons ────────────────────────────────────────────────
+  // ── Clearable input X buttons ─────────────────────────────────────────────────
   document.querySelectorAll('.amb-clr-wrap .amb-clr').forEach(btn => {
     const inp = document.getElementById(btn.dataset.target);
     if (!inp) return;
@@ -965,7 +1015,7 @@ document.addEventListener('DOMContentLoaded', function () {
     update();
   });
 
-  // ── Stop ─────────────────────────────────────────────────────────────────────
+  // ── Stop ──────────────────────────────────────────────────────────────────────
   document.getElementById('astopb')?.addEventListener('click', function () {
     fetch(ah('stop_automover.php'), {
       method:      'POST',
@@ -983,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }).catch(() => {});
   });
 
-  // ── Move button ──────────────────────────────────────────────────────────────
+  // ── Move Now button — saves settings then launches move ────────────────────────
   document.getElementById('amnb')?.addEventListener('click', function () {
     if (ambMoveRunning) return;
     if (!validateQbit()) {
@@ -1009,7 +1059,7 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(e => { console.error('Move error:', e); ambAlert(e.message || 'Move failed'); });
   });
 
-  // ── Exclusion picker ─────────────────────────────────────────────────────────
+  // ── Exclusion picker ──────────────────────────────────────────────────────────
   let pickerPath = '/mnt', pickerExts = new Set();
 
   function buildCrumbs(path, crmId) {
@@ -1170,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', function () {
     .catch(() => showToast('algt', 'Save failed'));
   });
 
-  // ── Path picker (manual move) ────────────────────────────────────────────────
+  // ── Path picker (manual move) ─────────────────────────────────────────────────
   let ppMode = '', ppPath = '/mnt', ppSel = '';
 
   function ppBuildCrumbs(path) { buildCrumbs(path, 'appcrm'); }
@@ -1287,7 +1337,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (e.key === 'Escape') document.getElementById('appnnc')?.click();
   });
 
-  // ── Manual move ──────────────────────────────────────────────────────────────
+  // ── Manual move ───────────────────────────────────────────────────────────────
   ['ammc', 'ammd2', 'ammsy'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', function () {
       if (this.checked) {
@@ -1329,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', function () {
     .catch(() => showPop('ammp2', '❌ Request error'));
   });
 
-  // ── Mover tuning warning ─────────────────────────────────────────────────────
+  // ── Mover tuning warning ──────────────────────────────────────────────────────
   const mwBox = document.getElementById('amb-mw');
   if (mwBox) {
     fetch(ah('mover_warning_state.php'))
@@ -1358,7 +1408,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // ── Inline help (click label → tooltip below row; F1 toggles all) ────────────
+  // ── Inline help ───────────────────────────────────────────────────────────────
   let hlastClick = 0;
   function attachHelp(trigger, text, insertAfter) {
     if (trigger._helpAttached) return;
@@ -1387,7 +1437,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const row = span.closest('.af'); if (!row) return;
     attachHelp(span, tip, row);
   });
-  const tips = { apl: 'Switch between your installed jcofer555 plugins', aml: 'Switch between Automover scheduling mode and Manual Move mode' };
+  const tips = { apl: 'Easily switch between your installed jcofer555 plugins', aml: 'Switch between Automover scheduling mode and Manual Move mode' };
   document.querySelectorAll('#amb-tb .atbl[id]').forEach(span => {
     const tip = tips[span.id]; if (!tip) return;
     const tb  = document.getElementById('amb-tb'); if (tb) attachHelp(span, tip, tb);
