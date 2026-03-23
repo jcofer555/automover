@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/rebuild_cron.php';
@@ -64,7 +65,8 @@ const ALLOWED_KEYS = [
 ];
 
 // ── respond() ─────────────────────────────────────────────────────────────────
-function respond(int $code, array $payload): void {
+function respond(int $code, array $payload): void
+{
     http_response_code($code);
     header('Content-Type: application/json');
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -72,7 +74,8 @@ function respond(int $code, array $payload): void {
 }
 
 // ── load_schedules() ──────────────────────────────────────────────────────────
-function load_schedules(string $cfg): array {
+function load_schedules(string $cfg): array
+{
     $real = realpath($cfg);
     if ($real === false || !file_exists($real)) {
         respond(404, ['error' => 'Schedules file not found']);
@@ -85,7 +88,8 @@ function load_schedules(string $cfg): array {
 }
 
 // ── write_schedules() ─────────────────────────────────────────────────────────
-function write_schedules(string $cfg, array $schedules): void {
+function write_schedules(string $cfg, array $schedules): void
+{
     $real = realpath($cfg);
     if ($real === false) {
         respond(500, ['error' => 'Cannot resolve schedules file path']);
@@ -111,22 +115,9 @@ function write_schedules(string $cfg, array $schedules): void {
     }
 }
 
-// ── check_duplicate() ─────────────────────────────────────────────────────────
-// Reject if another schedule (not the one being updated) has the same cron expression.
-function check_duplicate(array $schedules, string $new_cron, string $exclude_id): void {
-    foreach ($schedules as $id => $s) {
-        if ($id === $exclude_id) continue;
-        if (trim((string)($s['CRON'] ?? '')) === $new_cron) {
-            respond(409, [
-                'error'       => 'A schedule with this cron expression already exists',
-                'conflict_id' => $id,
-            ]);
-        }
-    }
-}
-
 // ── main() ────────────────────────────────────────────────────────────────────
-function main(): void {
+function main(): void
+{
     $id       = trim($_POST['id']       ?? '');
     $cron     = trim($_POST['cron']     ?? '');
     $settings = $_POST['settings']      ?? [];
@@ -156,9 +147,6 @@ function main(): void {
     if (!isset($schedules[$id])) {
         respond(404, ['error' => 'Schedule not found']);
     }
-
-    // Duplicate cron check — exclude self to avoid false conflict on unchanged cron
-    check_duplicate($schedules, $cron, $id);
 
     // Encode settings as escaped JSON for safe INI storage
     $settings_json = addcslashes(

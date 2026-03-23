@@ -69,8 +69,6 @@ ksort($write);
 $cfg=''; foreach ($write as $k=>$v) { $cfg.="$k=\"{$v}\"\n"; }
 @file_put_contents(CFG_PATH,$cfg);
 $settings=$existing;
-$unraid_version='7.1';
-if (file_exists('/etc/unraid-version')) { $d=parse_ini_file('/etc/unraid-version'); if (!empty($d['version'])) $unraid_version=$d['version']; }
 $sib_checks=[
     'automover_beta'             =>['plg'=>'/boot/config/plugins/automover_beta.plg','page'=>'/usr/local/emhttp/plugins/automover_beta/automover_beta.page','label'=>'Automover (Beta)','url'=>'/Settings/automover_beta'],
     'flash-backup'          =>['plg'=>'/boot/config/plugins/flash-backup.plg','page'=>'/usr/local/emhttp/plugins/flash-backup/flash-backup.page','label'=>'Flash Backup','url'=>'/Settings/flash-backup'],

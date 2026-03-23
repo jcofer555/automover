@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/rebuild_cron.php';
@@ -64,39 +65,17 @@ const ALLOWED_KEYS = [
 ];
 
 // ── respond() ─────────────────────────────────────────────────────────────────
-function respond(int $code, array $payload): void {
+function respond(int $code, array $payload): void
+{
     http_response_code($code);
     header('Content-Type: application/json');
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-// ── load_schedules() ──────────────────────────────────────────────────────────
-function load_schedules(string $cfg): array {
-    $real = realpath($cfg);
-    if ($real === false || !file_exists($real)) {
-        return [];
-    }
-    $schedules = parse_ini_file($real, true, INI_SCANNER_RAW);
-    return is_array($schedules) ? $schedules : [];
-}
-
-// ── check_duplicate() ─────────────────────────────────────────────────────────
-// Reject if another schedule already has the exact same cron expression.
-function check_duplicate(array $schedules, string $new_cron, string $exclude_id = ''): void {
-    foreach ($schedules as $id => $s) {
-        if ($id === $exclude_id) continue;
-        if (trim((string)($s['CRON'] ?? '')) === $new_cron) {
-            respond(409, [
-                'error'       => 'A schedule with this cron expression already exists',
-                'conflict_id' => $id,
-            ]);
-        }
-    }
-}
-
 // ── append_schedule() ─────────────────────────────────────────────────────────
-function append_schedule(string $cfg, string $id, string $cron, string $settings_json): void {
+function append_schedule(string $cfg, string $id, string $cron, string $settings_json): void
+{
     $real   = realpath($cfg);
     $target = ($real !== false) ? $real : $cfg;
 
@@ -111,7 +90,8 @@ function append_schedule(string $cfg, string $id, string $cron, string $settings
 }
 
 // ── main() ────────────────────────────────────────────────────────────────────
-function main(): void {
+function main(): void
+{
     $cron     = trim($_POST['cron']     ?? '');
     $settings = $_POST['settings']      ?? [];
 
@@ -138,9 +118,6 @@ function main(): void {
     if (!is_dir($cfg_dir)) {
         mkdir($cfg_dir, 0755, true);
     }
-
-    $schedules = load_schedules(SCHEDULES_CFG);
-    check_duplicate($schedules, $cron);
 
     // Encode settings as escaped JSON for safe INI storage
     $settings_json = addcslashes(
