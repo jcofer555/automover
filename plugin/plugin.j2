@@ -48,7 +48,30 @@ PACKAGE_TXZ="/boot/config/plugins/{{ name }}/{{ package_name }}-{{ env['PLUGIN_V
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
-CRON_FILE="/boot/config/plugins/automover/automover.cron"
+
+# Ensure default settings file exists
+if [ ! -f "$DEFAULT_CFG" ]; then
+    echo "ERROR: Missing default settings file: $DEFAULT_CFG"
+    exit 1
+fi
+
+# Ensure main package exists
+if [ ! -f "$PACKAGE_TXZ" ]; then
+    echo "ERROR: Package missing: $PACKAGE_TXZ"
+    exit 1
+fi
+
+# Ensure jdupes package exists
+if [ ! -f "/boot/config/plugins/{{ name }}/jdupes-1.30.0-x86_64-2_slackdce.txz" ]; then
+    echo "ERROR: Missing jdupes package"
+    exit 1
+fi
+
+# Ensure libjodycode package exists
+if [ ! -f "/boot/config/plugins/{{ name }}/libjodycode-4.0.1-x86_64-2_slackdce.txz" ]; then
+    echo "ERROR: Missing libjodycode package"
+    exit 1
+fi
 
 # Install the package
 upgradepkg --install-new "$PACKAGE_TXZ"
@@ -63,28 +86,21 @@ ordered_keys=(
     "AGE_BASED_FILTER"
     "AGE_DAYS"
     "ALLOW_DURING_PARITY"
-    "AUTOSTART"
-    "CONTAINER_NAMES"
-    "CRON_EXPRESSION"
-    "CRON_MODE"
-    "DAILY_TIME"
+    "CLEANUP"
+    "CPU_AND_IO_PRIORITIES"
+    "CPU_PRIORITY"
     "DRY_RUN"
-    "ENABLE_CLEANUP"
-    "ENABLE_JDUPES"
-    "ENABLE_NOTIFICATIONS"
-    "ENABLE_SCRIPTS"
-    "ENABLE_TRIM"
-    "EXCLUSIONS_ENABLED"
-    "FORCE_RECONSTRUCTIVE_WRITE"
-    "HASH_PATH"
+    "EXCLUSIONS"
+    "FORCE_TURBO_WRITE"
+    "HASH_LOCATION"
     "HIDDEN_FILTER"
-    "HOURLY_FREQUENCY"
     "IO_PRIORITY"
-    "MONTHLY_DAY"
-    "MONTHLY_TIME"
+    "JDUPES"
     "NOTIFICATION_SERVICE"
+    "NOTIFICATIONS"
     "POOL_NAME"
     "POST_SCRIPT"
+    "PRE_AND_POST_SCRIPTS"
     "PRE_SCRIPT"
     "PRIORITIES"
     "PROCESS_PRIORITY"
@@ -92,23 +108,22 @@ ordered_keys=(
     "QBITTORRENT_DAYS_FROM"
     "QBITTORRENT_DAYS_TO"
     "QBITTORRENT_HOST"
+    "QBITTORRENT_MOVE_SCRIPT"
     "QBITTORRENT_PASSWORD"
-    "QBITTORRENT_SCRIPT"
     "QBITTORRENT_STATUS"
     "QBITTORRENT_USERNAME"
+    "SIZE"
     "SIZE_BASED_FILTER"
-    "SIZE_MB"
     "SIZE_UNIT"
     "STOP_ALL_CONTAINERS"
     "STOP_THRESHOLD"
+    "SSD_TRIM"
     "THRESHOLD"
     "WEBHOOK_DISCORD"
     "WEBHOOK_GOTIFY"
     "WEBHOOK_NTFY"
     "WEBHOOK_PUSHOVER"
     "WEBHOOK_SLACK"
-    "WEEKLY_DAY"
-    "WEEKLY_TIME"
 )
 
 # ==========================================================
@@ -135,45 +150,19 @@ fi
 
 mv "$TMP_CFG" "$USER_CFG"
 
-# ==========================================================
-#  LOAD SETTINGS & SETUP CRON
-# ==========================================================
-SETTINGS="/boot/config/plugins/automover/settings.cfg"
-if [ -f "$SETTINGS" ]; then
-    source "$SETTINGS"
-fi
-
 # === Check for Mover Tuning plugin ===
 MOVER_TUNING="/boot/config/plugins/ca.mover.tuning.plg"
 MOVER_TUNING_DIR="/usr/local/emhttp/plugins/ca.mover.tuning"
 
-if realpath "$MOVER_TUNING" &>/dev/null || [ -d "$MOVER_TUNING_DIR" ]; then
-  if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
+if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
     echo -e "⚠️ Mover Tuning plugin appears to be installed. Having both can result in conflicts between Mover Tuning and Automover.\nConsider uninstalling one to avoid incompatibility issues"
-  fi
 fi
 
 # Remove older txz packages (keep only the current one)
 find /boot/config/plugins/{{ name }}/ -maxdepth 1 -type f -name "{{ package_name }}-*.txz" ! -name "{{ package_name }}-{{ env['PLUGIN_VERSION'] }}-noarch-1.txz" -delete
 
 # Ensure helper scripts are executable
-chmod +x /usr/local/emhttp/plugins/{{ name }}/helpers/*
-
-# ==========================================================
-#  HANDLE AUTOSTART + CRON GENERATION (NEW CRON-ONLY MODEL)
-# ==========================================================
-CRON_CMD="/usr/local/emhttp/plugins/automover/helpers/automover.sh &> /dev/null 2>&1"
-
-if [ "$AUTOSTART" == "no" ]; then
-    rm -f "$CRON_FILE"
-else
-    if [ -n "$CRON_EXPRESSION" ]; then
-        echo "${CRON_EXPRESSION} ${CRON_CMD}" > "$CRON_FILE"
-    else
-        rm -f "$CRON_FILE"
-    fi
-    update_cron
-fi
+chmod -f +x /usr/local/emhttp/plugins/{{ name }}/helpers/* 2>/dev/null
 
 echo ""
 echo "----------------------------------------------------"
@@ -198,8 +187,8 @@ echo ""
 <INLINE>
 <![CDATA[
 removepkg {{ package_name }}
-removepkg "/boot/config/plugins/{{ name }}/jdupes-1.30.0-x86_64-2_slackdce.txz"
-removepkg "/boot/config/plugins/{{ name }}/libjodycode-4.0.1-x86_64-2_slackdce.txz"
+removepkg jdupes-1.30.0-x86_64-2_slackdce
+removepkg libjodycode-4.0.1-x86_64-2_slackdce
 rm -f /boot/config/plugins/{{ name }}/jdupes-1.30.0-x86_64-2_slackdce.txz
 rm -f /boot/config/plugins/{{ name }}/libjodycode-4.0.1-x86_64-2_slackdce.txz
 rm -rf /usr/local/emhttp/plugins/{{ name }}
