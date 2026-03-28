@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+rm -f /tmp/automover/boot_failure
+rm -f /tmp/automover/temp_logs/status.txt
+
 # ==========================================================
 #  CONSTANTS
 # ==========================================================
@@ -24,7 +27,6 @@ readonly STOP_FILE="${TMP_LOGS_DIR}/stopped_containers.txt"
 readonly RSYNC_SPEED_FILE="${TMP_LOGS_DIR}/rsync_speed.txt"
 readonly LOCK_FILE="${TMP_DIR}/lock.txt"
 readonly DONE_FILE="${TMP_LOGS_DIR}/done.txt"
-readonly BOOT_FAIL_FILE="${TMP_DIR}/boot_failure"
 readonly QBIT_PAUSED_FILE="${TMP_DIR}/qbittorrent_paused.txt"
 readonly QBIT_RESUMED_FILE="${TMP_DIR}/qbittorrent_resumed.txt"
 readonly ELIGIBLE_TMP_FILE="${TMP_LOGS_DIR}/eligible_files.txt"
@@ -214,11 +216,11 @@ fi
 
 # List of all config keys the script uses
 CONFIG_VARS=(
-    AGE_BASED_FILTER AGE_DAYS ALLOW_DURING_PARITY AUTOSTART_ON_BOOT
+    AGE_BASED_FILTER AGE_DAYS ALLOW_DURING_PARITY
     CLEANUP CPU_AND_IO_PRIORITIES DRY_RUN
     EXCLUSIONS FORCE_TURBO_WRITE
     HASH_LOCATION HIDDEN_FILTER IO_PRIORITY
-    JDUPES MANUAL_MOVE
+    JDUPES
     NOTIFICATION_SERVICE NOTIFICATIONS POOL_NAME POST_SCRIPT PRE_AND_POST_SCRIPTS PRE_SCRIPT
     CPU_PRIORITY PUSHOVER_USER_KEY
     QBITTORRENT_DAYS_FROM QBITTORRENT_DAYS_TO QBITTORRENT_HOST
@@ -777,17 +779,6 @@ log_session_end() {
     log_info ""
     log_debug "Session ended. duration=${duration_str} moved=${moved_anything_bool} state=${current_state_str}"
 }
-
-# ==========================================================
-#  BOOT FAILURE CHECK
-# ==========================================================
-if [[ -f "${BOOT_FAIL_FILE}" ]]; then
-    set_status "Autostart Failed"
-    log_info "Autostart failure detected: $(cat "${BOOT_FAIL_FILE}")"
-    log_debug "Boot failure file found: ${BOOT_FAIL_FILE}"
-    log_session_end
-    cleanup 0
-fi
 
 # ==========================================================
 #  PARITY GUARD

@@ -405,18 +405,6 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Pool change ───────────────────────────────────────────────────────────────
   document.getElementById('apool')?.addEventListener('change', function () { checkPoolWarn(this.value); });
 
-  // ── Mode switcher ─────────────────────────────────────────────────────────────
-  const msSel = document.getElementById('amb-ms');
-  function applyMode() {
-    const m = msSel?.value;
-    document.getElementById('aap').style.display  = m === 'manual' ? 'none' : '';
-    document.getElementById('ammp').style.display = m === 'manual' ? '' : 'none';
-    const t = document.getElementById('act');
-    if (t) t.textContent = m === 'manual' ? 'Manual Move' : 'Automover';
-  }
-  msSel?.addEventListener('change', applyMode);
-  applyMode();
-
   // ── Cron mode ─────────────────────────────────────────────────────────────────
   const cronSel = document.getElementById('acm');
   function applyCron() {
@@ -635,8 +623,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const { cron, mode } = buildCronFromUI();
     return {
       AGE_BASED_FILTER:       cb('aagf'), AGE_DAYS:              g('aaged'),
-      ALLOW_DURING_PARITY:    cb('aap2'), AUTOSTART_ON_BOOT:     cb('aaut'),
-      CLEANUP:                cb('acln'), CPU_AND_IO_PRIORITIES: cb('apri'),
+      ALLOW_DURING_PARITY:    cb('aap2'), CLEANUP:               cb('acln'), CPU_AND_IO_PRIORITIES: cb('apri'),
       CPU_PRIORITY:           g('acpu'),  CRON_EXPRESSION:       cron || '',
       CRON_MODE:              mode || g('acm') || 'daily',
       DAILY_MINUTE:           g('adm'),   DAILY_TIME:            g('adt'),
@@ -644,7 +631,6 @@ document.addEventListener('DOMContentLoaded', function () {
       FORCE_TURBO_WRITE:      cb('atw'),  HASH_LOCATION:         g('ahp'),
       HIDDEN_FILTER:          cb('ahid'), HOURLY_FREQUENCY:      g('ahf'),
       IO_PRIORITY:            g('aiop'),  JDUPES:                cb('ajdp'),
-      MANUAL_MOVE:            document.getElementById('amb-ms')?.value === 'manual' ? 'yes' : 'no',
       MONTHLY_DAY:            g('amdy'),  MONTHLY_MINUTE:        g('amm'),
       MONTHLY_TIME:           g('amt'),   NOTIFICATION_SERVICE:  svcs,
       NOTIFICATIONS:          cb('antf'), POOL_NAME:             g('apool'),
@@ -800,25 +786,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ── Schedule edit mode helpers ────────────────────────────────────────────────
   function ambEnterEditMode(id) {
-    // Hide Move Now, show Update
     const moveNow = document.getElementById('amnb');
     const update  = document.getElementById('amnb-update');
     if (moveNow) moveNow.style.display = 'none';
     if (update)  update.style.display  = '';
-    // Hide Schedule It, show Cancel
     const schedBtn  = document.getElementById('amb-schedule-btn');
     const cancelBtn = document.getElementById('amb-cancel-edit-btn');
     if (schedBtn)  schedBtn.style.display  = 'none';
     if (cancelBtn) cancelBtn.style.display = '';
-    // Grey out Save button
     const saveBtn = document.getElementById('amb-save-btn');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = '0.45'; saveBtn.style.cursor = 'not-allowed'; }
-    // Mark the table Edit button as Update for this row
     ambMarkTableEditBtn(id, true);
   }
 
   function ambMarkTableEditBtn(id, isEditing) {
-    // Reset all Edit buttons to their original onclick
     document.querySelectorAll('#amb-schedule-list button[data-action="edit"]').forEach(btn => {
       const btnId = btn.dataset.id;
       btn.textContent = 'Edit';
@@ -849,20 +830,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function ambResetScheduleUI() {
     ambEditingId = null;
-    // Restore Move Now, hide Update
     const moveNow = document.getElementById('amnb');
     const update  = document.getElementById('amnb-update');
     if (moveNow) moveNow.style.display = '';
     if (update)  update.style.display  = 'none';
-    // Restore Schedule It, hide Cancel
     const schedBtn  = document.getElementById('amb-schedule-btn');
     const cancelBtn = document.getElementById('amb-cancel-edit-btn');
     if (schedBtn)  schedBtn.style.display  = '';
     if (cancelBtn) cancelBtn.style.display = 'none';
-    // Re-enable Save
     const saveBtn = document.getElementById('amb-save-btn');
     if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ''; saveBtn.style.cursor = ''; }
-    // Reset table edit buttons
     ambMarkTableEditBtn(null, false);
   }
 
@@ -890,7 +867,7 @@ document.addEventListener('DOMContentLoaded', function () {
           FORCE_TURBO_WRITE: 'atw', SSD_TRIM: 'atrm',
           ALLOW_DURING_PARITY: 'aap2', CPU_AND_IO_PRIORITIES: 'apri', PRE_AND_POST_SCRIPTS: 'ascp',
           JDUPES: 'ajdp', QBITTORRENT_MOVE_SCRIPT: 'aqbt', CLEANUP: 'acln',
-          STOP_ALL_CONTAINERS: 'asac', EXCLUSIONS: 'aext', AUTOSTART_ON_BOOT: 'aaut',
+          STOP_ALL_CONTAINERS: 'asac', EXCLUSIONS: 'aext',
         };
         Object.entries(settings).forEach(([k, v]) => {
           const el = document.getElementById(fieldMap[k]);
@@ -900,7 +877,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (c) c.checked = (v === 'yes');
           }
         });
-        // Populate cron fields from stored expression
         if (s.CRON) populateCronUI(s.CRON);
         if (settings.NOTIFICATION_SERVICE) {
           const svcs = settings.NOTIFICATION_SERVICE.split(',').map(s => s.trim());
@@ -968,7 +944,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   };
 
-  // Delegated listener on document
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('#amb-schedule-list button[data-action]');
     if (!btn) return;
@@ -985,7 +960,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('amnb-update')?.addEventListener('click', ambScheduleJob);
   document.getElementById('amb-cancel-edit-btn')?.addEventListener('click', () => { ambResetScheduleUI(); });
 
-  // ── Save button — saves settings without running ───────────────────────────
+  // ── Save button ───────────────────────────────────────────────────────────────
   document.getElementById('amb-save-btn')?.addEventListener('click', function() {
     doSaveSettings()
       .then(() => showPop('asp', '✅ Settings Saved'))
@@ -994,7 +969,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   ambLoadSchedules();
 
-  // Restore banner if move already running on page load
   fetch(ah('check_lock.php'))
     .then(r => r.json())
     .then(d => { if ((d.data || d).locked) ambShowBanner('⚠ Move in progress'); })
@@ -1033,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }).catch(() => {});
   });
 
-  // ── Move Now button — saves settings then launches move ────────────────────────
+  // ── Move Now button ────────────────────────────────────────────────────────────
   document.getElementById('amnb')?.addEventListener('click', function () {
     if (ambMoveRunning) return;
     if (!validateQbit()) {
@@ -1220,165 +1194,6 @@ document.addEventListener('DOMContentLoaded', function () {
     .catch(() => showToast('algt', 'Save failed'));
   });
 
-  // ── Path picker (manual move) ─────────────────────────────────────────────────
-  let ppMode = '', ppPath = '/mnt', ppSel = '';
-
-  function ppBuildCrumbs(path) { buildCrumbs(path, 'appcrm'); }
-
-  function ppLoad(path) {
-    ppPath = path;
-    ppBuildCrumbs(path);
-    fetch(ah('list_dir.php') + '?path=' + encodeURIComponent(path))
-      .then(r => r.json())
-      .then(d => {
-        const grid = document.getElementById('amb-ppg'); if (!grid) return;
-        grid.innerHTML = '';
-        const dd    = d.data || d;
-        const srcV  = (document.getElementById('amms')?.value || '').trim().replace(/\/$/, '');
-        const dstV  = (document.getElementById('ammd')?.value || '').trim().replace(/\/$/, '');
-        const other = ppMode === 'src' ? dstV : srcV;
-        const oIsU  = /^\/mnt\/user(\/|$)/.test(other) && !/^\/mnt\/user0/.test(other);
-        const oIsU0 = /^\/mnt\/user0(\/|$)/.test(other);
-        const oIsD  = /^\/mnt\/disk[0-9]+(\/|$)/.test(other);
-        (dd.entries || []).forEach(e => {
-          const full = path.replace(/\/$/, '') + '/' + e.name;
-          const isU  = /^\/mnt\/user(\/|$)/.test(full) && !/^\/mnt\/user0/.test(full);
-          const isU0 = /^\/mnt\/user0(\/|$)/.test(full);
-          const isD  = /^\/mnt\/disk[0-9]+(\/|$)/.test(full);
-          let dis    = false;
-          if (oIsU  && (isU0 || isD)) dis = true;
-          if (oIsU0 && (isU  || isD)) dis = true;
-          if (oIsD  && (isU || isU0)) dis = true;
-          if (full.replace(/\/$/, '') === other) dis = true;
-          const row = document.createElement('div');
-          row.className = 'appr ' + (e.type !== 'dir' ? 'file' : '') + (dis ? ' dim' : '');
-          if (e.type === 'dir') {
-            const cb = document.createElement('input');
-            cb.type     = 'checkbox';
-            cb.disabled = dis;
-            cb.addEventListener('click', ev => {
-              ev.stopPropagation();
-              grid.querySelectorAll('input[type=checkbox]').forEach(c => { if (c !== cb) c.checked = false; });
-              ppSel = cb.checked ? full : '';
-            });
-            row.appendChild(cb);
-          } else {
-            const sp = document.createElement('span');
-            sp.style.width = '22px';
-            row.appendChild(sp);
-          }
-          const nm = document.createElement('span');
-          nm.className   = 'appn';
-          nm.textContent = (e.type === 'dir' ? '📁 ' : '📄 ') + e.name;
-          nm.addEventListener('click', () => { if (!dis && e.type === 'dir') ppLoad(full); });
-          row.appendChild(nm);
-          grid.appendChild(row);
-        });
-      })
-      .catch(() => {});
-  }
-
-  ['amms', 'ammd'].forEach((id, i) => {
-    document.getElementById(id)?.addEventListener('click', () => {
-      ppMode = i === 0 ? 'src' : 'dst';
-      ppSel  = '';
-      ppPath = '/mnt';
-      document.getElementById('appm')?.classList.add('open');
-      ppLoad('/mnt');
-    });
-  });
-  document.getElementById('appup')?.addEventListener('click', () => {
-    if (ppPath && ppPath !== '/mnt') {
-      const up = ppPath.replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/mnt';
-      ppLoad(up.startsWith('/mnt') ? up : '/mnt');
-    }
-  });
-  document.getElementById('appcl')?.addEventListener('click', () => {
-    document.getElementById('appm')?.classList.remove('open');
-    document.getElementById('appnr').style.display = 'none';
-  });
-  document.getElementById('appcnf')?.addEventListener('click', () => {
-    if (!ppSel) return;
-    document.getElementById(ppMode === 'src' ? 'amms' : 'ammd').value = ppSel + '/';
-    document.getElementById('appm')?.classList.remove('open');
-  });
-  document.getElementById('appclr')?.addEventListener('click', () => {
-    document.getElementById('amb-ppg')?.querySelectorAll('input').forEach(c => c.checked = false);
-    ppSel = '';
-    document.getElementById(ppMode === 'src' ? 'amms' : 'ammd').value = '';
-  });
-  document.getElementById('appcr')?.addEventListener('click', () => {
-    const r = document.getElementById('appnr');
-    if (r) { r.style.display = (r.style.display === 'none' || !r.style.display) ? 'flex' : 'none'; document.getElementById('appnn')?.focus(); }
-  });
-  document.getElementById('appnnc')?.addEventListener('click', () => {
-    const r = document.getElementById('appnr'); if (r) r.style.display = 'none';
-  });
-  document.getElementById('appnok')?.addEventListener('click', () => {
-    const name = document.getElementById('appnn')?.value.trim();
-    if (!name) return;
-    fetch(ah('create_folder.php'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'parent=' + encodeURIComponent(ppPath) + '&name=' + encodeURIComponent(name) + '&csrf_token=' + encodeURIComponent(csrf)
-    })
-    .then(r => r.json())
-    .then(d => {
-      if ((d.data || d).ok) {
-        const r = document.getElementById('appnr'); if (r) r.style.display = 'none';
-        document.getElementById('appnn').value = '';
-        ppLoad(ppPath);
-      }
-    })
-    .catch(() => {});
-  });
-  document.getElementById('appnn')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  document.getElementById('appnok')?.click();
-    if (e.key === 'Escape') document.getElementById('appnnc')?.click();
-  });
-
-  // ── Manual move ───────────────────────────────────────────────────────────────
-  ['ammc', 'ammd2', 'ammsy'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', function () {
-      if (this.checked) {
-        ['ammc', 'ammd2', 'ammsy'].forEach(oid => {
-          if (oid !== id) document.getElementById(oid).checked = false;
-        });
-      }
-    });
-  });
-
-  document.getElementById('ammst')?.addEventListener('click', function () {
-    const src  = (document.getElementById('amms')?.value || '').trim();
-    const dst  = (document.getElementById('ammd')?.value || '').trim();
-    const copy = document.getElementById('ammc')?.checked;
-    const del  = document.getElementById('ammd2')?.checked;
-    const sync = document.getElementById('ammsy')?.checked;
-    let ok = true;
-    document.getElementById('amse')?.classList.toggle('on', !src); if (!src) ok = false;
-    document.getElementById('amde')?.classList.toggle('on', !dst); if (!dst) ok = false;
-    document.getElementById('ammoe')?.classList.toggle('on', !copy && !del && !sync);
-    if (!copy && !del && !sync) ok = false;
-    if (!ok) {
-      document.getElementById('ammp')?.classList.add('ashk');
-      setTimeout(() => document.getElementById('ammp')?.classList.remove('ashk'), 400);
-      return;
-    }
-    const p = new URLSearchParams({ csrf_token: csrf, source: src, dest: dst, copy: copy ? '1' : '0', delete: del ? '1' : '0', fullsync: sync ? '1' : '0' });
-    fetch(ah('manual_rsync.php'), {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
-      body:    p.toString()
-    })
-    .then(r => r.json())
-    .then(d => {
-      const dd = d.data || d;
-      if (dd.ok) showPop('ammp2', '✅ Manual Move Started');
-      else        showPop('ammp2', '❌ ' + (dd.error || 'Failed'));
-    })
-    .catch(() => showPop('ammp2', '❌ Request error'));
-  });
-
   // ── Mover tuning warning ──────────────────────────────────────────────────────
   const mwBox = document.getElementById('amb-mw');
   if (mwBox) {
@@ -1437,7 +1252,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const row = span.closest('.af'); if (!row) return;
     attachHelp(span, tip, row);
   });
-  const tips = { apl: 'Easily switch between your installed jcofer555 plugins', aml: 'Switch between Automover scheduling mode and Manual Move mode' };
+  const tips = { apl: 'Easily switch between your installed jcofer555 plugins' };
   document.querySelectorAll('#amb-tb .atbl[id]').forEach(span => {
     const tip = tips[span.id]; if (!tip) return;
     const tb  = document.getElementById('amb-tb'); if (tb) attachHelp(span, tip, tb);

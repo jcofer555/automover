@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const AUTOMOVER_SCRIPT = '/usr/local/emhttp/plugins/automover/helpers/automover.sh';
+const automover_SCRIPT = '/usr/local/emhttp/plugins/automover/helpers/automover_beta.sh';
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($cookie_str, $posted_s
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
-if (!file_exists(AUTOMOVER_SCRIPT)) {
+if (!file_exists(automover_SCRIPT)) {
     echo json_encode(['ok' => false, 'error' => 'automover.sh not found']);
     exit;
 }
@@ -28,7 +28,7 @@ if (!file_exists(AUTOMOVER_SCRIPT)) {
 // Do NOT pass --pool here — that flag would override the saved config value.
 $cmd_str = sprintf(
     '/bin/bash %s --force-now >/dev/null 2>&1 &',
-    escapeshellarg(AUTOMOVER_SCRIPT)
+    escapeshellarg(automover_SCRIPT)
 );
 exec($cmd_str);
 

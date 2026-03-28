@@ -588,14 +588,6 @@
 }
 #amb-et:focus { box-shadow: 0 0 0 2px var(--aglow); }
 
-/* ── Path picker rows ───────────────────────────────────────────────────── */
-.appr            { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--br); }
-.appn            { flex: 1; cursor: pointer; color: var(--al); font-size: 12px; }
-.appr.file .appn { color: var(--tx); cursor: default; }
-.appr.dim        { opacity: .35; }
-.appr.dim .appn  { cursor: not-allowed; }
-#amb-ppg         { max-height: 320px; overflow-y: auto; }
-
 /* ── Error message ──────────────────────────────────────────────────────── */
 .ame    { color: var(--er); font-size: 11px; display: none; margin-top: 2px; }
 .ame.on { display: block; }

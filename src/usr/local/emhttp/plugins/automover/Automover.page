@@ -9,17 +9,15 @@ Markdown="false"
 const CFG_PATH = '/boot/config/plugins/automover/settings.cfg';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// Keys that are no longer stored in settings.cfg (moved to schedules.cfg)
 const STALE_KEYS = ['CRON_EXPRESSION','CRON_MODE','DAILY_TIME','DAILY_MINUTE',
-    'HOURLY_FREQUENCY','MONTHLY_DAY','MONTHLY_MINUTE','MONTHLY_TIME','PROCESS_PRIORITY',
+    'HOURLY_FREQUENCY','MONTHLY_DAY','MONTHLY_MINUTE','MONTHLY_TIME','PROCESS_PRIORITY','MANUAL_MOVE',
     'WEEKLY_DAY','WEEKLY_MINUTE','WEEKLY_TIME','ENABLE_CLEANUP','ENABLE_JDUPES','ENABLE_NOTIFICATIONS','ENABLE_SCRIPTS',
-    'ENABLE_TRIM','EXCLUSIONS_ENABLED','AUTOSTART','CONTAINER_NAMES','FORCE_RECONSTRUCTIVE_WRITE','HASH_PATH','SIZE_MB','PRIORITIES','QBITTORRENT_SCRIPT'];
+    'ENABLE_TRIM','EXCLUSIONS_ENABLED','AUTOSTART','AUTOSTART_ON_BOOT','CONTAINER_NAMES','FORCE_RECONSTRUCTIVE_WRITE','HASH_PATH','SIZE_MB','PRIORITIES','QBITTORRENT_SCRIPT'];
 
 $defaults = [
     'AGE_BASED_FILTER'       => 'no',
     'AGE_DAYS'               => 1,
     'ALLOW_DURING_PARITY'    => 'no',
-    'AUTOSTART_ON_BOOT'      => 'no',
     'CLEANUP'                => 'no',
     'CPU_AND_IO_PRIORITIES'  => 'no',
     'CPU_PRIORITY'           => '0',
@@ -30,7 +28,6 @@ $defaults = [
     'HIDDEN_FILTER'          => 'no',
     'IO_PRIORITY'            => 'normal',
     'JDUPES'                 => 'no',
-    'MANUAL_MOVE'            => 'no',
     'NOTIFICATION_SERVICE'   => '',
     'NOTIFICATIONS'          => 'no',
     'POOL_NAME'              => 'cache',
@@ -60,10 +57,8 @@ $defaults = [
     'WEBHOOK_SLACK'          => '',
 ];
 $existing = file_exists(CFG_PATH) ? (parse_ini_file(CFG_PATH) ?: []) : [];
-// Remove stale cron keys if present
 foreach (STALE_KEYS as $sk) { unset($existing[$sk]); }
 foreach ($defaults as $k=>$v) { if (!array_key_exists($k,$existing)) $existing[$k]=$v; }
-// Write alphabetically so key order never shifts
 $write = []; foreach ($defaults as $k=>$dv) { $write[$k] = $existing[$k]; }
 ksort($write);
 $cfg=''; foreach ($write as $k=>$v) { $cfg.="$k=\"{$v}\"\n"; }
@@ -121,13 +116,7 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
 <div id="amb-sc">
 <div class="ac">
 
-<!-- ── Top bar: Mode LEFT, Plugin RIGHT ────────────────────────────────── -->
 <div id="amb-tb">
-  <span class="atbl" id="aml">Mode:</span>
-  <select id="amb-ms">
-    <option value="auto" <?=($settings['MANUAL_MOVE']??'no')==='yes'?'':'selected'?>>Automover</option>
-    <option value="manual" <?=($settings['MANUAL_MOVE']??'no')==='yes'?'selected':''?>>Manual Move</option>
-  </select>
   <?php if($has_sibs): ?>
   <span class="atbl" id="apl" style="margin-left:auto;">Plugin:</span>
   <select onchange="if(this.value)window.location=this.value">
@@ -147,15 +136,10 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
 
 <div class="asec">Controls</div>
 <div class="aact">
-  <!-- Save: always visible, greyed out while editing a schedule -->
   <button type="button" id="amb-save-btn" data-tipster="Save settings without running a move">Save</button>
-  <!-- Move Now: normal mode. Hidden when editing a schedule. -->
   <button type="button" id="amnb" data-tipster="Save settings and run the mover now">Move Now</button>
-  <!-- Update: shown only while editing a schedule (replaces Move Now) -->
   <button type="button" id="amnb-update" style="display:none;" data-tipster="Save changes to this schedule">Update</button>
-  <!-- Schedule It: normal mode. Hidden when editing (replaced by Cancel). -->
   <button type="button" id="amb-schedule-btn" data-tipster="Create a scheduled job using the settings shown above">Schedule It</button>
-  <!-- Cancel: shown only while editing a schedule -->
   <button type="button" id="amb-cancel-edit-btn" data-tipster="Cancel editing this schedule" style="display:none;">Cancel</button>
 </div>
 
@@ -253,7 +237,6 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   <span class="afl" data-tip="Comma-separated list of containers to stop during moves">Stop Containers:</span>
   <div class="afi"><div class="amb-clr-wrap"><input type="text" id="acont" placeholder="e.g. qbit-manage,cross-seed" value="<?=htmlspecialchars($settings['STOP_CONTAINERS']??'')?>"><button type="button" class="amb-clr" data-target="acont"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div></div>
 </div>
-
 
 <div id="aex-sec" style="display:none;">
   <div class="asec" style="margin-top:8px;">Exclusions</div>
@@ -356,7 +339,6 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
 <div class="aog">
 <?php
 $opts=[
-  'aaut'=>['AUTOSTART_ON_BOOT',               'Autostart on Boot',           'Start automatically when Unraid boots'],
   'aext'=>['EXCLUSIONS',      'Exclusions',                  'Exclude specific files and folders from moving'],
   'adr' =>['DRY_RUN',                 'Dry Run',                     'Simulate moves without transferring files'],
   'aszf'=>['SIZE_BASED_FILTER',       'Size Based Filter',           'Only move files larger than the specified MB'],
@@ -382,26 +364,6 @@ foreach($opts as $id=>$info): ?>
 </div>
 
 </div>
-
-<div id="ammp" class="ac-body" style="display:none;">
-<p style="font-size:11px;color:var(--mt);margin:0 0 10px;">* Only Dry Run, Cleanup, and Notifications from saved settings apply.</p>
-<div class="af"><span class="afl" data-tip="Source folder to move from">Source:</span>
-  <div class="afi"><input type="text" id="amms" readonly placeholder="Click to browse&hellip;" style="cursor:pointer;"><span class="ame" id="amse">&#9888; Source is required</span></div>
-</div>
-<div class="af"><span class="afl" data-tip="Destination folder to move to">Destination:</span>
-  <div class="afi"><input type="text" id="ammd" readonly placeholder="Click to browse&hellip;" style="cursor:pointer;"><span class="ame" id="amde">&#9888; Destination is required</span></div>
-</div>
-<div class="asec" style="margin-top:8px;">Sync Mode</div>
-<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
-  <div class="aor"><span class="aol" data-tip="Copy only new or modified files, preserving hardlinks">Copy</span><label class="atog"><input type="checkbox" id="ammc"><span class="aslide"></span></label></div>
-  <div class="aor"><span class="aol" data-tip="Copy then delete source files after successful transfer">Delete Source After</span><label class="atog"><input type="checkbox" id="ammd2"><span class="aslide"></span></label></div>
-  <div class="aor"><span class="aol" data-tip="Keep destination fully in sync with source">Full Sync</span><label class="atog"><input type="checkbox" id="ammsy"><span class="aslide"></span></label></div>
-</div>
-<span class="ame" id="ammoe" style="max-width:320px;">&#9888; Select one mode</span>
-<div class="aact" style="margin-top:12px;"><button type="button" id="ammst" data-tipster="Start the manual rsync operation">Start</button></div>
-<div id="ammp2" class="apop"></div>
-</div>
-
 </div>
 </div>
 
@@ -498,35 +460,6 @@ foreach($opts as $id=>$info): ?>
         <button type="button" id="aesv" data-tipster="Save changes to exclusions list">Save</button>
       </div>
       <button type="button" id="aecl2" data-tipster="Close this dialog">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Path picker modal (manual move) ─────────────────────────────────────── -->
-<div class="amd" id="appm">
-  <div class="amb-box" style="max-width:700px;height:520px;">
-    <div class="amh">
-      <button type="button" id="appup" data-tipster="Go up one directory" style="padding:4px 10px;font-size:12px;">&uarr; Up</button>
-      <span>Select Path</span>
-      <button type="button" id="appcl" data-tipster="Close this dialog" style="margin-left:auto;">Close</button>
-    </div>
-    <div class="ambo" style="display:flex;flex-direction:column;padding-bottom:0;overflow:hidden;">
-      <div class="apc" id="appcrm" style="flex-shrink:0;"></div>
-      <div id="amb-ppg" style="flex:1;overflow-y:auto;"></div>
-    </div>
-    <div class="amf">
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <button type="button" id="appcr" data-tipster="Create a new folder at the current location">Create Folder</button>
-        <div id="appnr" style="display:none;gap:6px;align-items:center;">
-          <input type="text" id="appnn" placeholder="Folder name" style="width:160px;height:26px;background:var(--bg);border:1px solid var(--br2);border-radius:var(--r2);color:var(--tx);padding:0 8px;font-size:12px;outline:none;-webkit-appearance:none;appearance:none;">
-          <button type="button" id="appnok" data-tipster="Create this folder">Create</button>
-          <button type="button" id="appnnc" data-tipster="Cancel folder creation" class="ab-sec">Cancel</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;">
-        <button type="button" id="appclr" data-tipster="Clear the current selection">Clear</button>
-        <button type="button" id="appcnf" data-tipster="Use selected path">Select</button>
-      </div>
     </div>
   </div>
 </div>

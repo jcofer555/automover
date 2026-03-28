@@ -1,12 +1,9 @@
 <?php
 ob_start();
 
-// ── Shutdown handler — catches fatal errors that would otherwise cause an ──────
-// empty response (ob_start() holds everything and nothing is flushed).
 register_shutdown_function(function () {
     $err = error_get_last();
     if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
-        // Discard whatever partial output is buffered
         if (ob_get_level() > 0) ob_end_clean();
         header('Content-Type: application/json');
         http_response_code(500);
@@ -17,13 +14,10 @@ register_shutdown_function(function () {
     }
 });
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 define('CFG_PATH', '/boot/config/plugins/automover/settings.cfg');
 
-// ── Entry point ───────────────────────────────────────────────────────────────
 header('Content-Type: application/json');
 
-// ── CSRF validation ───────────────────────────────────────────────────────────
 $csrf_header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 $csrf_post   = $_POST['csrf_token']          ?? '';
 $csrf_cookie = $_COOKIE['csrf_token']        ?? '';
@@ -37,8 +31,6 @@ if (empty($token)) {
     exit;
 }
 
-// If cookie is present, validate against it. If absent, accept the token as-is
-// (Unraid's webUI may not expose the cookie to helper requests).
 if (!empty($csrf_cookie) && $csrf_header !== $csrf_cookie && $csrf_post !== $csrf_cookie) {
     ob_end_clean();
     http_response_code(403);
@@ -46,7 +38,6 @@ if (!empty($csrf_cookie) && $csrf_header !== $csrf_cookie && $csrf_post !== $csr
     exit;
 }
 
-// ── Catch stray warnings ──────────────────────────────────────────────────────
 set_error_handler(function ($errno, $errstr, $errfile, $errline) {
     global $_amb_err;
     $_amb_err = "PHP error [$errno]: $errstr in $errfile:$errline";
@@ -55,7 +46,6 @@ set_error_handler(function ($errno, $errstr, $errfile, $errline) {
 global $_amb_err;
 $_amb_err = null;
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
 function get_str($key, $default = '') {
     return isset($_POST[$key]) ? trim((string) $_POST[$key]) : $default;
 }
@@ -65,12 +55,10 @@ function normalize_container_names($raw) {
     return trim(preg_replace('/,\s*/', ',', $raw));
 }
 
-// ── Input ─────────────────────────────────────────────────────────────────────
 $settings = [
     'AGE_BASED_FILTER'            => get_str('AGE_BASED_FILTER',            'no'),
     'AGE_DAYS'                    => get_str('AGE_DAYS',                    '1'),
     'ALLOW_DURING_PARITY'         => get_str('ALLOW_DURING_PARITY',         'no'),
-    'AUTOSTART_ON_BOOT'           => get_str('AUTOSTART_ON_BOOT',           'no'),
     'CLEANUP'                     => get_str('CLEANUP',                     'no'),
     'CPU_AND_IO_PRIORITIES'       => get_str('CPU_AND_IO_PRIORITIES',       'no'),
     'CPU_PRIORITY'                => get_str('CPU_PRIORITY',                '0'),
@@ -81,7 +69,6 @@ $settings = [
     'HIDDEN_FILTER'               => get_str('HIDDEN_FILTER',               'no'),
     'IO_PRIORITY'                 => get_str('IO_PRIORITY',                 'normal'),
     'JDUPES'                      => get_str('JDUPES',                      'no'),
-    'MANUAL_MOVE'                 => get_str('MANUAL_MOVE',                 'no'),
     'NOTIFICATION_SERVICE'        => get_str('NOTIFICATION_SERVICE',        ''),
     'NOTIFICATIONS'               => get_str('NOTIFICATIONS',               'no'),
     'POOL_NAME'                   => get_str('POOL_NAME',                   'cache'),
@@ -112,7 +99,6 @@ $settings = [
 ];
 ksort($settings);
 
-// ── Ensure config directory exists ────────────────────────────────────────────
 $cfg_dir = dirname(CFG_PATH);
 if (!is_dir($cfg_dir)) {
     if (!mkdir($cfg_dir, 0755, true) && !is_dir($cfg_dir)) {
@@ -122,13 +108,11 @@ if (!is_dir($cfg_dir)) {
     }
 }
 
-// ── Build config content ──────────────────────────────────────────────────────
 $cfg_out = '';
 foreach ($settings as $key => $val) {
     $cfg_out .= $key . '="' . $val . '"' . "\n";
 }
 
-// ── Write atomically ──────────────────────────────────────────────────────────
 $tmp = CFG_PATH . '.tmp.' . getmypid();
 if (file_put_contents($tmp, $cfg_out) === false) {
     $stray = ob_get_clean();
@@ -142,7 +126,6 @@ if (!rename($tmp, CFG_PATH)) {
     exit;
 }
 
-// ── Respond ───────────────────────────────────────────────────────────────────
 $stray = ob_get_clean();
 echo json_encode([
     'status'    => 'ok',
