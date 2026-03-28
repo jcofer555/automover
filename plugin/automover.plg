@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2026.03.27.01"
+  version="2026.03.28.01"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2026.03.28.01
+
+- Fix for error on brand new installs
+
 ### 2026.03.27.01
 
 - Removed manual move
@@ -24,10 +28,6 @@
 ### 2026.03.22.01
 
 - Added a save button and a few other minor webui changes
-
-### 2026.03.19.04
-
-- Fix for cleanup to prevent shares with no secondary storage from being touched
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -42,9 +42,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.03.27.01-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2026.03.27.01/unraid-automover-2026.03.27.01-noarch-1.txz</URL>
-<SHA256>6e1a58da4a8302fcb881376d651ff74f0ae8f1a47dde60396266f5cdef01df52</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.03.28.01-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2026.03.28.01/unraid-automover-2026.03.28.01-noarch-1.txz</URL>
+<SHA256>417aa838ef5b58f977053a750cd28d9ba93e4df8d146206696ca4bf4655e6850</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -57,10 +57,15 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.03.27.01-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.03.28.01-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
+
+# Install the package
+upgradepkg --install-new "$PACKAGE_TXZ"
+upgradepkg --install-new "/boot/config/plugins/automover/jdupes-1.30.0-x86_64-2_slackdce.txz"
+upgradepkg --install-new "/boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.txz"
 
 # Ensure default settings file exists
 if [ ! -f "$DEFAULT_CFG" ]; then
@@ -85,11 +90,6 @@ if [ ! -f "/boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.tx
     echo "ERROR: Missing libjodycode package"
     exit 1
 fi
-
-# Install the package
-upgradepkg --install-new "$PACKAGE_TXZ"
-upgradepkg --install-new "/boot/config/plugins/automover/jdupes-1.30.0-x86_64-2_slackdce.txz"
-upgradepkg --install-new "/boot/config/plugins/automover/libjodycode-4.0.1-x86_64-2_slackdce.txz"
 
 # Ensure tmp directory exists
 mkdir -p /tmp/automover
@@ -172,7 +172,7 @@ if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.03.27.01-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.03.28.01-noarch-1.txz" -delete
 
 # Ensure helper scripts are executable
 chmod -f +x /usr/local/emhttp/plugins/automover/helpers/* 2>/dev/null
@@ -180,7 +180,7 @@ chmod -f +x /usr/local/emhttp/plugins/automover/helpers/* 2>/dev/null
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2026.03.27.01"
+echo " Version: 2026.03.28.01"
 echo "----------------------------------------------------"
 echo ""
 echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover"
