@@ -4,7 +4,7 @@
 <PLUGIN 
   name="automover"
   author="jcofer555"
-  version="2026.03.30.01"
+  version="2026.03.31.01"
   launch="Settings/Automover"
   pluginURL="https://raw.githubusercontent.com/jcofer555/automover/main/plugin/automover.plg"
   support="https://forums.unraid.net/topic/192216-automover-for-unraid/"
@@ -16,6 +16,10 @@
 <CHANGES>
 <![CDATA[
 
+### 2026.03.31.01
+
+- Fix for pool names having disk in the name are detected properly
+
 ### 2026.03.30.01
 
 - Fix for automover.sh not found when manually running a schedule
@@ -23,11 +27,6 @@
 ### 2026.03.28.01
 
 - Fix for error on brand new installs
-
-### 2026.03.27.01
-
-- Removed manual move
-- Removed autostart as it's not needed anymore
 
 
 For older releases, see https://github.com/jcofer555/automover/releases
@@ -42,9 +41,9 @@ For older releases, see https://github.com/jcofer555/automover/releases
 <URL>https://github.com/jcofer555/automover/raw/refs/heads/main/packages/libjodycode-4.0.1-x86_64-2_slackdce.txz</URL>
 </FILE>
 
-<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.03.30.01-noarch-1.txz">
-<URL>https://github.com/jcofer555/automover/releases/download/2026.03.30.01/unraid-automover-2026.03.30.01-noarch-1.txz</URL>
-<SHA256>eed178f5e76eced85c3ba2e647706b9eba2993e1d179745e285cfce877714174</SHA256>
+<FILE Name="/boot/config/plugins/automover/unraid-automover-2026.03.31.01-noarch-1.txz">
+<URL>https://github.com/jcofer555/automover/releases/download/2026.03.31.01/unraid-automover-2026.03.31.01-noarch-1.txz</URL>
+<SHA256>be074b5b380693d7b59070a3eea15c5c153c8fb2db0778d935626d7ceb676f0e</SHA256>
 </FILE>
 
 <!-- ==========================================================
@@ -57,7 +56,7 @@ For older releases, see https://github.com/jcofer555/automover/releases
 #  INSTALL / UPGRADE LOGIC
 # ==========================================================
 
-PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.03.30.01-noarch-1.txz"
+PACKAGE_TXZ="/boot/config/plugins/automover/unraid-automover-2026.03.31.01-noarch-1.txz"
 USER_CFG="/boot/config/plugins/automover/settings.cfg"
 DEFAULT_CFG="/usr/local/emhttp/plugins/automover/helpers/default_settings.cfg"
 TMP_CFG="/tmp/automover_settings.tmp"
@@ -172,7 +171,7 @@ if [ -f "$MOVER_TUNING" ] || [ -d "$MOVER_TUNING_DIR" ]; then
 fi
 
 # Remove older txz packages (keep only the current one)
-find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.03.30.01-noarch-1.txz" -delete
+find /boot/config/plugins/automover/ -maxdepth 1 -type f -name "unraid-automover-*.txz" ! -name "unraid-automover-2026.03.31.01-noarch-1.txz" -delete
 
 # Ensure helper scripts are executable
 chmod -f +x /usr/local/emhttp/plugins/automover/helpers/* 2>/dev/null
@@ -180,7 +179,7 @@ chmod -f +x /usr/local/emhttp/plugins/automover/helpers/* 2>/dev/null
 echo ""
 echo "----------------------------------------------------"
 echo " automover has been installed."
-echo " Version: 2026.03.30.01"
+echo " Version: 2026.03.31.01"
 echo "----------------------------------------------------"
 echo ""
 echo "⚠️ If you were on version 2025.12.15.04 or earlier, reconfigure your schedule in Settings → Automover"
