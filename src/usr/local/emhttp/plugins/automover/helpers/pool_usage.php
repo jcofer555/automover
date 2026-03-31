@@ -38,7 +38,7 @@ foreach ($disk_data_arr as $disk_arr) {
     $name_str = $disk_arr['name'];
 
     if (in_array($name_str, SKIP_NAMES_ARR, true)) continue;
-    if (strpos($name_str, 'disk') !== false)        continue;
+    if (strpos($name_str, 'disk') === 0)             continue;
 
     $mount_str = '/mnt/' . $name_str;
 
