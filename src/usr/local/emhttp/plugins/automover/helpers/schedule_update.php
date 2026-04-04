@@ -14,12 +14,13 @@ const ALLOWED_KEYS = [
     'AGE_DAYS',
     'ALLOW_DURING_PARITY',
     'STOP_CONTAINERS',
+    'CLEANUP',
+    'CLEANUP_ZFS_DATASETS',
     'CRON_EXPRESSION',
     'CRON_MODE',
     'DAILY_MINUTE',
     'DAILY_TIME',
     'DRY_RUN',
-    'CLEANUP',
     'JDUPES',
     'NOTIFICATIONS',
     'PRE_AND_POST_SCRIPTS',
@@ -128,6 +129,11 @@ function main(): void
     // Allowlist — strip anything that shouldn't be persisted
     $settings = array_intersect_key($settings, array_flip(ALLOWED_KEYS));
     unset($settings['csrf_token']);
+
+    // Validate CLEANUP value
+    if (isset($settings['CLEANUP']) && !in_array($settings['CLEANUP'], ['no', 'yes', 'top'], true)) {
+        $settings['CLEANUP'] = 'no';
+    }
 
     if ($id === '') {
         respond(400, ['error' => 'Missing schedule ID']);

@@ -208,7 +208,7 @@ function ambInitTooltips(root) {
   fetch(ah('fetch_last_run_log.php') + '?debug=' + (logDebug ? '1' : '0'))
     .then(r => r.text())
     .then(raw => {
-      const empty   = logDebug ? 'Automover debug log not found' : 'Automover log not found';
+      const empty   = logDebug ? 'Automover debug log not found or is empty' : 'Automover log not found or is empty';
       const rev     = raw ? raw.split('\n').filter(l => l.trim()).reverse().join('\n') : '';
       const display = rev || empty;
       if (display === snLog) return;
@@ -355,51 +355,83 @@ document.addEventListener('DOMContentLoaded', function () {
   })();
 
   // ── Clear / copy ──────────────────────────────────────────────────────────────
+
+  // Activity log clear
   document.getElementById('algcl')?.addEventListener('click', function () {
     const lbl = logDebug ? 'debug log' : 'automover log';
-    if (!confirm('Clear the ' + lbl + '?')) return;
-    fetch(ah('clear_log.php'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
-      body: 'log=last&debug=' + (logDebug ? '1' : '0') + '&csrf_token=' + encodeURIComponent(csrf)
-    }).then(r => r.json()).then(d => {
-      if ((d.data || d).ok) {
-        const el = document.getElementById('algl');
-        if (el) { el.dataset.raw = ''; el.textContent = ''; }
-        snLog = null;
-        showToast('algt', logDebug ? 'Debug log cleared' : 'Log cleared');
-      }
-    }).catch(() => ambAlert('Failed'));
-    fetch(ah('clear_log.php'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
-      body: 'log=mover&csrf_token=' + encodeURIComponent(csrf)
-    }).then(r => r.json()).then(d => {
-      if ((d.data || d).ok) {
-        const el = document.getElementById('amvl');
-        if (el) { el.innerHTML = ''; el.dataset.raw = ''; }
-        snMoved = null;
-        const lc = document.getElementById('amb-lc');
-        if (lc) lc.textContent = '';
-        showToast('amvt', 'Log cleared');
-      }
-    }).catch(() => ambAlert('Failed'));
+    ambConfirm('Clear the ' + lbl + '?', () => {
+      fetch(ah('clear_log.php'), {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
+        body:    'log=last&debug=' + (logDebug ? '1' : '0') + '&csrf_token=' + encodeURIComponent(csrf)
+      })
+      .then(r => r.json())
+      .then(d => {
+        if ((d.data || d).ok) {
+          const el = document.getElementById('algl');
+          if (el) { el.dataset.raw = ''; el.textContent = ''; }
+          snLog = null;
+          showToast('algt', logDebug ? 'Debug log cleared' : 'Log cleared');
+        } else {
+          ambAlert((d.data || d).message || 'Clear failed');
+        }
+      })
+      .catch(() => ambAlert('Failed to clear log'));
+    });
   });
 
+  // Files moved log clear
+  document.getElementById('amvcl')?.addEventListener('click', function () {
+    ambConfirm('Clear the files moved log?', () => {
+      fetch(ah('clear_log.php'), {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
+        body:    'log=mover&csrf_token=' + encodeURIComponent(csrf)
+      })
+      .then(r => r.json())
+      .then(d => {
+        if ((d.data || d).ok) {
+          const el = document.getElementById('amvl');
+          if (el) { el.innerHTML = ''; el.dataset.raw = ''; }
+          snMoved = null;
+          const lc = document.getElementById('amb-lc');
+          if (lc) lc.textContent = '';
+          showToast('amvt', 'Log cleared');
+        } else {
+          ambAlert((d.data || d).message || 'Clear failed');
+        }
+      })
+      .catch(() => ambAlert('Failed to clear log'));
+    });
+  });
+
+  // Activity log copy
   document.getElementById('algcp')?.addEventListener('click', function () {
     const t = (document.getElementById('algl')?.dataset.raw) || '';
     if (!t.trim()) return;
-    navigator.clipboard?.writeText(t)
-      .then(() => showToast('algt', logDebug ? 'Debug log copied' : 'Log copied'))
-      .catch(() => fallbackCopy(t)) || fallbackCopy(t);
+    const label = logDebug ? 'Debug log copied' : 'Log copied';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(t)
+        .then(() => showToast('algt', label))
+        .catch(() => { fallbackCopy(t); showToast('algt', label); });
+    } else {
+      fallbackCopy(t);
+      showToast('algt', label);
+    }
   });
 
+  // Files moved copy
   document.getElementById('amvcp')?.addEventListener('click', function () {
     const t = (document.getElementById('amvl')?.dataset.raw) || '';
     if (!t.trim()) return;
-    navigator.clipboard?.writeText(t)
-      .then(() => showToast('amvt', 'Copied'))
-      .catch(() => fallbackCopy(t)) || fallbackCopy(t);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(t)
+        .then(() => showToast('amvt', 'Log copied'))
+        .catch(() => { fallbackCopy(t); showToast('amvt', 'Log copied'); });
+    } else {
+      fallbackCopy(t);
+      showToast('amvt', 'Log copied');
+    }
   });
 
   // ── Pool change ───────────────────────────────────────────────────────────────
@@ -623,7 +655,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const { cron, mode } = buildCronFromUI();
     return {
       AGE_BASED_FILTER:       cb('aagf'), AGE_DAYS:              g('aaged'),
-      ALLOW_DURING_PARITY:    cb('aap2'), CLEANUP:               cb('acln'), CPU_AND_IO_PRIORITIES: cb('apri'),
+      ALLOW_DURING_PARITY:    cb('aap2'),
+      CLEANUP:                g('acln'),   // select value: no / yes / top
+      CLEANUP_ZFS_DATASETS:   g('aclnzfs'), // select value: no / yes
+      CPU_AND_IO_PRIORITIES:  cb('apri'),
       CPU_PRIORITY:           g('acpu'),  CRON_EXPRESSION:       cron || '',
       CRON_MODE:              mode || g('acm') || 'daily',
       DAILY_MINUTE:           g('adm'),   DAILY_TIME:            g('adt'),
@@ -860,13 +895,15 @@ document.addEventListener('DOMContentLoaded', function () {
           QBITTORRENT_HOST: 'aqbh', QBITTORRENT_USERNAME: 'aqbu',
           QBITTORRENT_DAYS_FROM: 'aqbdf', QBITTORRENT_DAYS_TO: 'aqbdt',
           QBITTORRENT_STATUS: 'aqbs', PRE_SCRIPT: 'apres', POST_SCRIPT: 'aposts',
+          // CLEANUP and CLEANUP_ZFS_DATASETS are selects — handled via fieldMap (g() reads .value)
+          CLEANUP: 'acln', CLEANUP_ZFS_DATASETS: 'aclnzfs',
         };
         const cbMap = {
           DRY_RUN: 'adr', AGE_BASED_FILTER: 'aagf', SIZE_BASED_FILTER: 'aszf',
           NOTIFICATIONS: 'antf', HIDDEN_FILTER: 'ahid',
           FORCE_TURBO_WRITE: 'atw', SSD_TRIM: 'atrm',
           ALLOW_DURING_PARITY: 'aap2', CPU_AND_IO_PRIORITIES: 'apri', PRE_AND_POST_SCRIPTS: 'ascp',
-          JDUPES: 'ajdp', QBITTORRENT_MOVE_SCRIPT: 'aqbt', CLEANUP: 'acln',
+          JDUPES: 'ajdp', QBITTORRENT_MOVE_SCRIPT: 'aqbt',
           STOP_ALL_CONTAINERS: 'asac', EXCLUSIONS: 'aext',
         };
         Object.entries(settings).forEach(([k, v]) => {

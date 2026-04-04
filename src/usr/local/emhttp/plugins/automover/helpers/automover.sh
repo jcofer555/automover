@@ -172,17 +172,12 @@ cleanup() {
 }
 
 # Graceful stop — called when stop button sends SIGTERM.
-# Rsync is in a foreground pipeline so it will finish its current file
-# before this handler runs. We log the stop, run session end, then exit.
 _stop_requested_bool=false
 handle_stop() {
     if [[ "${_stop_requested_bool}" == true ]]; then return; fi
     _stop_requested_bool=true
     log_info "Stop requested — finishing current file then stopping"
     log_debug "SIGTERM received. Finishing current rsync then stopping."
-    # Let the current rsync finish (it runs in the foreground), then the
-    # main loop will hit this flag check after rsync returns and break out.
-    # We raise an exit after a brief wait to unblock any sleep/wait calls.
     ( sleep 2 && kill -TERM $$ 2>/dev/null ) &
 }
 trap 'handle_stop' SIGTERM
@@ -214,10 +209,9 @@ if [[ ! -f "${CFG_PATH}" ]]; then
     cleanup 0
 fi
 
-# List of all config keys the script uses
 CONFIG_VARS=(
     AGE_BASED_FILTER AGE_DAYS ALLOW_DURING_PARITY
-    CLEANUP CPU_AND_IO_PRIORITIES DRY_RUN
+    CLEANUP CLEANUP_ZFS_DATASETS CPU_AND_IO_PRIORITIES DRY_RUN
     EXCLUSIONS FORCE_TURBO_WRITE
     HASH_LOCATION HIDDEN_FILTER IO_PRIORITY
     JDUPES
@@ -231,8 +225,6 @@ CONFIG_VARS=(
     WEBHOOK_DISCORD WEBHOOK_GOTIFY WEBHOOK_NTFY WEBHOOK_PUSHOVER WEBHOOK_SLACK
 )
 
-# If run_schedule.php injected settings via env vars (SCHEDULE_ID is set),
-# capture them before sourcing settings.cfg so they win after the source.
 declare -A sched_env_arr=()
 if [[ -n "${SCHEDULE_ID:-}" ]]; then
     log_debug "Scheduled run detected (SCHEDULE_ID=${SCHEDULE_ID}) — capturing env overrides"
@@ -247,7 +239,6 @@ fi
 source "${CFG_PATH}"
 log_debug "Config loaded from ${CFG_PATH}"
 
-# Restore schedule env vars so they override what settings.cfg just set
 if [[ "${#sched_env_arr[@]}" -gt 0 ]]; then
     for var in "${!sched_env_arr[@]}"; do
         declare "${var}=${sched_env_arr[${var}]}"
@@ -255,12 +246,10 @@ if [[ "${#sched_env_arr[@]}" -gt 0 ]]; then
     done
 fi
 
-# Apply pool override if set (--pool flag takes highest priority)
 if [[ -n "${POOL_NAME_OVERRIDE:-}" ]]; then
     POOL_NAME="${POOL_NAME_OVERRIDE}"
 fi
 
-# Strip quotes from all config values
 for var in "${CONFIG_VARS[@]}"; do
     if [[ -n "${!var+x}" ]]; then
         eval "${var}=\"$(echo "${!var}" | tr -d '\"')\""
@@ -271,8 +260,6 @@ log_debug "Config values stripped of quotes"
 # ==========================================================
 #  SIZE UNIT → BYTES CONVERSION
 # ==========================================================
-# Converts SIZE + SIZE_UNIT into SIZE_BYTES_INT for filter comparisons.
-# SIZE_UNIT defaults to MB for backwards compatibility with existing configs.
 SIZE_BYTES_INT=0
 if [[ "${SIZE_BASED_FILTER:-no}" == "yes" && "${SIZE:-0}" -gt 0 ]]; then
     case "${SIZE_UNIT:-MB}" in
@@ -284,7 +271,6 @@ if [[ "${SIZE_BASED_FILTER:-no}" == "yes" && "${SIZE:-0}" -gt 0 ]]; then
     log_debug "Size filter: ${SIZE} ${SIZE_UNIT:-MB} = ${SIZE_BYTES_INT} bytes"
 fi
 
-# Disable notifications during dry run
 if [[ "${DRY_RUN:-no}" == "yes" ]]; then
     NOTIFICATIONS="no"
     log_debug "Dry run active — notifications disabled"
@@ -302,7 +288,6 @@ if [[ "${CPU_AND_IO_PRIORITIES:-no}" != "yes" ]]; then
     CPU_PRIORITY=""
     log_debug "Priorities disabled"
 else
-    # CPU nice: clamp to -20..19
     if [[ -z "${CPU_PRIORITY:-}" || ! "${CPU_PRIORITY}" =~ ^-?[0-9]+$ ]]; then
         CPU_PRIORITY=0
     elif (( CPU_PRIORITY < -20 )); then
@@ -312,7 +297,7 @@ else
     fi
 
     case "${IO_PRIORITY:-normal}" in
-        idle)    IO_CLASS_STR=3; IO_LEVEL_STR="" ;;
+        idle)     IO_CLASS_STR=3; IO_LEVEL_STR="" ;;
         be:[0-7]) IO_CLASS_STR=2; IO_LEVEL_STR="${IO_PRIORITY#be:}" ;;
         normal|"") IO_CLASS_STR=""; IO_LEVEL_STR="" ;;
         *) IO_CLASS_STR=""; IO_LEVEL_STR="" ;;
@@ -320,7 +305,6 @@ else
     log_debug "Priorities: cpu=${CPU_PRIORITY} io_class=${IO_CLASS_STR} io_level=${IO_LEVEL_STR}"
 fi
 
-# Build rsync wrapper array
 rsync_wrapper_arr=()
 if [[ "${CPU_AND_IO_PRIORITIES:-no}" == "yes" ]]; then
     [[ -n "${CPU_PRIORITY}" ]] && rsync_wrapper_arr+=(nice -n "${CPU_PRIORITY}")
@@ -700,6 +684,191 @@ guard_pool_path() {
     [[ "${pool_path_str}" == /mnt/* ]]                  || { log_error "guard_pool_path: pool path not under /mnt: ${pool_path_str}"; return 1; }
     log_debug "guard_pool_path: ${pool_path_str} OK"
     return 0
+}
+
+# ==========================================================
+#  CLEANUP HELPERS (mover-tuning style)
+#
+#  CLEANUP controls empty folder removal:
+#    no  — disabled entirely
+#    yes — remove empty subdirectories (never the share root itself)
+#    top — same as yes, but also removes the top-level share dir if empty
+#
+#  CLEANUP_ZFS_DATASETS controls ZFS dataset removal independently:
+#    no  — never destroy empty ZFS datasets
+#    yes — destroy empty ZFS sub-datasets under moved shares
+#
+#  All functions below are only ever called when CLEANUP != no.
+# ==========================================================
+
+# Returns 0 if the given path is itself a ZFS mountpoint (not just under one)
+is_zfs_mountpoint() {
+    local path_str="${1%/}"
+    command -v zfs > /dev/null 2>&1 || return 1
+    zfs list -H -o mountpoint 2>/dev/null | grep -qxF "${path_str}"
+}
+
+# cleanup_empty_parents()
+# Called immediately after each successful file move (only when CLEANUP != no).
+# Walks up the source directory tree from the moved file, removing each
+# ancestor that is now empty, stopping just before the share root.
+# When CLEANUP=top the share root itself is also eligible for removal.
+#
+# Protections (matching mover tuning):
+#   - Share root is only removed when CLEANUP=top
+#   - Skips dirs containing a .placeholder file
+#   - Skips dirs that are ZFS mountpoints
+#   - Stops climbing as soon as a non-empty dir is found
+#   - Full dry-run support
+#
+# Args:
+#   $1  moved_file_src  — absolute source path of the file that was just moved
+#   $2  share_src_root  — absolute path of the share root on the pool
+#                         e.g. /mnt/cache/movies
+cleanup_empty_parents() {
+    local file_src_str="$1"
+    local share_root_str="${2%/}"
+
+    local dir_str
+    dir_str="$(dirname "${file_src_str}")"
+
+    # Walk up. When CLEANUP=top we allow removing the share root itself;
+    # otherwise we stop as soon as we reach it.
+    while [[ "${dir_str}" == "${share_root_str}" || "${dir_str}" == "${share_root_str}/"* ]]; do
+
+        # If we've reached the share root, only continue when CLEANUP=top
+        if [[ "${dir_str}" == "${share_root_str}" && "${CLEANUP:-no}" != "top" ]]; then
+            break
+        fi
+
+        # Must still exist
+        [[ -d "${dir_str}" ]] || break
+
+        # .placeholder protection — leave the folder and stop climbing
+        if [[ -f "${dir_str}/.placeholder" ]]; then
+            log_debug "cleanup_empty_parents: skipping (has .placeholder): ${dir_str}"
+            break
+        fi
+
+        # ZFS mountpoint protection — skip rmdir on a dataset root
+        if is_zfs_mountpoint "${dir_str}"; then
+            log_debug "cleanup_empty_parents: skipping ZFS mountpoint: ${dir_str}"
+            break
+        fi
+
+        # If not empty, stop — parent dirs won't be empty either
+        local contents_str
+        contents_str="$(ls -A "${dir_str}" 2>/dev/null)"
+        if [[ -n "${contents_str}" ]]; then
+            log_debug "cleanup_empty_parents: not empty, stopping at: ${dir_str}"
+            break
+        fi
+
+        # Empty — remove it
+        if [[ "${DRY_RUN:-no}" == "yes" ]]; then
+            log_info "DRY-RUN: would remove empty folder: ${dir_str}"
+            log_debug "DRY-RUN cleanup_empty_parents: ${dir_str}"
+        else
+            if rmdir "${dir_str}" 2>/dev/null; then
+                log_debug "Removed empty folder: ${dir_str}"
+            else
+                log_debug "cleanup_empty_parents: rmdir failed (busy?): ${dir_str}"
+                break
+            fi
+        fi
+
+        # Once we've handled the share root (top mode) there's nowhere left to climb
+        [[ "${dir_str}" == "${share_root_str}" ]] && break
+
+        # Climb one level
+        dir_str="$(dirname "${dir_str}")"
+    done
+}
+
+# Protected share names — never cleaned at top level
+declare -A _CLEANUP_HARD_EXCL=([appdata]=1 [system]=1 [domains]=1 [isos]=1)
+
+# _cleanup_share_ok()
+# Returns 0 if a share is eligible for cleanup:
+#   - not in the hard-exclude list
+#   - has a secondary pool configured in its share config
+_cleanup_share_ok() {
+    local share_str="$1"
+    [[ -n "${_CLEANUP_HARD_EXCL[${share_str}]+x}" ]] && return 1
+    local cfg_str="${SHARE_CFG_DIR}/${share_str}.cfg"
+    [[ -f "${cfg_str}" ]] || return 1
+    local pool2_str
+    pool2_str="$(grep -E '^shareCachePool2=' "${cfg_str}" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs || true)"
+    [[ -n "${pool2_str}" ]]
+}
+
+# _sweep_empty_dirs()
+# Depth-first sweep of all subdirectories under a share root, removing empty
+# ones. The share root itself is only removed when CLEANUP=top.
+# ZFS sub-datasets are only destroyed when CLEANUP_ZFS_DATASETS=yes.
+# Protections: .placeholder, ZFS mountpoints, dry-run.
+#
+# Args:
+#   $1  share_root_str — absolute path of the share root to sweep
+_sweep_empty_dirs() {
+    local share_root_str="${1%/}"
+    [[ -d "${share_root_str}" ]] || return
+
+    # Process deepest directories first so parents become empty after children
+    while IFS= read -r dir_str; do
+        [[ -d "${dir_str}" ]] || continue
+
+        # Share root: only remove when CLEANUP=top
+        if [[ "${dir_str}" == "${share_root_str}" ]]; then
+            [[ "${CLEANUP:-no}" == "top" ]] || continue
+        fi
+
+        # .placeholder protection
+        if [[ -f "${dir_str}/.placeholder" ]]; then
+            log_debug "_sweep_empty_dirs: skipping (has .placeholder): ${dir_str}"
+            continue
+        fi
+
+        # ZFS mountpoint protection
+        if is_zfs_mountpoint "${dir_str}"; then
+            log_debug "_sweep_empty_dirs: skipping ZFS mountpoint: ${dir_str}"
+            continue
+        fi
+
+        # Only act if empty
+        local contents_str
+        contents_str="$(ls -A "${dir_str}" 2>/dev/null)"
+        [[ -n "${contents_str}" ]] && continue
+
+        safe_rmdir "${dir_str}"
+
+    done < <(find "${share_root_str}" -mindepth 1 -type d | sort -r)
+
+    # Optionally remove the share root itself when CLEANUP=top
+    if [[ "${CLEANUP:-no}" == "top" && -d "${share_root_str}" ]]; then
+        if [[ -z "$(ls -A "${share_root_str}" 2>/dev/null)" && ! -f "${share_root_str}/.placeholder" ]]; then
+            if ! is_zfs_mountpoint "${share_root_str}"; then
+                safe_rmdir "${share_root_str}"
+            fi
+        fi
+    fi
+
+    # Handle empty ZFS sub-datasets — only when CLEANUP_ZFS_DATASETS=yes
+    if [[ "${CLEANUP_ZFS_DATASETS:-no}" == "yes" ]] && command -v zfs > /dev/null 2>&1; then
+        while IFS=$'\t' read -r ds_str mp_str; do
+            # Skip the share root dataset itself unless CLEANUP=top
+            if [[ "${mp_str%/}" == "${share_root_str}" ]]; then
+                [[ "${CLEANUP:-no}" == "top" ]] || continue
+            fi
+            [[ -d "${mp_str}" ]] || continue
+            [[ -f "${mp_str}/.placeholder" ]] && continue
+            local contents_str
+            contents_str="$(ls -A "${mp_str}" 2>/dev/null)"
+            [[ -n "${contents_str}" ]] && continue
+            safe_zfs_destroy "${ds_str}"
+        done < <(zfs list -H -o name,mountpoint 2>/dev/null \
+                    | awk -v mp="${share_root_str}/" '$2 ~ "^"mp')
+    fi
 }
 
 # ==========================================================
@@ -1202,18 +1371,21 @@ for cfg_file_str in "${SHARE_CFG_DIR}"/*.cfg; do
         if [[ "${DRY_RUN:-no}" == "yes" ]]; then
             echo "${srcfile_str} -> ${dstfile_str}" >> "${FILES_MOVED_LOG}"
             log_debug "DRY-RUN logged: ${srcfile_str} → ${dstfile_str}"
+            # Per-file parent cleanup — only when CLEANUP is enabled (dry-run = log only)
+            [[ "${CLEANUP:-no}" != "no" ]] && cleanup_empty_parents "${srcfile_str}" "${src_str}"
         else
             if [[ -f "${dstfile_str}" ]]; then
                 (( file_count_moved_int++ )) || true
                 echo "${srcfile_str} -> ${dstfile_str}" >> "${FILES_MOVED_LOG}"
                 log_debug "Moved: ${srcfile_str} → ${dstfile_str}"
+                # Per-file parent cleanup — only when CLEANUP is enabled
+                [[ "${CLEANUP:-no}" != "no" ]] && cleanup_empty_parents "${srcfile_str}" "${src_str}"
             else
                 log_warn "File not found at destination after rsync: ${dstfile_str}"
             fi
         fi
 
-        # Check for stop request after each file — rsync already finished so
-        # the current file is safe. Break out to let cleanup run normally.
+        # Check for stop request after each file
         if [[ "${_stop_requested_bool}" == true ]]; then
             log_debug "Stop flag detected after file move — breaking move loop"
             stop_triggered_bool=true
@@ -1252,7 +1424,7 @@ if [[ "${pre_move_done_str}" != "yes" && "${moved_anything_bool}" == false ]]; t
     log_info "No shares had files to move"
     log_debug "No eligible files found across all shares"
     [[ "${FORCE_TURBO_WRITE:-no}" == "yes" ]] && log_info "No files moved — skipping enabling reconstructive write (turbo write)"
-    [[ -n "${STOP_CONTAINERS:-}" ]]                    && log_info "No files moved — skipping stopping of containers"
+    [[ -n "${STOP_CONTAINERS:-}" ]]                         && log_info "No files moved — skipping stopping of containers"
     [[ "${QBITTORRENT_MOVE_SCRIPT:-no}" == "yes" ]]         && log_info "No files moved — skipping pausing of qbittorrent torrents"
 fi
 
@@ -1291,129 +1463,71 @@ manage_containers start
 [[ "${DRY_RUN:-no}" != "yes" ]] && log_info "Finished move process"
 
 # ==========================================================
-#  CLEANUP EMPTY FOLDERS (moved sources)
+#  CLEANUP EMPTY FOLDERS
+#  Gated on CLEANUP != no — nothing here runs when CLEANUP=no.
+#
+#  CLEANUP values:
+#    no  — disabled entirely
+#    yes — remove empty subdirectories, never the share root
+#    top — same as yes, but also removes the share root if empty
+#
+#  CLEANUP_ZFS_DATASETS=yes additionally destroys empty ZFS sub-datasets.
+#
+#  Phase 1 — safety-net sweep of share source dirs that had files moved.
+#             Catches anything the per-file cleanup_empty_parents() may have
+#             missed (e.g. stop_triggered fired mid-share).
+#  Phase 2 — full depth-first sweep of every share dir on the pool.
+#
+#  Protections on every directory checked:
+#    - Share root only removed when CLEANUP=top
+#    - Dirs containing a .placeholder file are skipped
+#    - ZFS mountpoints are skipped (unless CLEANUP_ZFS_DATASETS=yes for datasets)
+#    - Protected shares (appdata, system, domains, isos) are skipped
+#    - Shares without a secondary pool configured are skipped
+#    - Dry-run is fully supported (logs only, no deletes)
 # ==========================================================
 current_state_str="${STATE_COMPLETE}"
-log_step "Cleaning up empty folders from moved sources"
-set_status "Cleaning Up"
 
-if [[ "${moved_anything_bool}" == true && -s "${CLEANUP_SOURCES_FILE}" ]]; then
-    while IFS= read -r src_path_str; do
-        [[ -z "${src_path_str}" ]] && continue
-        [[ -d "${src_path_str}" ]] || continue
-        cleanup_share_str="$(basename "${src_path_str}")"
+if [[ "${CLEANUP:-no}" != "no" && "${moved_anything_bool}" == true ]]; then
+    log_step "Cleaning up empty folders (CLEANUP=${CLEANUP:-no})"
+    set_status "Cleaning Up"
 
-        case "${cleanup_share_str}" in
-            appdata|system|domains|isos)
-                log_info "Skipping cleanup for excluded share: ${cleanup_share_str}"
-                log_debug "Cleanup skipped for protected share: ${cleanup_share_str}"
-                continue
-                ;;
-        esac
+    # ── Phase 1: safety-net sweep of moved share sources ─────────────────────
+    if [[ -s "${CLEANUP_SOURCES_FILE}" ]]; then
+        while IFS= read -r src_path_str; do
+            [[ -z "${src_path_str}" || ! -d "${src_path_str}" ]] && continue
+            local_share_str="$(basename "${src_path_str}")"
 
-        # Skip cleanup if share has no secondary pool configured
-        share_cfg_check_str="${SHARE_CFG_DIR}/${cleanup_share_str}.cfg"
-        if [[ -f "${share_cfg_check_str}" ]]; then
-            pool2_check_str="$(grep -E '^shareCachePool2=' "${share_cfg_check_str}" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs || true)"
-            if [[ -z "${pool2_check_str}" ]]; then
-                log_debug "Cleanup skipped for ${cleanup_share_str}: no secondary pool configured"
+            if ! _cleanup_share_ok "${local_share_str}"; then
+                log_debug "Cleanup safety-net: skipping protected/ineligible share: ${local_share_str}"
                 continue
             fi
-        fi
 
-        if [[ "${DRY_RUN:-no}" == "yes" ]]; then
-            find "${src_path_str}" -mindepth 1 -depth -type d -empty | while IFS= read -r dir_str; do
-                safe_rmdir "${dir_str}"
-            done
-        else
-            log_debug "Removing empty dirs under: ${src_path_str}"
-            find "${src_path_str}" -mindepth 1 -depth -type d -empty -exec rmdir {} \; 2>/dev/null || true
-        fi
+            log_debug "Cleanup safety-net sweep: ${src_path_str}"
+            _sweep_empty_dirs "${src_path_str}"
+        done < <(sort -u "${CLEANUP_SOURCES_FILE}")
+        log_debug "Cleanup safety-net pass complete"
+    fi
 
-        if command -v zfs > /dev/null 2>&1; then
-            mapfile -t datasets_arr < <(zfs list -H -o name,mountpoint 2>/dev/null \
-                | awk -v mp="${src_path_str}" '$2~"^"mp{print $1}')
-            for ds_str in "${datasets_arr[@]}"; do
-                mountpoint_str="$(zfs get -H -o value mountpoint "${ds_str}" 2>/dev/null)"
-                if [[ -d "${mountpoint_str}" && -z "$(ls -A "${mountpoint_str}" 2>/dev/null)" ]]; then
-                    safe_zfs_destroy "${ds_str}"
-                fi
-            done
-        fi
-    done < <(sort -u "${CLEANUP_SOURCES_FILE}")
-    log_debug "Cleanup from moved sources complete"
-else
-    log_debug "No cleanup needed (moved_anything=${moved_anything_bool})"
-fi
-
-# ==========================================================
-#  POOL-WIDE CLEANUP (CLEANUP=yes)
-# ==========================================================
-if [[ "${CLEANUP:-no}" == "yes" && "${moved_anything_bool}" == true ]]; then
-    log_step "Pool-wide cleanup (CLEANUP=yes)"
-    set_status "Cleaning Up"
-    pool_path_str="/mnt/${POOL_NAME:-cache}"
+    # ── Phase 2: full pool-wide sweep ─────────────────────────────────────────
+    local_pool_path_str="/mnt/${POOL_NAME:-cache}"
 
     if guard_pool_path "${POOL_NAME:-cache}"; then
-        declare -A hard_excl_arr=(
-            ["$(printf '%s' "${pool_path_str}/appdata")"]=1
-            ["$(printf '%s' "${pool_path_str}/system")"]=1
-            ["$(printf '%s' "${pool_path_str}/domains")"]=1
-            ["$(printf '%s' "${pool_path_str}/isos")"]=1
-        )
-
-        is_excluded() {
-            local d_str="${1%/}"
-            local ex_str
-            for ex_str in "${!hard_excl_arr[@]}"; do
-                if [[ "${d_str}" == "${ex_str}" || "${d_str}" == "${ex_str}/"* ]]; then
-                    return 0
-                fi
-            done
-            return 1
-        }
-
-        # Scan only top-level share directories on the pool rather than the
-        # entire pool tree — avoids a slow full-pool find on large pools.
-        for share_dir_str in "${pool_path_str}"/*/; do
+        for share_dir_str in "${local_pool_path_str}"/*/; do
             [[ -d "${share_dir_str}" ]] || continue
             share_dir_str="${share_dir_str%/}"
-            is_excluded "${share_dir_str}" && continue
+            local_share_name_str="$(basename "${share_dir_str}")"
 
-            # Skip cleanup if share has no secondary pool configured
-            share_name_check_str="$(basename "${share_dir_str}")"
-            share_cfg_check_str="${SHARE_CFG_DIR}/${share_name_check_str}.cfg"
-            if [[ -f "${share_cfg_check_str}" ]]; then
-                pool2_check_str="$(grep -E '^shareCachePool2=' "${share_cfg_check_str}" | cut -d'=' -f2- | tr -d '"' | tr -d '\r' | xargs || true)"
-                if [[ -z "${pool2_check_str}" ]]; then
-                    log_debug "Pool-wide cleanup skipped for ${share_name_check_str}: no secondary pool configured"
-                    continue
-                fi
+            if ! _cleanup_share_ok "${local_share_name_str}"; then
+                log_debug "Pool-wide cleanup: skipping protected/ineligible share: ${local_share_name_str}"
+                continue
             fi
 
-            log_debug "Pool-wide cleanup scanning: ${share_dir_str}"
-            if [[ "${DRY_RUN:-no}" == "yes" ]]; then
-                find "${share_dir_str}" -mindepth 1 -depth -type d -empty | while IFS= read -r dir_str; do
-                    safe_rmdir "${dir_str}"
-                done
-            else
-                find "${share_dir_str}" -mindepth 1 -depth -type d -empty -exec rmdir {} \; 2>/dev/null || true
-            fi
+            log_debug "Pool-wide cleanup sweep: ${share_dir_str}"
+            _sweep_empty_dirs "${share_dir_str}"
         done
-
-        if command -v zfs > /dev/null 2>&1; then
-            mapfile -t datasets_arr < <(zfs list -H -o name,mountpoint 2>/dev/null \
-                | awk -v mp="${pool_path_str}" '$2~"^"mp{print $1}')
-            for ds_str in "${datasets_arr[@]}"; do
-                mountpoint_str="$(zfs get -H -o value mountpoint "${ds_str}" 2>/dev/null)"
-                is_excluded "${mountpoint_str}" && continue
-                if [[ -d "${mountpoint_str}" && -z "$(ls -A "${mountpoint_str}" 2>/dev/null)" ]]; then
-                    safe_zfs_destroy "${ds_str}"
-                fi
-            done
-        fi
-        log_info "Cleanup of empty folders/datasets finished"
-        log_debug "Pool-wide cleanup complete: ${pool_path_str}"
+        log_info "Cleanup of empty folders finished"
+        log_debug "Pool-wide cleanup complete: ${local_pool_path_str}"
     else
         log_error "Cleanup aborted by pool guard: ${POOL_NAME:-cache}"
     fi
@@ -1544,7 +1658,7 @@ fi
 # ==========================================================
 #  POST-MOVE SHARE CONFIG CLEANUP
 # ==========================================================
-if [[ "${moved_anything_bool}" == true && "${CLEANUP:-no}" == "yes" ]]; then
+if [[ "${moved_anything_bool}" == true && "${CLEANUP:-no}" != "no" ]]; then
     set_status "Checking Share Existence"
     log_debug "Checking share config existence post-move"
     while IFS= read -r cleanup_share_str; do

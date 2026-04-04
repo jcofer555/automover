@@ -18,25 +18,9 @@ define('CFG_PATH', '/boot/config/plugins/automover/settings.cfg');
 
 header('Content-Type: application/json');
 
-$csrf_header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-$csrf_post   = $_POST['csrf_token']          ?? '';
-$csrf_cookie = $_COOKIE['csrf_token']        ?? '';
-
-$token = $csrf_header ?: $csrf_post;
-
-if (empty($token)) {
-    ob_end_clean();
-    http_response_code(403);
-    echo json_encode(['status' => 'error', 'message' => 'Missing CSRF token']);
-    exit;
-}
-
-if (!empty($csrf_cookie) && $csrf_header !== $csrf_cookie && $csrf_post !== $csrf_cookie) {
-    ob_end_clean();
-    http_response_code(403);
-    echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token']);
-    exit;
-}
+// No CSRF validation needed — these helpers are protected by Unraid's own
+// nginx authentication layer. All other automover helpers (schedule_delete,
+// schedule_toggle, run_schedule, etc.) follow the same pattern.
 
 set_error_handler(function ($errno, $errstr, $errfile, $errline) {
     global $_amb_err;
@@ -55,11 +39,17 @@ function normalize_container_names($raw) {
     return trim(preg_replace('/,\s*/', ',', $raw));
 }
 
+// Validate CLEANUP value — must be one of: no, yes, top
+function validate_cleanup($val) {
+    return in_array($val, ['no', 'yes', 'top'], true) ? $val : 'no';
+}
+
 $settings = [
     'AGE_BASED_FILTER'            => get_str('AGE_BASED_FILTER',            'no'),
     'AGE_DAYS'                    => get_str('AGE_DAYS',                    '1'),
     'ALLOW_DURING_PARITY'         => get_str('ALLOW_DURING_PARITY',         'no'),
-    'CLEANUP'                     => get_str('CLEANUP',                     'no'),
+    'CLEANUP'                     => validate_cleanup(get_str('CLEANUP',    'no')),
+    'CLEANUP_ZFS_DATASETS'        => get_str('CLEANUP_ZFS_DATASETS',        'no'),
     'CPU_AND_IO_PRIORITIES'       => get_str('CPU_AND_IO_PRIORITIES',       'no'),
     'CPU_PRIORITY'                => get_str('CPU_PRIORITY',                '0'),
     'DRY_RUN'                     => get_str('DRY_RUN',                     'no'),

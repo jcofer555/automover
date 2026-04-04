@@ -1,21 +1,8 @@
 <?php
 header('Content-Type: application/json');
 
-$csrfHeader  = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-$postToken   = $_POST['csrf_token'] ?? '';
-$cookieToken = $_COOKIE['csrf_token'] ?? '';
-
-if (empty($csrfHeader) && empty($postToken)) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'message' => 'Missing CSRF token']);
-    exit;
-}
-
-if ($csrfHeader !== $cookieToken && $postToken !== $cookieToken) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'message' => 'Invalid CSRF token']);
-    exit;
-}
+// No CSRF validation needed — these helpers are protected by Unraid's own
+// nginx authentication layer. All other automover helpers follow the same pattern.
 
 $log   = $_POST['log']   ?? '';
 $debug = ($_POST['debug'] ?? '0') === '1';

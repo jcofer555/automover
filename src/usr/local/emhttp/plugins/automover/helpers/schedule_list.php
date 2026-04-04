@@ -8,6 +8,15 @@ function yes_no(string $value): string {
     return ($v === 'yes' || $v === '1' || $v === 'true') ? 'Yes' : 'No';
 }
 
+// Display value for the CLEANUP three-state field
+function cleanup_label(string $value): string {
+    switch (strtolower($value)) {
+        case 'yes': return 'Yes';
+        case 'top': return 'Top';
+        default:    return 'No';
+    }
+}
+
 function human_cron(string $cron): string {
     $cron  = trim($cron);
     $parts = preg_split('/\s+/', $cron);
@@ -64,6 +73,8 @@ if (empty($schedules)) return;
   <col style="width:45px">
   <col style="width:45px">
   <col style="width:55px">
+  <col style="width:55px">
+  <col style="width:55px">
   <col style="width:220px">
 </colgroup>
 <thead>
@@ -78,6 +89,8 @@ if (empty($schedules)) return;
   <th>Size</th>
   <th>Excl</th>
   <th>Hidden</th>
+  <th>Clean Folders</th>
+  <th>Clean ZFS</th>
   <th>Actions</th>
 </tr>
 </thead>
@@ -96,7 +109,6 @@ if (empty($schedules)) return;
     }
     $pool        = $settings['POOL_NAME']            ?? '—';
     $thresh      = isset($settings['THRESHOLD'])      ? $settings['THRESHOLD'].'%'      : '—';
-    // Show — only when key is missing entirely, not when value is 0
     $stopThreshRaw = $settings['STOP_THRESHOLD'] ?? null;
     $stopThresh    = $stopThreshRaw !== null ? $stopThreshRaw.'%' : '—';
     $dryRun      = isset($settings['DRY_RUN'])             ? yes_no($settings['DRY_RUN'])             : '—';
@@ -105,6 +117,8 @@ if (empty($schedules)) return;
     $size        = isset($settings['SIZE_BASED_FILTER'])    ? yes_no($settings['SIZE_BASED_FILTER'])    : '—';
     $excl        = isset($settings['EXCLUSIONS'])   ? yes_no($settings['EXCLUSIONS'])   : '—';
     $hidden      = isset($settings['HIDDEN_FILTER'])        ? yes_no($settings['HIDDEN_FILTER'])        : '—';
+    $cleanFolders = isset($settings['CLEANUP'])             ? cleanup_label($settings['CLEANUP'])       : '—';
+    $cleanZfs     = isset($settings['CLEANUP_ZFS_DATASETS']) ? yes_no($settings['CLEANUP_ZFS_DATASETS']) : '—';
     $id_esc      = htmlspecialchars($id);
     $humanCron   = human_cron($cron);
     $tipText     = htmlspecialchars($humanCron . ' — ' . $cron);
@@ -125,6 +139,8 @@ if (empty($schedules)) return;
   <td><?= htmlspecialchars($size) ?></td>
   <td><?= htmlspecialchars($excl) ?></td>
   <td><?= htmlspecialchars($hidden) ?></td>
+  <td><?= htmlspecialchars($cleanFolders) ?></td>
+  <td><?= htmlspecialchars($cleanZfs) ?></td>
   <td>
     <div class="sched-actions">
       <button type="button" data-tipster="Edit this schedule" data-action="edit" data-id="<?= $id_esc ?>">Edit</button>

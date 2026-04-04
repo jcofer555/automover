@@ -9,16 +9,12 @@ Markdown="false"
 const CFG_PATH = '/boot/config/plugins/automover/settings.cfg';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-const STALE_KEYS = ['CRON_EXPRESSION','CRON_MODE','DAILY_TIME','DAILY_MINUTE',
-    'HOURLY_FREQUENCY','MONTHLY_DAY','MONTHLY_MINUTE','MONTHLY_TIME','PROCESS_PRIORITY','MANUAL_MOVE',
-    'WEEKLY_DAY','WEEKLY_MINUTE','WEEKLY_TIME','ENABLE_CLEANUP','ENABLE_JDUPES','ENABLE_NOTIFICATIONS','ENABLE_SCRIPTS',
-    'ENABLE_TRIM','EXCLUSIONS_ENABLED','AUTOSTART','AUTOSTART_ON_BOOT','CONTAINER_NAMES','FORCE_RECONSTRUCTIVE_WRITE','HASH_PATH','SIZE_MB','PRIORITIES','QBITTORRENT_SCRIPT'];
-
 $defaults = [
     'AGE_BASED_FILTER'       => 'no',
     'AGE_DAYS'               => 1,
     'ALLOW_DURING_PARITY'    => 'no',
     'CLEANUP'                => 'no',
+    'CLEANUP_ZFS_DATASETS'   => 'no',
     'CPU_AND_IO_PRIORITIES'  => 'no',
     'CPU_PRIORITY'           => '0',
     'DRY_RUN'                => 'no',
@@ -57,9 +53,9 @@ $defaults = [
     'WEBHOOK_SLACK'          => '',
 ];
 $existing = file_exists(CFG_PATH) ? (parse_ini_file(CFG_PATH) ?: []) : [];
-foreach (STALE_KEYS as $sk) { unset($existing[$sk]); }
+$existing = array_intersect_key($existing, $defaults);
 foreach ($defaults as $k=>$v) { if (!array_key_exists($k,$existing)) $existing[$k]=$v; }
-$write = []; foreach ($defaults as $k=>$dv) { $write[$k] = $existing[$k]; }
+$write = $existing;
 ksort($write);
 $cfg=''; foreach ($write as $k=>$v) { $cfg.="$k=\"{$v}\"\n"; }
 @file_put_contents(CFG_PATH,$cfg);
@@ -79,34 +75,20 @@ $sel_svcs=array_filter(array_map('trim',explode(',',$settings['NOTIFICATION_SERV
 $sharesFile='/var/local/emhttp/shares.ini'; $curHash=$settings['HASH_LOCATION']??'/mnt/user/appdata'; $sharesList=[];
 if (file_exists($sharesFile)){$sh=parse_ini_file($sharesFile,true);if($sh)$sharesList=array_keys($sh);}
 if (empty($sharesList)) $sharesList=['appdata','system','domains','isos'];
+$cleanupVal    = $settings['CLEANUP']              ?? 'no';
+$cleanupZfsVal = $settings['CLEANUP_ZFS_DATASETS'] ?? 'no';
 ?>
 <script>
 'use strict';
-const A_H='/plugins/automover/helpers',A_F=1000,A_S=1000;
-let csrf = '';
-
-try {
-  if (typeof parent !== 'undefined' && parent.csrf_token) {
-    csrf = parent.csrf_token;
-  }
-  if (!csrf && typeof csrf_token !== 'undefined' && csrf_token) {
-    csrf = csrf_token;
-  }
-  if (!csrf && document.cookie) {
-    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    if (m && m[1]) csrf = decodeURIComponent(m[1]);
-  }
-  if (!csrf) {
-    const meta = document.querySelector("meta[name='csrf_token']");
-    if (meta) csrf = meta.getAttribute('content') || '';
-  }
-} catch(e) {}
-
-if (!csrf) {
-  csrf = "<?= htmlspecialchars($_SESSION['csrf_token'] ?? $_GET['csrf_token'] ?? $_COOKIE['csrf_token'] ?? '', ENT_QUOTES) ?>";
+// CSRF token rendered directly from Unraid's $var array (injected into .page files)
+var csrf = "<?= htmlspecialchars($var['csrf_token'] ?? '', ENT_QUOTES) ?>";
+// Fallback: try the parent iframe's csrf_token (Unraid WebGUI exposes this)
+if (!csrf && typeof parent !== 'undefined') {
+  try { csrf = parent.csrf_token || ''; } catch(e) {}
 }
-const WH_SAVED={DISCORD:"<?=htmlspecialchars($settings['WEBHOOK_DISCORD']??'')?>",GOTIFY:"<?=htmlspecialchars($settings['WEBHOOK_GOTIFY']??'')?>",NTFY:"<?=htmlspecialchars($settings['WEBHOOK_NTFY']??'')?>",PUSHOVER:"<?=htmlspecialchars($settings['WEBHOOK_PUSHOVER']??'')?>",SLACK:"<?=htmlspecialchars($settings['WEBHOOK_SLACK']??'')?>"};
-const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
+var A_H='/plugins/automover/helpers',A_F=1000,A_S=1000;
+var WH_SAVED={DISCORD:"<?=htmlspecialchars($settings['WEBHOOK_DISCORD']??'')?>",GOTIFY:"<?=htmlspecialchars($settings['WEBHOOK_GOTIFY']??'')?>",NTFY:"<?=htmlspecialchars($settings['WEBHOOK_NTFY']??'')?>",PUSHOVER:"<?=htmlspecialchars($settings['WEBHOOK_PUSHOVER']??'')?>",SLACK:"<?=htmlspecialchars($settings['WEBHOOK_SLACK']??'')?>"};
+var PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
 </script>
 <link rel="stylesheet" href="/plugins/automover/automover.css">
 
@@ -335,6 +317,29 @@ const PO_SAVED="<?=htmlspecialchars($settings['PUSHOVER_USER_KEY']??'')?>";
   <div id="apyw" data-py="<?=file_exists('/usr/bin/python3')?'1':'0'?>" style="display:none;color:var(--er);font-size:11px;margin-bottom:6px;">&#9888; Python3 not installed &mdash; required for Qbit Script</div>
 </div>
 
+<div class="asec" style="margin-top:8px;">Cleanup</div>
+
+<div class="af">
+  <span class="afl" data-tip="Remove empty folders after moving. No = disabled. Yes = remove all empty subdirectories. Top Folder = also remove the top-level share folder if empty.">Clean Empty Folders:</span>
+  <div class="afi">
+    <select id="acln">
+      <option value="no"  <?=$cleanupVal==='no' ?'selected':''?>>No</option>
+      <option value="yes" <?=$cleanupVal==='yes'?'selected':''?>>Yes</option>
+      <option value="top" <?=$cleanupVal==='top'?'selected':''?>>Top Folder</option>
+    </select>
+  </div>
+</div>
+
+<div class="af">
+  <span class="afl" data-tip="Remove empty ZFS datasets after moving. Only applies when using ZFS pools.">Clean Empty ZFS Datasets:</span>
+  <div class="afi">
+    <select id="aclnzfs">
+      <option value="no"  <?=$cleanupZfsVal==='no' ?'selected':''?>>No</option>
+      <option value="yes" <?=$cleanupZfsVal==='yes'?'selected':''?>>Yes</option>
+    </select>
+  </div>
+</div>
+
 <div class="asec" style="margin-top:8px;">Options</div>
 <div class="aog">
 <?php
@@ -352,7 +357,6 @@ $opts=[
   'ascp'=>['PRE_AND_POST_SCRIPTS',          'Pre &amp; Post Scripts',            'Run a script at session start and end'],
   'ajdp'=>['JDUPES',           'Jdupes',                      'Run jdupes fix-hardlinks on shares after moving'],
   'aqbt'=>['QBITTORRENT_MOVE_SCRIPT',      'Qbittorrent Move Script',     'Pause qBittorrent torrents before moving'],
-  'acln'=>['CLEANUP',          'Cleanup',                     'Remove empty folders from the selected pool'],
   'asac'=>['STOP_ALL_CONTAINERS',     'Stop All Containers',         'Stop all running containers during moves'],
 ];
 foreach($opts as $id=>$info): ?>
@@ -402,11 +406,11 @@ foreach($opts as $id=>$info): ?>
       <span class="asc" id="algc"></span>
     </div>
     <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-top:1px solid var(--br);margin-left:-12px;">
-      <span class="atst" id="algt"></span>
       <button type="button" id="algcl" data-tipster="Clear activity log">Clear</button>
       <button type="button" id="algcp" data-tipster="Copy log to clipboard">Copy</button>
       <button type="button" id="algtp" data-tipster="Scroll to top">&#8679;</button>
-      <button type="button" id="algbt" data-tipster="Auto-scroll to bottom (toggles)" style="margin-right:-10px;">&#8681;</button>
+      <button type="button" id="algbt" data-tipster="Auto-scroll to bottom (toggles)">&#8681;</button>
+      <span class="atst" id="algt" style="margin-left:-3px;"></span>
     </div>
   </div>
   <pre class="alp" id="algl">Automover log not found</pre>
