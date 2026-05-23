@@ -5,6 +5,5 @@
     "icon": "icon.png",
     "support": "https://forums.unraid.net/topic/192216-automover-for-unraid/",
     "min": "7.1.99",
-    "max": "7.3.0",    
     "launch": "Settings/Automover"
 }
